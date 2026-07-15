@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+
 import { mutation, query } from "./_generated/server";
 import { assertBridgeSecret } from "./lib/bridge";
 
@@ -62,13 +63,12 @@ export const replaceWindow = mutation({
       .collect();
 
     for (const row of existing) {
-      await ctx.db.delete(row._id);
+      await ctx.db.delete("messages", row._id);
     }
 
     const toInsert = args.messages.slice(-keep);
-    let baseTime = Date.now();
-    for (let i = 0; i < toInsert.length; i += 1) {
-      const msg = toInsert[i]!;
+    const baseTime = Date.now();
+    for (const [i, msg] of toInsert.entries()) {
       await ctx.db.insert("messages", {
         spaceId: args.spaceId,
         role: msg.role,
@@ -94,10 +94,9 @@ export const appendMany = mutation({
     assertBridgeSecret(args.secret);
 
     const keep = Math.max(1, Math.min(args.keep, 100));
-    let baseTime = Date.now();
+    const baseTime = Date.now();
 
-    for (let i = 0; i < args.messages.length; i += 1) {
-      const msg = args.messages[i]!;
+    for (const [i, msg] of args.messages.entries()) {
       await ctx.db.insert("messages", {
         spaceId: args.spaceId,
         role: msg.role,
@@ -117,7 +116,7 @@ export const appendMany = mutation({
     if (overflow > 0) {
       for (let i = 0; i < overflow; i += 1) {
         const row = all[i];
-        if (row) await ctx.db.delete(row._id);
+        if (row) await ctx.db.delete("messages", row._id);
       }
     }
 

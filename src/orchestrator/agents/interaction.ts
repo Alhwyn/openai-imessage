@@ -11,13 +11,18 @@ import {
   setHistory,
 } from "../memory/index";
 import { interactionSystemPrompt } from "../prompts/index";
-import type { InteractionEvent, InteractionResult } from "../types/index";
 import { assertGmiApiKey, getGmiTemperature, model } from "../utils/index";
 
-export type { InteractionEvent, InteractionResult };
+import type { InteractionEvent, InteractionResult } from "./types";
 
 const spaceLocks = new Map<string, Promise<void>>();
 
+/**
+ * Runs a function after earlier work for the same space has completed.
+ * @param spaceId - The space ID.
+ * @param fn - The function to run with the space lock.
+ * @returns The function result.
+ */
 const withSpaceLock = async <T>(spaceId: string, fn: () => Promise<T>): Promise<T> => {
   const previous = spaceLocks.get(spaceId) ?? Promise.resolve();
   let release!: () => void;
@@ -37,6 +42,11 @@ const withSpaceLock = async <T>(spaceId: string, fn: () => Promise<T>): Promise<
   }
 };
 
+/**
+ * Formats an event message.
+ * @param event - The event to format.
+ * @returns The formatted event message.
+ */
 const formatEventMessage = (event: InteractionEvent): string => {
   switch (event.kind) {
     case "user_message":
@@ -50,6 +60,12 @@ const formatEventMessage = (event: InteractionEvent): string => {
   }
 };
 
+/**
+ * Runs an interaction turn without acquiring the per-space lock.
+ * @param spaceId - The space ID.
+ * @param event - The event to run the interaction agent for.
+ * @returns The interaction result.
+ */
 const runInteractionAgentUnlocked = async (
   spaceId: string,
   event: InteractionEvent,
@@ -76,7 +92,7 @@ const runInteractionAgentUnlocked = async (
         inputSchema: z.object({
           task: z.string().describe("Clear task instructions for the worker"),
         }),
-        execute: async ({ task }) => {
+        execute: ({ task }) => {
           const { taskId, status } = assignTask({ spaceId, task });
           return { taskId, status };
         },
@@ -86,7 +102,7 @@ const runInteractionAgentUnlocked = async (
         inputSchema: z.object({
           message: z.string().describe("Text to send to the person"),
         }),
-        execute: async ({ message }) => {
+        execute: ({ message }) => {
           const trimmed = message.trim();
           if (trimmed) replies.push(trimmed);
           return { ok: true, queued: Boolean(trimmed) };
@@ -144,6 +160,12 @@ const runInteractionAgentUnlocked = async (
   return { replies, messages: await getHistory(spaceId) };
 };
 
+/**
+ * Serializes and runs an interaction turn for a space.
+ * @param spaceId - The space ID.
+ * @param event - The event to run the interaction agent for.
+ * @returns The interaction result.
+ */
 export const runInteractionAgent = async (
   spaceId: string,
   event: InteractionEvent,

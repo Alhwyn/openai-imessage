@@ -1,4 +1,3 @@
-import type { Message, Space } from "@spectrum-ts/core";
 import type { ModelMessage } from "ai";
 
 export type InteractionEvent =
@@ -8,11 +7,4 @@ export type InteractionEvent =
 export type InteractionResult = {
   replies: string[];
   messages: ModelMessage[];
-};
-
-export type OrchestratorTurn = {
-  texts: string[];
-  space: Space;
-  message: Message;
-  senderKey?: string;
 };

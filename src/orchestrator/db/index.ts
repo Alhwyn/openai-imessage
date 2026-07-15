@@ -2,15 +2,10 @@ export { assertConvexEnv, getBridgeSecret, getConvexClient, getConvexUrl } from 
 export {
   applyMemoryEdit,
   getMemoriesForSpace,
-  type CuratedMemories,
-  type MemoryEditAction,
-  type MemoryEditResult,
-  type MemoryKind,
 } from "./memories";
 export {
   appendMessages,
   listRecentMessages,
   replaceMessageWindow,
-  type MessageInput,
-  type StoredMessage,
 } from "./messages";
+export type { MemoryEditResult, MessageInput, StoredMessage } from "./types";

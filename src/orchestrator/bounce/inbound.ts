@@ -1,11 +1,14 @@
-import type { Message, Space } from "@spectrum-ts/core";
 
 import { runInteractionAgent } from "../agents/index";
 import { registerSpace } from "../handoff/index";
-import type { OrchestratorTurn } from "../types/index";
 import { createKeyedDebounce, deliverReplies } from "../utils/index";
 
-export type { OrchestratorTurn };
+import type {
+  BuildDebouncedTurnInput,
+  OrchestratorTurn,
+  ScheduleOrchestratorTurnInput,
+} from "./types";
+import type { Space } from "@spectrum-ts/core";
 
 const DEFAULT_DEBOUNCE_MS = 1_500;
 
@@ -22,9 +25,15 @@ const getDebounceKey = (space: Space, senderKey?: string) => {
   return senderKey?.trim() || space.id;
 };
 
+/**
+ * Builds a debounced turn.
+ * @param existing - The existing orchestrator turn.
+ * @param input - The input to build a debounced turn.
+ * @returns A turn containing the accumulated inbound texts and latest message.
+ */
 export const buildDebouncedTurn = (
   existing: OrchestratorTurn | undefined,
-  input: { text: string; space: Space; message: Message; senderKey?: string },
+  input: BuildDebouncedTurnInput,
 ): OrchestratorTurn => {
   return {
     texts: [...(existing?.texts ?? []), input.text],
@@ -36,6 +45,12 @@ export const buildDebouncedTurn = (
 
 const pendingTurns = new Map<string, OrchestratorTurn>();
 
+/**
+ * Flushes an orchestrator turn.
+ * @param key - The key of the orchestrator turn.
+ * @param turn - The orchestrator turn to flush.
+ * @returns Nothing after the turn has been processed.
+ */
 const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   pendingTurns.delete(key);
 
@@ -70,17 +85,17 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   });
 };
 
+/** Debounces pending turns and flushes the latest value for each key. */
 const debounce = createKeyedDebounce<OrchestratorTurn>({
   delayMs: getOrchestratorDebounceMs,
   onFlush: flushOrchestratorTurn,
 });
 
-export const scheduleOrchestratorTurn = (input: {
-  space: Space;
-  message: Message;
-  text: string;
-  senderKey?: string;
-}): void => {
+/**
+ * Schedules an orchestrator turn.
+ * @param input - The input to schedule an orchestrator turn.
+ */
+export const scheduleOrchestratorTurn = (input: ScheduleOrchestratorTurnInput): void => {
   const key = getDebounceKey(input.space, input.senderKey);
   registerSpace(input.space.id, input.space);
 

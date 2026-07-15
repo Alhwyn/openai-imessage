@@ -1,24 +1,16 @@
-type KeyedDebounceOptions<T> = {
-  delayMs: number | (() => number);
-  onFlush: (key: string, value: T) => void | Promise<void>;
-};
+import type { KeyedDebounce, KeyedDebounceOptions } from "./types";
 
-type KeyedDebounce<T> = {
-  schedule: (key: string, value: T) => void;
-  flush: (key: string) => Promise<void>;
-  cancel: (key: string) => void;
-  cancelAll: () => void;
-};
-
-const resolveDelayMs = (delayMs: number | (() => number)) => {
-  return typeof delayMs === "function" ? delayMs() : delayMs;
-};
-
+/**
+ * Creates a keyed debounce.
+ * @param options - The options for the keyed debounce.
+ * @returns The keyed debounce.
+ */
 export const createKeyedDebounce = <T>(
   options: KeyedDebounceOptions<T>,
 ): KeyedDebounce<T> => {
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const latestValues = new Map<string, T>();
+  const flushQueues = new Map<string, Promise<void>>();
 
   const cancel = (key: string) => {
     const timer = pendingTimers.get(key);
@@ -48,6 +40,25 @@ export const createKeyedDebounce = <T>(
     }
   };
 
+  const enqueueFlush = (key: string, value: T): Promise<void> => {
+    const previous = flushQueues.get(key) ?? Promise.resolve();
+    const current = previous.then(() => runFlush(key, value));
+    flushQueues.set(key, current);
+
+    void current.then(() => {
+      if (flushQueues.get(key) === current) {
+        flushQueues.delete(key);
+      }
+    });
+
+    return current;
+  };
+
+  /**
+   * Schedules a value to be flushed.
+   * @param key - The key to schedule the value for.
+   * @param value - The value to schedule.
+   */
   const schedule = (key: string, value: T) => {
     latestValues.set(key, value);
 
@@ -62,8 +73,8 @@ export const createKeyedDebounce = <T>(
 
       if (latest === undefined) return;
 
-      void runFlush(key, latest);
-    }, resolveDelayMs(options.delayMs));
+      void enqueueFlush(key, latest);
+    }, typeof options.delayMs === "function" ? options.delayMs() : options.delayMs);
 
     pendingTimers.set(key, timer);
   };
@@ -81,7 +92,7 @@ export const createKeyedDebounce = <T>(
 
     if (latest === undefined) return;
 
-    await runFlush(key, latest);
+    await enqueueFlush(key, latest);
   };
 
   return { schedule, flush, cancel, cancelAll };

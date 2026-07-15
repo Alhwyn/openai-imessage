@@ -4,14 +4,24 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "build": "bun build index.ts --outdir dist --target bun",
+    "check": "bun run lint && bun run typecheck && bun run test && bun run build",
     "start": "bun --hot index.ts",
     "convex:dev": "convex dev",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "bun test",
     "tunnel": "bash scripts/run-tunnel.sh",
     "tunnel:setup": "bash scripts/setup-tunnel.sh",
-    "tunnel:quick": "cloudflared tunnel --url http://127.0.0.1:4001"
+    "tunnel:quick": "cloudflared tunnel --url http://127.0.0.1:4001",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@convex-dev/eslint-plugin": "^2.0.0",
+    "@types/bun": "latest",
+    "eslint": "^9",
+    "eslint-plugin-import": "^2.32.0",
+    "typescript-eslint": "^8.64.0"
   },
   "peerDependencies": {
     "typescript": "^5"

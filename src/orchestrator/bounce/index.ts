@@ -3,4 +3,8 @@ export {
   getOrchestratorDebounceMs,
   scheduleOrchestratorTurn,
 } from "./inbound";
-export type { OrchestratorTurn } from "./inbound";
+export type {
+  BuildDebouncedTurnInput,
+  OrchestratorTurn,
+  ScheduleOrchestratorTurnInput,
+} from "./types";
