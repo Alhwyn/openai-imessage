@@ -1,11 +1,13 @@
-import type { ModelMessage } from "ai";
 import {
   appendMessages,
   listRecentMessages,
   replaceMessageWindow,
   type MessageInput,
 } from "../db/index";
+
 import { MAX_HISTORY_MESSAGES } from "./utils";
+
+import type { ModelMessage } from "ai";
 
 /**
  * Converts a message to a search text.

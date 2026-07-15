@@ -1,13 +1,14 @@
-import type { Space } from "@spectrum-ts/core";
 
 import { runInteractionAgent } from "../agents/index";
 import { registerSpace } from "../handoff/index";
 import { createKeyedDebounce, deliverReplies } from "../utils/index";
+
 import type {
   BuildDebouncedTurnInput,
   OrchestratorTurn,
   ScheduleOrchestratorTurnInput,
 } from "./types";
+import type { Space } from "@spectrum-ts/core";
 
 const DEFAULT_DEBOUNCE_MS = 1_500;
 

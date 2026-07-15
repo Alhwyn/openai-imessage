@@ -1,6 +1,7 @@
 import { api } from "../../../convex/_generated/api";
 
 import { getBridgeSecret, getConvexClient } from "./client";
+
 import type { MessageInput, StoredMessage } from "./types";
 
 /**

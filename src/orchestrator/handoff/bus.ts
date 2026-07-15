@@ -1,13 +1,14 @@
-import type { Space } from "@spectrum-ts/core";
 
 import { runExecutionAgent } from "../agents/execution";
 import { deliverReplies } from "../utils/index";
+
 import type {
   AssignTaskInput,
   AssignTaskResult,
   NotifyOrchestratorInput,
   SpaceHandle,
 } from "./types";
+import type { Space } from "@spectrum-ts/core";
 
 const spaces = new Map<string, SpaceHandle>();
 const inFlight = new Set<string>();

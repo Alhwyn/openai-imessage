@@ -1,8 +1,9 @@
 import { api } from "../../../convex/_generated/api";
 
-import type { CuratedMemories, MemoryEditInput } from "../memory/types";
 import { getBridgeSecret, getConvexClient } from "./client";
+
 import type { MemoryEditResult } from "./types";
+import type { CuratedMemories, MemoryEditInput } from "../memory/types";
 
 export const getMemoriesForSpace = async (spaceId: string): Promise<CuratedMemories> => {
   return await getConvexClient().query(api.memories.getForSpace, {

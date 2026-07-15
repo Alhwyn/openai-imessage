@@ -12,6 +12,7 @@ import {
 } from "../memory/index";
 import { interactionSystemPrompt } from "../prompts/index";
 import { assertGmiApiKey, getGmiTemperature, model } from "../utils/index";
+
 import type { InteractionEvent, InteractionResult } from "./types";
 
 const spaceLocks = new Map<string, Promise<void>>();
@@ -91,7 +92,7 @@ const runInteractionAgentUnlocked = async (
         inputSchema: z.object({
           task: z.string().describe("Clear task instructions for the worker"),
         }),
-        execute: async ({ task }) => {
+        execute: ({ task }) => {
           const { taskId, status } = assignTask({ spaceId, task });
           return { taskId, status };
         },
@@ -101,7 +102,7 @@ const runInteractionAgentUnlocked = async (
         inputSchema: z.object({
           message: z.string().describe("Text to send to the person"),
         }),
-        execute: async ({ message }) => {
+        execute: ({ message }) => {
           const trimmed = message.trim();
           if (trimmed) replies.push(trimmed);
           return { ok: true, queued: Boolean(trimmed) };

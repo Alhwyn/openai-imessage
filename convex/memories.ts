@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+
 import { mutation, query } from "./_generated/server";
 import { assertBridgeSecret, charLimitForKind } from "./lib/bridge";
 
@@ -111,14 +112,14 @@ export const applyEdit = mutation({
       }
       default: {
         const _exhaustive: never = args.action;
-        throw new Error(`Unknown action: ${_exhaustive}`);
+        throw new Error(`Unknown action: ${String(_exhaustive)}`);
       }
     }
 
     const updatedAt = Date.now();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { body: nextBody, updatedAt });
+      await ctx.db.patch("memories", existing._id, { body: nextBody, updatedAt });
     } else {
       await ctx.db.insert("memories", {
         spaceId: args.spaceId,

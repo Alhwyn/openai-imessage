@@ -10,14 +10,14 @@ const stubTools = {
     inputSchema: z.object({
       text: z.string().describe("Text to echo"),
     }),
-    execute: async ({ text }) => ({ echoed: text }),
+    execute: ({ text }) => ({ echoed: text }),
   }),
   search_mock: tool({
     description: "Mock search that returns placeholder results for a query.",
     inputSchema: z.object({
       query: z.string().describe("Search query"),
     }),
-    execute: async ({ query }) => ({
+    execute: ({ query }) => ({
       query,
       results: [
         {

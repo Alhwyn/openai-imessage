@@ -4,7 +4,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["convex/_generated/**", "dist/**", "node_modules/**"],
+    ignores: ["convex/_generated/**", "dist/**", "eslint.config.mjs", "node_modules/**"],
   },
   ...tseslint.configs.recommendedTypeChecked,
   ...convexPlugin.configs.recommended,

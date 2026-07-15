@@ -40,7 +40,7 @@ const senderKeyFrom = (space: Space, message: Message): string | undefined => {
   return space.id;
 };
 
-const handleInbound = async (space: Space, message: Message) => {
+const handleInbound = (space: Space, message: Message): void => {
   if (message.direction === "outbound") {
     return;
   }
@@ -91,7 +91,7 @@ const main = async () => {
 
   for await (const [space, message] of app.messages) {
     try {
-      await handleInbound(space, message);
+      handleInbound(space, message);
     } catch (error) {
       console.error("[app] Failed to handle inbound message", error);
     }

@@ -1,5 +1,6 @@
-import type { Space } from "@spectrum-ts/core";
 import { text } from "@spectrum-ts/core";
+
+import type { Space } from "@spectrum-ts/core";
 
 /**
  * Delivers replies to a space.
