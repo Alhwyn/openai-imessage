@@ -2,6 +2,7 @@ import { Spectrum, type Message, type Space } from "@spectrum-ts/core";
 import { imessage } from "@spectrum-ts/imessage";
 
 import {
+  assertConvexEnv,
   assertGmiApiKey,
   extractInboundText,
   scheduleOrchestratorTurn,
@@ -67,6 +68,7 @@ const handleInbound = async (space: Space, message: Message) => {
 
 const main = async () => {
   assertGmiApiKey();
+  assertConvexEnv();
 
   const { projectId, projectSecret, webhookSecret, missing } = getSpectrumEnv();
   if (missing.length > 0) {

@@ -2,7 +2,14 @@ import { generateText, stepCountIs, tool, type ModelMessage } from "ai";
 import { z } from "zod";
 
 import { assignTask } from "../handoff/index";
-import { appendHistory, getHistory, setHistory } from "../memory/index";
+import {
+  appendHistory,
+  buildSystemPrompt,
+  editMemory,
+  getCuratedMemories,
+  getHistory,
+  setHistory,
+} from "../memory/index";
 import { interactionSystemPrompt } from "../prompts/index";
 import type { InteractionEvent, InteractionResult } from "../types/index";
 import { assertGmiApiKey, getGmiTemperature, model } from "../utils/index";
@@ -50,13 +57,17 @@ const runInteractionAgentUnlocked = async (
   assertGmiApiKey();
 
   const replies: string[] = [];
-  const history = getHistory(spaceId);
+  const [history, memories] = await Promise.all([
+    getHistory(spaceId),
+    getCuratedMemories(spaceId),
+  ]);
   const userContent = formatEventMessage(event);
+  const system = buildSystemPrompt(interactionSystemPrompt, memories);
 
   const result = await generateText({
     model: model(),
     temperature: getGmiTemperature(1),
-    system: interactionSystemPrompt,
+    system,
     messages: [...history, { role: "user", content: userContent }],
     tools: {
       assign_task: tool({
@@ -81,6 +92,39 @@ const runInteractionAgentUnlocked = async (
           return { ok: true, queued: Boolean(trimmed) };
         },
       }),
+      memory: tool({
+        description:
+          "Update persistent memory. Use kind=user for the person's preferences/profile; kind=agent for lasting notes and conventions. Do not store secrets.",
+        inputSchema: z.object({
+          kind: z.enum(["user", "agent"]).describe("Which memory file to edit"),
+          action: z
+            .enum(["add", "replace", "remove"])
+            .describe("add appends; replace/remove match old_text substring"),
+          text: z
+            .string()
+            .optional()
+            .describe("New text for add/replace"),
+          old_text: z
+            .string()
+            .optional()
+            .describe("Substring to find for replace/remove"),
+        }),
+        execute: async ({ kind, action, text, old_text }) => {
+          const updated = await editMemory({
+            spaceId,
+            kind,
+            action,
+            text,
+            oldText: old_text,
+          });
+          return {
+            ok: true,
+            kind: updated.kind,
+            body: updated.body,
+            updatedAt: updated.updatedAt,
+          };
+        },
+      }),
     },
     stopWhen: stepCountIs(10),
   });
@@ -90,14 +134,14 @@ const runInteractionAgentUnlocked = async (
     { role: "user", content: userContent },
     ...result.response.messages,
   ];
-  setHistory(spaceId, nextMessages);
+  await setHistory(spaceId, nextMessages);
 
   if (replies.length === 0 && result.text.trim()) {
     replies.push(result.text.trim());
-    appendHistory(spaceId, { role: "assistant", content: result.text.trim() });
+    await appendHistory(spaceId, { role: "assistant", content: result.text.trim() });
   }
 
-  return { replies, messages: getHistory(spaceId) };
+  return { replies, messages: await getHistory(spaceId) };
 };
 
 export const runInteractionAgent = async (
