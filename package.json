@@ -1,0 +1,16 @@
+{
+  "name": "openai-imessage",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@spectrum-ts/core": "^11.0.0",
+    "@spectrum-ts/imessage": "^11.0.0"
+  }
+}
