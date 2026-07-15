@@ -1,21 +1,14 @@
 import { api } from "../../../convex/_generated/api";
 
 import { getBridgeSecret, getConvexClient } from "./client";
+import type { MessageInput, StoredMessage } from "./types";
 
-export type StoredMessage = {
-  role: string;
-  searchText: string;
-  payloadJson: string;
-  createdAt: number;
-};
-
-export type MessageInput = {
-  role: string;
-  searchText: string;
-  payloadJson: string;
-  createdAt?: number;
-};
-
+/**
+ * Lists recent messages for a space.
+ * @param spaceId - The space ID.
+ * @param limit - The limit of messages to list.
+ * @returns A promise that resolves when the recent messages are listed.
+ */
 export const listRecentMessages = async (
   spaceId: string,
   limit: number,
@@ -27,6 +20,13 @@ export const listRecentMessages = async (
   });
 };
 
+/**
+ * Replaces the message window for a space.
+ * @param spaceId - The space ID.
+ * @param messages - The messages to replace the window.
+ * @param keep - The number of messages to keep.
+ * @returns A promise that resolves when the message window is replaced.
+ */
 export const replaceMessageWindow = async (
   spaceId: string,
   messages: MessageInput[],
@@ -40,6 +40,13 @@ export const replaceMessageWindow = async (
   });
 };
 
+/**
+ * Appends messages to a space.
+ * @param spaceId - The space ID.
+ * @param messages - The messages to append.
+ * @param keep - The number of messages to keep.
+ * @returns A promise that resolves when the messages are appended.
+ */
 export const appendMessages = async (
   spaceId: string,
   messages: MessageInput[],

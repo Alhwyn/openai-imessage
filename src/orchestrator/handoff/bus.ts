@@ -2,28 +2,42 @@ import type { Space } from "@spectrum-ts/core";
 
 import { runExecutionAgent } from "../agents/execution";
 import { deliverReplies } from "../utils/index";
-
-type SpaceHandle = {
-  space: Space;
-};
+import type {
+  AssignTaskInput,
+  AssignTaskResult,
+  NotifyOrchestratorInput,
+  SpaceHandle,
+} from "./types";
 
 const spaces = new Map<string, SpaceHandle>();
 const inFlight = new Set<string>();
 
 let taskCounter = 0;
 
+/**
+ * Registers a space.
+ * @param spaceId - The space ID.
+ * @param space - The space to register.
+ */
 export const registerSpace = (spaceId: string, space: Space): void => {
   spaces.set(spaceId, { space });
 };
 
+/**
+ * Gets a registered space.
+ * @param spaceId - The space ID.
+ * @returns The registered space or undefined if not found.
+ */
 export const getRegisteredSpace = (spaceId: string): Space | undefined => {
   return spaces.get(spaceId)?.space;
 };
 
-export const assignTask = (input: {
-  spaceId: string;
-  task: string;
-}): { taskId: string; status: "started" } => {
+/**
+ * Assigns a task to an execution sub-agent.
+ * @param input - The input to assign a task.
+ * @returns The task ID and status.
+ */
+export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
   taskCounter += 1;
   const taskId = `task_${Date.now()}_${taskCounter}`;
 
@@ -51,11 +65,12 @@ export const assignTask = (input: {
   return { taskId, status: "started" };
 };
 
-export const notifyOrchestrator = async (input: {
-  spaceId: string;
-  taskId: string;
-  result: string;
-}): Promise<void> => {
+/**
+ * Notifies the orchestrator of a task completion.
+ * @param input - The input to notify the orchestrator.
+ * @returns A promise that resolves when the orchestrator is notified.
+ */
+export const notifyOrchestrator = async (input: NotifyOrchestratorInput): Promise<void> => {
   const lockKey = `${input.spaceId}:${input.taskId}`;
   if (inFlight.has(lockKey)) {
     console.warn(`[handoff] Skipping duplicate notify for ${lockKey}`);

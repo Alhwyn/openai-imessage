@@ -7,6 +7,11 @@ export {
   gmi,
   model,
 } from "./llm";
+export type { 
+  KeyedDebounce,
+  KeyedDebounceOptions,
+} from "./types";
 export { createKeyedDebounce } from "./debounce";
 export { extractInboundText } from "./text";
 export { deliverReplies } from "./deliver";
+

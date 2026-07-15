@@ -1,19 +1,10 @@
-type KeyedDebounceOptions<T> = {
-  delayMs: number | (() => number);
-  onFlush: (key: string, value: T) => void | Promise<void>;
-};
+import type { KeyedDebounce, KeyedDebounceOptions } from "./types";
 
-type KeyedDebounce<T> = {
-  schedule: (key: string, value: T) => void;
-  flush: (key: string) => Promise<void>;
-  cancel: (key: string) => void;
-  cancelAll: () => void;
-};
-
-const resolveDelayMs = (delayMs: number | (() => number)) => {
-  return typeof delayMs === "function" ? delayMs() : delayMs;
-};
-
+/**
+ * Creates a keyed debounce.
+ * @param options - The options for the keyed debounce.
+ * @returns The keyed debounce.
+ */
 export const createKeyedDebounce = <T>(
   options: KeyedDebounceOptions<T>,
 ): KeyedDebounce<T> => {
@@ -48,6 +39,11 @@ export const createKeyedDebounce = <T>(
     }
   };
 
+  /**
+   * Schedules a value to be flushed.
+   * @param key - The key to schedule the value for.
+   * @param value - The value to schedule.
+   */
   const schedule = (key: string, value: T) => {
     latestValues.set(key, value);
 
@@ -63,7 +59,7 @@ export const createKeyedDebounce = <T>(
       if (latest === undefined) return;
 
       void runFlush(key, latest);
-    }, resolveDelayMs(options.delayMs));
+    }, typeof options.delayMs === "function" ? options.delayMs() : options.delayMs);
 
     pendingTimers.set(key, timer);
   };

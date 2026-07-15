@@ -1,7 +1,10 @@
+import { assertGmiApiKey, getGmiTemperature, model } from "../utils/index";
 import { generateText, stepCountIs, tool, type ModelMessage } from "ai";
-import { z } from "zod";
-
+import type { InteractionEvent, InteractionResult } from "./types";
+import { interactionSystemPrompt } from "../prompts/index";
+const spaceLocks = new Map<string, Promise<void>>();
 import { assignTask } from "../handoff/index";
+import { z } from "zod";
 import {
   appendHistory,
   buildSystemPrompt,
@@ -10,14 +13,13 @@ import {
   getHistory,
   setHistory,
 } from "../memory/index";
-import { interactionSystemPrompt } from "../prompts/index";
-import type { InteractionEvent, InteractionResult } from "../types/index";
-import { assertGmiApiKey, getGmiTemperature, model } from "../utils/index";
 
-export type { InteractionEvent, InteractionResult };
-
-const spaceLocks = new Map<string, Promise<void>>();
-
+/**
+ * With a space lock.
+ * @param spaceId - The space ID.
+ * @param fn - The function to run with the space lock.
+ * @returns A promise that resolves when the function is run.
+ */
 const withSpaceLock = async <T>(spaceId: string, fn: () => Promise<T>): Promise<T> => {
   const previous = spaceLocks.get(spaceId) ?? Promise.resolve();
   let release!: () => void;
@@ -37,6 +39,11 @@ const withSpaceLock = async <T>(spaceId: string, fn: () => Promise<T>): Promise<
   }
 };
 
+/**
+ * Formats an event message.
+ * @param event - The event to format.
+ * @returns The formatted event message.
+ */
 const formatEventMessage = (event: InteractionEvent): string => {
   switch (event.kind) {
     case "user_message":
@@ -50,6 +57,12 @@ const formatEventMessage = (event: InteractionEvent): string => {
   }
 };
 
+/**
+ * Runs the interaction agent for a space.
+ * @param spaceId - The space ID.
+ * @param event - The event to run the interaction agent for.
+ * @returns A promise that resolves when the interaction agent is run.
+ */
 const runInteractionAgentUnlocked = async (
   spaceId: string,
   event: InteractionEvent,
@@ -144,6 +157,12 @@ const runInteractionAgentUnlocked = async (
   return { replies, messages: await getHistory(spaceId) };
 };
 
+/**
+ * Runs the interaction agent for a space.
+ * @param spaceId - The space ID.
+ * @param event - The event to run the interaction agent for.
+ * @returns A promise that resolves when the interaction agent is run.
+ */
 export const runInteractionAgent = async (
   spaceId: string,
   event: InteractionEvent,

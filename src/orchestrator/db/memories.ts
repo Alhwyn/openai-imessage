@@ -1,21 +1,8 @@
 import { api } from "../../../convex/_generated/api";
 
+import type { CuratedMemories, MemoryEditInput } from "../memory/types";
 import { getBridgeSecret, getConvexClient } from "./client";
-
-export type MemoryKind = "user" | "agent";
-
-export type MemoryEditAction = "add" | "replace" | "remove";
-
-export type CuratedMemories = {
-  user: string;
-  agent: string;
-};
-
-export type MemoryEditResult = {
-  kind: MemoryKind;
-  body: string;
-  updatedAt: number;
-};
+import type { MemoryEditResult } from "./types";
 
 export const getMemoriesForSpace = async (spaceId: string): Promise<CuratedMemories> => {
   return await getConvexClient().query(api.memories.getForSpace, {
@@ -24,13 +11,7 @@ export const getMemoriesForSpace = async (spaceId: string): Promise<CuratedMemor
   });
 };
 
-export const applyMemoryEdit = async (input: {
-  spaceId: string;
-  kind: MemoryKind;
-  action: MemoryEditAction;
-  text?: string;
-  oldText?: string;
-}): Promise<MemoryEditResult> => {
+export const applyMemoryEdit = async (input: MemoryEditInput): Promise<MemoryEditResult> => {
   return await getConvexClient().mutation(api.memories.applyEdit, {
     secret: getBridgeSecret(),
     spaceId: input.spaceId,
