@@ -128,14 +128,15 @@ const runInteractionAgentUnlocked = async (
         },
       }),
       reply_to_user: tool({
-        description: "Send a message to the person over iMessage. This is the only outbound path.",
+        description:
+          "Send one compact, single-line message to the person over iMessage. This is the only outbound path.",
         inputSchema: z.object({
-          message: z.string().describe("Text to send to the person"),
+          message: z.string().describe("Single-line text to send to the person"),
         }),
         execute: ({ message }) => {
-          const trimmed = message.trim();
-          if (trimmed) replies.push(trimmed);
-          return { ok: true, queued: Boolean(trimmed) };
+          const normalized = message.replace(/\s+/g, " ").trim();
+          if (normalized) replies.push(normalized);
+          return { ok: true, queued: Boolean(normalized) };
         },
       }),
       memory: tool({
@@ -199,9 +200,10 @@ const runInteractionAgentUnlocked = async (
   ];
   await setHistory(spaceId, nextMessages);
 
-  if (replies.length === 0 && result.text.trim()) {
-    replies.push(result.text.trim());
-    await appendHistory(spaceId, { role: "assistant", content: result.text.trim() });
+  const fallbackReply = result.text.replace(/\s+/g, " ").trim();
+  if (replies.length === 0 && fallbackReply) {
+    replies.push(fallbackReply);
+    await appendHistory(spaceId, { role: "assistant", content: fallbackReply });
   }
 
   return { replies, messages: await getHistory(spaceId) };
