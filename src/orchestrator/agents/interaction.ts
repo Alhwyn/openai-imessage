@@ -11,7 +11,15 @@ import {
   setHistory,
 } from "../memory/index";
 import { interactionSystemPrompt } from "../prompts/index";
-import { assertGmiApiKey, getGmiTemperature, model } from "../utils/index";
+import {
+  assertGmiApiKey,
+  createGmiAbortSignal,
+  getGmiErrorDetails,
+  getGmiModelId,
+  getGmiTemperature,
+  GMI_MAX_RETRIES,
+  model,
+} from "../utils/index";
 
 import type { InteractionEvent, InteractionResult } from "./types";
 
@@ -73,16 +81,38 @@ const runInteractionAgentUnlocked = async (
   assertGmiApiKey();
 
   const replies: string[] = [];
+  const contextStartedAt = Date.now();
+  console.log("[agent] Loading interaction context", {
+    spaceId,
+    eventKind: event.kind,
+  });
   const [history, memories] = await Promise.all([
     getHistory(spaceId),
     getCuratedMemories(spaceId),
   ]);
+  console.log("[agent] Interaction context loaded", {
+    spaceId,
+    eventKind: event.kind,
+    elapsedMs: Date.now() - contextStartedAt,
+    historyCount: history.length,
+  });
   const userContent = formatEventMessage(event);
   const system = buildSystemPrompt(interactionSystemPrompt, memories);
+
+  const startedAt = Date.now();
+  console.log("[agent] Starting GMI interaction generation", {
+    spaceId,
+    eventKind: event.kind,
+    historyCount: history.length,
+    model: getGmiModelId(),
+    maxRetries: GMI_MAX_RETRIES,
+  });
 
   const result = await generateText({
     model: model(),
     temperature: getGmiTemperature(1),
+    maxRetries: GMI_MAX_RETRIES,
+    abortSignal: createGmiAbortSignal(),
     system,
     messages: [...history, { role: "user", content: userContent }],
     tools: {
@@ -143,6 +173,23 @@ const runInteractionAgentUnlocked = async (
       }),
     },
     stopWhen: stepCountIs(10),
+  }).catch((error: unknown) => {
+    console.error("[agent] GMI interaction generation failed", {
+      spaceId,
+      eventKind: event.kind,
+      elapsedMs: Date.now() - startedAt,
+      ...getGmiErrorDetails(error),
+    });
+    throw error;
+  });
+
+  console.log("[agent] GMI interaction generation completed", {
+    spaceId,
+    eventKind: event.kind,
+    elapsedMs: Date.now() - startedAt,
+    finishReason: result.finishReason,
+    stepCount: result.steps.length,
+    replyCount: replies.length,
   });
 
   const nextMessages: ModelMessage[] = [

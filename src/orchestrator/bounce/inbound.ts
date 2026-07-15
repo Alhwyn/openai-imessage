@@ -1,14 +1,18 @@
 
 import { runInteractionAgent } from "../agents/index";
 import { registerSpace } from "../handoff/index";
-import { createKeyedDebounce, deliverReplies } from "../utils/index";
+import {
+  createKeyedDebounce,
+  deliverReplies,
+  getGmiErrorDetails,
+  GMI_UNAVAILABLE_REPLY,
+} from "../utils/index";
 
 import type {
   BuildDebouncedTurnInput,
   OrchestratorTurn,
   ScheduleOrchestratorTurnInput,
 } from "./types";
-import type { Space } from "@spectrum-ts/core";
 
 const DEFAULT_DEBOUNCE_MS = 1_500;
 
@@ -19,10 +23,6 @@ export const getOrchestratorDebounceMs = () => {
 
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_DEBOUNCE_MS;
-};
-
-const getDebounceKey = (space: Space, senderKey?: string) => {
-  return senderKey?.trim() || space.id;
 };
 
 /**
@@ -69,10 +69,19 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   }
 
   await turn.space.responding(async () => {
-    const { replies } = await runInteractionAgent(spaceId, {
-      kind: "user_message",
-      text: inboundText,
-    });
+    console.log(`[bounce] Starting interaction for space ${spaceId}`);
+
+    let replies: string[];
+    try {
+      ({ replies } = await runInteractionAgent(spaceId, {
+        kind: "user_message",
+        text: inboundText,
+      }));
+    } catch (error) {
+      console.error(`[bounce] Interaction failed for space ${spaceId}`, getGmiErrorDetails(error));
+      await deliverReplies(turn.space, [GMI_UNAVAILABLE_REPLY]);
+      return;
+    }
 
     if (replies.length === 0) {
       console.log(
@@ -81,7 +90,9 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
       return;
     }
 
+    console.log(`[bounce] Delivering ${replies.length} reply/replies for space ${spaceId}`);
     await deliverReplies(turn.space, replies);
+    console.log(`[bounce] Completed turn for space ${spaceId}`);
   });
 };
 
@@ -96,7 +107,7 @@ const debounce = createKeyedDebounce<OrchestratorTurn>({
  * @param input - The input to schedule an orchestrator turn.
  */
 export const scheduleOrchestratorTurn = (input: ScheduleOrchestratorTurnInput): void => {
-  const key = getDebounceKey(input.space, input.senderKey);
+  const key = input.senderKey?.trim() || input.space.id;
   registerSpace(input.space.id, input.space);
 
   const next = buildDebouncedTurn(pendingTurns.get(key), input);

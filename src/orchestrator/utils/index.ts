@@ -1,12 +1,17 @@
 export {
   assertGmiApiKey,
+  createGmiAbortSignal,
   DEFAULT_GMI_MODEL,
   GMI_CLOUD_BASE_URL,
+  GMI_GENERATION_TIMEOUT_MS,
+  GMI_MAX_RETRIES,
+  GMI_UNAVAILABLE_REPLY,
+  getGmiErrorDetails,
   getGmiModelId,
   getGmiTemperature,
-  gmi,
   model,
 } from "./llm";
+export type { GmiErrorDetails } from "./llm";
 export type { 
   KeyedDebounce,
   KeyedDebounceOptions,

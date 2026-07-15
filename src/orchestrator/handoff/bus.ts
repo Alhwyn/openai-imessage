@@ -1,6 +1,6 @@
 
 import { runExecutionAgent } from "../agents/execution";
-import { deliverReplies } from "../utils/index";
+import { deliverReplies, getGmiErrorDetails, GMI_UNAVAILABLE_REPLY } from "../utils/index";
 
 import type {
   AssignTaskInput,
@@ -94,11 +94,23 @@ export const notifyOrchestrator = async (input: NotifyOrchestratorInput): Promis
 
     // Dynamic import avoids a cycle: interaction → assignTask → notify → interaction
     const { runInteractionAgent } = await import("../agents/interaction");
-    const { replies } = await runInteractionAgent(input.spaceId, {
-      kind: "subagent_completion",
-      taskId: input.taskId,
-      result: input.result,
-    });
+    let replies: string[];
+    try {
+      ({ replies } = await runInteractionAgent(input.spaceId, {
+        kind: "subagent_completion",
+        taskId: input.taskId,
+        result: input.result,
+      }));
+    } catch (error) {
+      console.error(
+        `[handoff] Orchestrator failed for ${input.taskId}`,
+        getGmiErrorDetails(error),
+      );
+      await space.responding(async () => {
+        await deliverReplies(space, [GMI_UNAVAILABLE_REPLY]);
+      });
+      return;
+    }
 
     if (replies.length === 0) {
       console.warn(`[handoff] Orchestrator produced no reply for ${input.taskId}`);

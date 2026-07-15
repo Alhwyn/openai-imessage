@@ -2,7 +2,15 @@ import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
 import { executionSystemPrompt } from "../prompts/index";
-import { assertGmiApiKey, getGmiTemperature, model } from "../utils/index";
+import {
+  assertGmiApiKey,
+  createGmiAbortSignal,
+  getGmiErrorDetails,
+  getGmiModelId,
+  getGmiTemperature,
+  GMI_MAX_RETRIES,
+  model,
+} from "../utils/index";
 
 const stubTools = {
   echo: tool({
@@ -32,13 +40,33 @@ const stubTools = {
 export const runExecutionAgent = async (task: string): Promise<string> => {
   assertGmiApiKey();
 
+  const startedAt = Date.now();
+  console.log("[agent] Starting GMI execution generation", {
+    model: getGmiModelId(),
+    maxRetries: GMI_MAX_RETRIES,
+  });
+
   const result = await generateText({
     model: model(),
     temperature: getGmiTemperature(1),
+    maxRetries: GMI_MAX_RETRIES,
+    abortSignal: createGmiAbortSignal(),
     system: executionSystemPrompt,
     prompt: task,
     tools: stubTools,
     stopWhen: stepCountIs(8),
+  }).catch((error: unknown) => {
+    console.error("[agent] GMI execution generation failed", {
+      elapsedMs: Date.now() - startedAt,
+      ...getGmiErrorDetails(error),
+    });
+    throw error;
+  });
+
+  console.log("[agent] GMI execution generation completed", {
+    elapsedMs: Date.now() - startedAt,
+    finishReason: result.finishReason,
+    stepCount: result.steps.length,
   });
 
   const text = result.text.trim();
