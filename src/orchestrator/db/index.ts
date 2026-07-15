@@ -8,10 +8,4 @@ export {
   listRecentMessages,
   replaceMessageWindow,
 } from "./messages";
-export type {
-  CuratedMemories,
-  MemoryEditAction,
-  MemoryEditInput,
-  MemoryKind,
-} from "../memory/types";
 export type { MemoryEditResult, MessageInput, StoredMessage } from "./types";

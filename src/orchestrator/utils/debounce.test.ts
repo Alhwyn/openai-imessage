@@ -23,6 +23,49 @@ describe("createKeyedDebounce", () => {
     await Bun.sleep(80);
     expect(flushed).toEqual(["three"]);
   });
+
+  test("serializes overlapping flushes for the same key", async () => {
+    const firstStarted = Promise.withResolvers<void>();
+    const releaseFirst = Promise.withResolvers<void>();
+    const secondFinished = Promise.withResolvers<void>();
+    const events: string[] = [];
+    let activeFlushes = 0;
+    let maxActiveFlushes = 0;
+
+    const debounce = createKeyedDebounce<string>({
+      delayMs: 0,
+      onFlush: async (_key, value) => {
+        activeFlushes += 1;
+        maxActiveFlushes = Math.max(maxActiveFlushes, activeFlushes);
+        events.push(`start:${value}`);
+
+        if (value === "first") {
+          firstStarted.resolve();
+          await releaseFirst.promise;
+        }
+
+        events.push(`end:${value}`);
+        activeFlushes -= 1;
+
+        if (value === "second") {
+          secondFinished.resolve();
+        }
+      },
+    });
+
+    debounce.schedule("a", "first");
+    await firstStarted.promise;
+
+    debounce.schedule("a", "second");
+    await Bun.sleep(10);
+    expect(events).toEqual(["start:first"]);
+
+    releaseFirst.resolve();
+    await secondFinished.promise;
+
+    expect(maxActiveFlushes).toBe(1);
+    expect(events).toEqual(["start:first", "end:first", "start:second", "end:second"]);
+  });
 });
 
 describe("buildDebouncedTurn", () => {

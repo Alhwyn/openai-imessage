@@ -10,6 +10,7 @@ export const createKeyedDebounce = <T>(
 ): KeyedDebounce<T> => {
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const latestValues = new Map<string, T>();
+  const flushQueues = new Map<string, Promise<void>>();
 
   const cancel = (key: string) => {
     const timer = pendingTimers.get(key);
@@ -39,6 +40,20 @@ export const createKeyedDebounce = <T>(
     }
   };
 
+  const enqueueFlush = (key: string, value: T): Promise<void> => {
+    const previous = flushQueues.get(key) ?? Promise.resolve();
+    const current = previous.then(() => runFlush(key, value));
+    flushQueues.set(key, current);
+
+    void current.then(() => {
+      if (flushQueues.get(key) === current) {
+        flushQueues.delete(key);
+      }
+    });
+
+    return current;
+  };
+
   /**
    * Schedules a value to be flushed.
    * @param key - The key to schedule the value for.
@@ -58,7 +73,7 @@ export const createKeyedDebounce = <T>(
 
       if (latest === undefined) return;
 
-      void runFlush(key, latest);
+      void enqueueFlush(key, latest);
     }, typeof options.delayMs === "function" ? options.delayMs() : options.delayMs);
 
     pendingTimers.set(key, timer);
@@ -77,7 +92,7 @@ export const createKeyedDebounce = <T>(
 
     if (latest === undefined) return;
 
-    await runFlush(key, latest);
+    await enqueueFlush(key, latest);
   };
 
   return { schedule, flush, cancel, cancelAll };
