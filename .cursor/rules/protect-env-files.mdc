@@ -1,0 +1,11 @@
+---
+description: Never read or edit .env; .env.example is read-only
+alwaysApply: true
+---
+
+# Protect env files
+
+- **Never read, create, edit, or delete** `.env` or secret variants (`.env.local`, `.env.production`, etc.).
+- **Never write secrets** into the repo or suggest committing them.
+- **`.env.example` is read-only**: you may read it to learn required variable names; do not change it.
+- If a new env var is needed, tell the user to add it themselves to `.env` (and optionally ask before proposing a `.env.example` update as a separate explicit request).

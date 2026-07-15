@@ -1,0 +1,40 @@
+---
+description: Prefer const arrow functions over function declarations
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Arrow Functions
+
+Use `const` arrow functions instead of `function` declarations.
+
+```typescript
+// BAD
+function getName(id: string): string {
+  return id;
+}
+
+async function loadUser(id: string) {
+  return await db.get(id);
+}
+
+export function helper() {}
+
+// GOOD
+const getName = (id: string): string => {
+  return id;
+};
+
+const loadUser = async (id: string) => {
+  return await db.get(id);
+};
+
+export const helper = () => {};
+```
+
+## Notes
+
+- Prefer `const name = () => {}` / `const name = async () => {}` for module-level helpers and exports.
+- Generics: `const run = async <T>(value: T): Promise<T> => value;`
+- Do not convert class methods.
+- Keep concise single-expression arrows when readable: `const double = (n: number) => n * 2;`

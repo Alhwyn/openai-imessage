@@ -1,0 +1,91 @@
+---
+description: Separate components, hooks, types, utils, and context
+globs: "{app,src/orchestrator}/**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Section separation
+
+Keep code in clear folders. Do not dump everything in one file or one folder.
+
+```
+app/   (or src/orchestrator/)
+  components/   # presentational + composed UI (agents/ for orchestrator)
+  hooks/        # reusable use* hooks
+  types/        # shared types + interfaces
+  utils/        # pure helpers (no React)
+  context/      # providers + useContext hooks
+  index.ts      # barrel re-exports
+```
+
+For `src/orchestrator/`, map concerns like this:
+
+```
+src/orchestrator/
+  types/        # InteractionEvent, OrchestratorTurn, …
+  utils/        # llm, debounce, text, deliver
+  agents/       # interaction + execution (composed logic)
+  bounce/       # inbound debounce
+  handoff/      # assign_task + notify bus
+  memory/       # conversation history
+  prompts/      # system prompt markdown
+  index.ts
+```
+
+## Rules
+
+- **components** — UI only. No fetch/business logic that belongs in services or hooks.
+- **hooks** — shared stateful/logic hooks (`useMarkets`, `useSearch`).
+- **types** — shared types. Colocate tiny local types next to the file that owns them.
+- **utils** — pure functions. No hooks, no JSX.
+- **context** — use React context + `useContext` when prop drilling gets deep (3+ levels) or many siblings need same state. Prefer props for one-level parent → child.
+
+```tsx
+// BAD — prop drill through many layers
+<Layout user={user}>
+  <Sidebar user={user}>
+    <Nav user={user} />
+  </Sidebar>
+</Layout>
+
+// GOOD — context when many consumers need same value
+const UserContext = createContext<User | null>(null);
+const useUser = () => {
+  const user = useContext(UserContext);
+  if (!user) throw new Error("useUser requires UserProvider");
+  return user;
+};
+```
+
+Route files (`app/routes/*`) stay thin: load/action + compose components/hooks.
+
+## Services
+
+`app/services/<domain>/` follow same split:
+
+```
+app/services/
+  index.server.ts       # barrel re-exports (server-only)
+  polymarket/
+    types.ts
+    utils.ts
+    gamma.server.ts
+    index.server.ts
+  markets/
+    types.ts
+    utils.ts
+    shop-market.server.ts
+    index.server.ts
+```
+
+## Barrel `index.ts` / `index.server.ts`
+
+Each shared folder gets a barrel with one-liner re-exports. Server-only modules use `index.server.ts`. Import the explicit file path (directory imports break under React Router `rootDirs`):
+
+```ts
+// GOOD
+import { searchMarkets, pickShopMarket } from "../services/index.server";
+
+// BAD — fails typecheck with rootDirs
+import { searchMarkets } from "../services";
+```
