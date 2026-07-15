@@ -28,7 +28,7 @@ const getDebounceKey = (space: Space, senderKey?: string) => {
  * Builds a debounced turn.
  * @param existing - The existing orchestrator turn.
  * @param input - The input to build a debounced turn.
- * @returns The debounced turn.
+ * @returns A turn containing the accumulated inbound texts and latest message.
  */
 export const buildDebouncedTurn = (
   existing: OrchestratorTurn | undefined,
@@ -48,7 +48,7 @@ const pendingTurns = new Map<string, OrchestratorTurn>();
  * Flushes an orchestrator turn.
  * @param key - The key of the orchestrator turn.
  * @param turn - The orchestrator turn to flush.
- * @returns A promise that resolves when the orchestrator turn is flushed.
+ * @returns Nothing after the turn has been processed.
  */
 const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   pendingTurns.delete(key);
@@ -84,11 +84,7 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   });
 };
 
-/**
- * Creates a debounced turn.
- * @param input - The input to create a debounced turn.
- * @returns A promise that resolves when the debounced turn is created.
- */
+/** Debounces pending turns and flushes the latest value for each key. */
 const debounce = createKeyedDebounce<OrchestratorTurn>({
   delayMs: getOrchestratorDebounceMs,
   onFlush: flushOrchestratorTurn,
@@ -97,7 +93,6 @@ const debounce = createKeyedDebounce<OrchestratorTurn>({
 /**
  * Schedules an orchestrator turn.
  * @param input - The input to schedule an orchestrator turn.
- * @returns A promise that resolves when the orchestrator turn is scheduled.
  */
 export const scheduleOrchestratorTurn = (input: ScheduleOrchestratorTurnInput): void => {
   const key = getDebounceKey(input.space, input.senderKey);

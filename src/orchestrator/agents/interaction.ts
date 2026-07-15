@@ -1,10 +1,7 @@
-import { assertGmiApiKey, getGmiTemperature, model } from "../utils/index";
 import { generateText, stepCountIs, tool, type ModelMessage } from "ai";
-import type { InteractionEvent, InteractionResult } from "./types";
-import { interactionSystemPrompt } from "../prompts/index";
-const spaceLocks = new Map<string, Promise<void>>();
-import { assignTask } from "../handoff/index";
 import { z } from "zod";
+
+import { assignTask } from "../handoff/index";
 import {
   appendHistory,
   buildSystemPrompt,
@@ -13,12 +10,17 @@ import {
   getHistory,
   setHistory,
 } from "../memory/index";
+import { interactionSystemPrompt } from "../prompts/index";
+import { assertGmiApiKey, getGmiTemperature, model } from "../utils/index";
+import type { InteractionEvent, InteractionResult } from "./types";
+
+const spaceLocks = new Map<string, Promise<void>>();
 
 /**
- * With a space lock.
+ * Runs a function after earlier work for the same space has completed.
  * @param spaceId - The space ID.
  * @param fn - The function to run with the space lock.
- * @returns A promise that resolves when the function is run.
+ * @returns The function result.
  */
 const withSpaceLock = async <T>(spaceId: string, fn: () => Promise<T>): Promise<T> => {
   const previous = spaceLocks.get(spaceId) ?? Promise.resolve();
@@ -58,10 +60,10 @@ const formatEventMessage = (event: InteractionEvent): string => {
 };
 
 /**
- * Runs the interaction agent for a space.
+ * Runs an interaction turn without acquiring the per-space lock.
  * @param spaceId - The space ID.
  * @param event - The event to run the interaction agent for.
- * @returns A promise that resolves when the interaction agent is run.
+ * @returns The interaction result.
  */
 const runInteractionAgentUnlocked = async (
   spaceId: string,
@@ -158,10 +160,10 @@ const runInteractionAgentUnlocked = async (
 };
 
 /**
- * Runs the interaction agent for a space.
+ * Serializes and runs an interaction turn for a space.
  * @param spaceId - The space ID.
  * @param event - The event to run the interaction agent for.
- * @returns A promise that resolves when the interaction agent is run.
+ * @returns The interaction result.
  */
 export const runInteractionAgent = async (
   spaceId: string,

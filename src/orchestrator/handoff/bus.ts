@@ -68,7 +68,7 @@ export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
 /**
  * Notifies the orchestrator of a task completion.
  * @param input - The input to notify the orchestrator.
- * @returns A promise that resolves when the orchestrator is notified.
+ * @returns Nothing after the completion has been delivered or dropped.
  */
 export const notifyOrchestrator = async (input: NotifyOrchestratorInput): Promise<void> => {
   const lockKey = `${input.spaceId}:${input.taskId}`;

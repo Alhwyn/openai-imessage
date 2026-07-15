@@ -7,7 +7,7 @@ import type { MessageInput, StoredMessage } from "./types";
  * Lists recent messages for a space.
  * @param spaceId - The space ID.
  * @param limit - The limit of messages to list.
- * @returns A promise that resolves when the recent messages are listed.
+ * @returns The recent messages in chronological order.
  */
 export const listRecentMessages = async (
   spaceId: string,
@@ -25,7 +25,7 @@ export const listRecentMessages = async (
  * @param spaceId - The space ID.
  * @param messages - The messages to replace the window.
  * @param keep - The number of messages to keep.
- * @returns A promise that resolves when the message window is replaced.
+ * @returns The number of messages retained.
  */
 export const replaceMessageWindow = async (
   spaceId: string,
@@ -45,7 +45,7 @@ export const replaceMessageWindow = async (
  * @param spaceId - The space ID.
  * @param messages - The messages to append.
  * @param keep - The number of messages to keep.
- * @returns A promise that resolves when the messages are appended.
+ * @returns The number of messages appended.
  */
 export const appendMessages = async (
   spaceId: string,

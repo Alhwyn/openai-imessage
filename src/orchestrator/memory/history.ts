@@ -62,7 +62,7 @@ const fromStoredPayload = (payloadJson: string): ModelMessage | null => {
 /**
  * Gets the history for a space.
  * @param spaceId - The space ID.
- * @returns A promise that resolves when the history is retrieved.
+ * @returns The recent valid model messages.
  */
 export const getHistory = async (spaceId: string): Promise<ModelMessage[]> => {
   const rows = await listRecentMessages(spaceId, MAX_HISTORY_MESSAGES);
@@ -78,7 +78,7 @@ export const getHistory = async (spaceId: string): Promise<ModelMessage[]> => {
  * Sets the history for a space.
  * @param spaceId - The space ID.
  * @param messages - The messages to set.
- * @returns A promise that resolves when the history is set.
+ * @returns Nothing after the stored history has been replaced.
  */
 export const setHistory = async (spaceId: string, messages: ModelMessage[]): Promise<void> => {
   const window = messages.slice(-MAX_HISTORY_MESSAGES);
@@ -93,7 +93,7 @@ export const setHistory = async (spaceId: string, messages: ModelMessage[]): Pro
  * Appends messages to the history.
  * @param spaceId - The space ID.
  * @param messages - The messages to append.
- * @returns A promise that resolves when the messages are appended.
+ * @returns Nothing after the messages have been stored.
  */
 export const appendHistory = async (
   spaceId: string,
