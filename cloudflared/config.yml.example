@@ -1,0 +1,7 @@
+tunnel: webhook-automator
+credentials-file: ~/.cloudflared/TUNNEL_ID.json
+
+ingress:
+  - hostname: agent.alhwyn.com
+    service: http://127.0.0.1:4001
+  - service: http_status:404
