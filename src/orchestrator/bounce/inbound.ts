@@ -7,9 +7,7 @@ import { registerSpace } from "../handoff/index";
 import {
   createKeyedDebounce,
   deliverOutbound,
-  deliverReplies,
   getGmiErrorDetails,
-  GMI_UNAVAILABLE_REPLY,
 } from "../utils/index";
 
 import type {
@@ -41,6 +39,7 @@ export const buildDebouncedTurn = (
   input: BuildDebouncedTurnInput,
 ): OrchestratorTurn => {
   return {
+    images: [...(existing?.images ?? []), ...(input.images ?? [])],
     texts: [...(existing?.texts ?? []), input.text],
     space: input.space,
     message: input.message,
@@ -60,7 +59,7 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   pendingTurns.delete(key);
 
   const inboundText = turn.texts.join("\n").trim();
-  if (!inboundText) return;
+  if (!inboundText && turn.images.length === 0) return;
 
   const spaceId = turn.space.id;
   registerSpace(spaceId, turn.space, turn.message);
@@ -92,10 +91,15 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
       ({ outbound } = await runInteractionAgent(spaceId, {
         kind: "user_message",
         text: inboundText,
+        images: turn.images,
       }));
     } catch (error) {
       console.error(`[bounce] Interaction failed for space ${spaceId}`, getGmiErrorDetails(error));
-      await deliverReplies(turn.space, [GMI_UNAVAILABLE_REPLY]);
+      await deliverOutbound(
+        turn.space,
+        [{ kind: "reaction", emoji: "like" }],
+        { targetMessage: turn.message },
+      );
       return;
     }
 

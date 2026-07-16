@@ -1,5 +1,6 @@
 export { runExecutionAgent, runInteractionAgent } from "./agents/index";
 export type {
+  InboundImage,
   InteractionEvent,
   InteractionResult,
   OutboundItem,
@@ -9,4 +10,11 @@ export { buildDebouncedTurn, scheduleOrchestratorTurn } from "./bounce/index";
 export type { OrchestratorTurn } from "./bounce/index";
 export { assertConvexEnv } from "./db/index";
 export { assignTask, notifyOrchestrator, registerSpace } from "./handoff/index";
-export { assertGmiApiKey, extractInboundText, model } from "./utils/index";
+export {
+  assertGmiApiKey,
+  createRecentIdTracker,
+  extractInboundImages,
+  extractInboundText,
+  model,
+} from "./utils/index";
+export type { RecentIdTracker, RecentIdTrackerOptions } from "./utils/index";

@@ -1,4 +1,10 @@
-import { generateText, stepCountIs, tool, type ModelMessage } from "ai";
+import {
+  generateText,
+  stepCountIs,
+  tool,
+  type ModelMessage,
+  type UserContent,
+} from "ai";
 import { z } from "zod";
 
 import { assignTask } from "../handoff/index";
@@ -13,7 +19,6 @@ import {
 import { interactionSystemPrompt } from "../prompts/index";
 import {
   assertGmiApiKey,
-  createGmiAbortSignal,
   getGmiErrorDetails,
   getGmiModelId,
   getGmiTemperature,
@@ -61,10 +66,21 @@ const withSpaceLock = async <T>(spaceId: string, fn: () => Promise<T>): Promise<
  * @param event - The event to format.
  * @returns The formatted event message.
  */
-const formatEventMessage = (event: InteractionEvent): string => {
+const formatEventMessage = (event: InteractionEvent): UserContent => {
   switch (event.kind) {
-    case "user_message":
-      return event.text;
+    case "user_message": {
+      if (!event.images?.length) return event.text;
+
+      return [
+        ...(event.text ? [{ type: "text" as const, text: event.text }] : []),
+        ...event.images.map((image) => ({
+          type: "file" as const,
+          data: image.data,
+          filename: image.filename,
+          mediaType: image.mediaType,
+        })),
+      ];
+    }
     case "subagent_completion":
       return `[sub-agent completed] taskId=${event.taskId}\nresult:\n${event.result}`;
     default: {
@@ -119,7 +135,6 @@ export const runInteractionAgent = async (
       model: model(),
       temperature: getGmiTemperature(1),
       maxRetries: GMI_MAX_RETRIES,
-      abortSignal: createGmiAbortSignal(),
       system,
       messages: [...history, { role: "user", content: userContent }],
       tools: {
@@ -130,7 +145,11 @@ export const runInteractionAgent = async (
             task: z.string().describe("Clear task instructions for the worker"),
           }),
           execute: ({ task }) => {
-            const { taskId, status } = assignTask({ spaceId, task });
+            const { taskId, status } = assignTask({
+              spaceId,
+              task,
+              images: event.kind === "user_message" ? event.images : undefined,
+            });
             return { taskId, status };
           },
         }),

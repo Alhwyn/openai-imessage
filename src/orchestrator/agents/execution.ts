@@ -1,16 +1,17 @@
-import { generateText, stepCountIs, tool } from "ai";
+import { generateText, stepCountIs, tool, type UserContent } from "ai";
 import { z } from "zod";
 
 import { executionSystemPrompt } from "../prompts/index";
 import {
   assertGmiApiKey,
-  createGmiAbortSignal,
   getGmiErrorDetails,
   getGmiModelId,
   getGmiTemperature,
   GMI_MAX_RETRIES,
   model,
 } from "../utils/index";
+
+import type { InboundImage } from "./types";
 
 const stubTools = {
   echo: tool({
@@ -37,7 +38,24 @@ const stubTools = {
   }),
 };
 
-export const runExecutionAgent = async (task: string): Promise<string> => {
+const buildTaskContent = (task: string, images: InboundImage[]): UserContent => {
+  if (images.length === 0) return task;
+
+  return [
+    { type: "text", text: task },
+    ...images.map((image) => ({
+      type: "file" as const,
+      data: image.data,
+      filename: image.filename,
+      mediaType: image.mediaType,
+    })),
+  ];
+};
+
+export const runExecutionAgent = async (
+  task: string,
+  images: InboundImage[] = [],
+): Promise<string> => {
   assertGmiApiKey();
 
   const startedAt = Date.now();
@@ -50,9 +68,8 @@ export const runExecutionAgent = async (task: string): Promise<string> => {
     model: model(),
     temperature: getGmiTemperature(1),
     maxRetries: GMI_MAX_RETRIES,
-    abortSignal: createGmiAbortSignal(),
     system: executionSystemPrompt,
-    prompt: task,
+    messages: [{ role: "user", content: buildTaskContent(task, images) }],
     tools: stubTools,
     stopWhen: stepCountIs(8),
   }).catch((error: unknown) => {
@@ -77,9 +94,7 @@ export const runExecutionAgent = async (task: string): Promise<string> => {
     .map((tr) => JSON.stringify(tr.output))
     .filter(Boolean);
 
-  if (toolNotes.length > 0) {
-    return `Task completed. Tool outputs: ${toolNotes.join(" | ")}`;
-  }
+  if (toolNotes.length > 0) return `Task completed. Tool outputs: ${toolNotes.join(" | ")}`;
 
   return "Task finished with no textual result.";
 };

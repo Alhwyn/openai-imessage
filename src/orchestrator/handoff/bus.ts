@@ -1,6 +1,6 @@
 
 import { runExecutionAgent } from "../agents/execution";
-import { deliverOutbound, deliverReplies, getGmiErrorDetails, GMI_UNAVAILABLE_REPLY } from "../utils/index";
+import { deliverOutbound, getGmiErrorDetails } from "../utils/index";
 
 import type {
   AssignTaskInput,
@@ -56,7 +56,7 @@ export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
 
   void (async () => {
     try {
-      const result = await runExecutionAgent(input.task);
+      const result = await runExecutionAgent(input.task, input.images);
       await notifyOrchestrator({
         spaceId: input.spaceId,
         taskId,
@@ -119,7 +119,11 @@ export const notifyOrchestrator = async (input: NotifyOrchestratorInput): Promis
           `[handoff] Orchestrator failed for ${input.taskId}`,
           getGmiErrorDetails(error),
         );
-        await deliverReplies(space, [GMI_UNAVAILABLE_REPLY]);
+        await deliverOutbound(
+          space,
+          [{ kind: "reaction", emoji: "like" }],
+          { targetMessage },
+        );
         return;
       }
 

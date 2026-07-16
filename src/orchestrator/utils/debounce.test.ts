@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { buildDebouncedTurn } from "../bounce/index";
 
 import { createKeyedDebounce } from "./debounce";
-import { extractInboundText } from "./text";
+import { extractInboundImages, extractInboundText } from "./text";
 
 describe("createKeyedDebounce", () => {
   test("coalesces rapid schedules into one flush", async () => {
@@ -86,6 +86,36 @@ describe("buildDebouncedTurn", () => {
 
     expect(second.texts).toEqual(["hi", "there"]);
   });
+
+  test("stacks images across messages", () => {
+    const space = { id: "space-1" } as never;
+    const message = { id: "m1" } as never;
+    const firstImage = {
+      data: new Uint8Array([1]),
+      filename: "first.png",
+      mediaType: "image/png",
+    };
+    const secondImage = {
+      data: new Uint8Array([2]),
+      filename: "second.jpeg",
+      mediaType: "image/jpeg",
+    };
+
+    const first = buildDebouncedTurn(undefined, {
+      images: [firstImage],
+      text: "",
+      space,
+      message,
+    });
+    const second = buildDebouncedTurn(first, {
+      images: [secondImage],
+      text: "compare these",
+      space,
+      message,
+    });
+
+    expect(second.images).toEqual([firstImage, secondImage]);
+  });
 });
 
 describe("extractInboundText", () => {
@@ -95,5 +125,78 @@ describe("extractInboundText", () => {
     } as never;
 
     expect(extractInboundText(message)).toBe("hello");
+  });
+
+  test("reads supported image attachments", async () => {
+    const message = {
+      content: {
+        type: "attachment",
+        name: "photo.jpg",
+        mimeType: "image/jpg; charset=binary",
+        read: () => Promise.resolve(Buffer.from([1, 2, 3])),
+      },
+    } as never;
+
+    expect(await extractInboundImages(message)).toEqual([
+      {
+        data: new Uint8Array([1, 2, 3]),
+        filename: "photo.jpg",
+        mediaType: "image/jpeg",
+      },
+    ]);
+  });
+
+  test("ignores unsupported attachment formats", async () => {
+    const message = {
+      content: {
+        type: "attachment",
+        name: "photo.heic",
+        mimeType: "image/heic",
+        read: () => Promise.resolve(Buffer.from([1, 2, 3])),
+      },
+    } as never;
+
+    expect(await extractInboundImages(message)).toEqual([]);
+  });
+
+  test("reads captions and multiple images from grouped content", async () => {
+    const message = {
+      content: {
+        type: "group",
+        items: [
+          { content: { type: "text", text: " compare these " } },
+          {
+            content: {
+              type: "attachment",
+              name: "first.png",
+              mimeType: "image/png",
+              read: () => Promise.resolve(Buffer.from([1])),
+            },
+          },
+          {
+            content: {
+              type: "attachment",
+              name: "second.webp",
+              mimeType: "image/webp",
+              read: () => Promise.resolve(Buffer.from([2])),
+            },
+          },
+        ],
+      },
+    } as never;
+
+    expect(extractInboundText(message)).toBe("compare these");
+    expect(await extractInboundImages(message)).toEqual([
+      {
+        data: new Uint8Array([1]),
+        filename: "first.png",
+        mediaType: "image/png",
+      },
+      {
+        data: new Uint8Array([2]),
+        filename: "second.webp",
+        mediaType: "image/webp",
+      },
+    ]);
   });
 });

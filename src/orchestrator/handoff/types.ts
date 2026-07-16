@@ -1,3 +1,4 @@
+import type { InboundImage } from "../agents/types";
 import type { Message, Space } from "@spectrum-ts/core";
 
 export type SpaceHandle = {
@@ -7,6 +8,7 @@ export type SpaceHandle = {
 };
 
 export type AssignTaskInput = {
+  images?: InboundImage[];
   spaceId: string;
   task: string;
 };

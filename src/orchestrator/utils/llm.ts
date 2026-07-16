@@ -4,10 +4,6 @@ export const GMI_CLOUD_BASE_URL = "https://api.gmi-serving.com/v1";
 export const DEFAULT_GMI_MODEL = "moonshotai/kimi-k2.7-code-highspeed";
 /** Match the reference provider's three total attempts without a minute-long silent wait. */
 export const GMI_MAX_RETRIES = 2;
-/** Hard upper bound for one complete generation, including retries. */
-export const GMI_GENERATION_TIMEOUT_MS = 30_000;
-export const GMI_UNAVAILABLE_REPLY =
-  "Sorry, my AI service is temporarily unavailable. Please try again in a moment.";
 
 export type GmiErrorDetails = {
   guidance?: string;
@@ -51,10 +47,6 @@ export const model = () => {
   });
 
   return gmi.chat(getGmiModelId());
-};
-
-export const createGmiAbortSignal = (): AbortSignal => {
-  return AbortSignal.timeout(GMI_GENERATION_TIMEOUT_MS);
 };
 
 export const getGmiTemperature = (requested = 1): number => {

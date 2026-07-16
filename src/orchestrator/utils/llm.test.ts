@@ -4,7 +4,6 @@ import {
   assertGmiApiKey,
   DEFAULT_GMI_MODEL,
   getGmiErrorDetails,
-  GMI_GENERATION_TIMEOUT_MS,
   GMI_MAX_RETRIES,
   model,
 } from "./llm";
@@ -13,7 +12,6 @@ describe("GMI configuration", () => {
   test("keeps Kimi as the default with bounded retries", () => {
     expect(DEFAULT_GMI_MODEL).toBe("moonshotai/kimi-k2.7-code-highspeed");
     expect(GMI_MAX_RETRIES).toBe(2);
-    expect(GMI_GENERATION_TIMEOUT_MS).toBe(30_000);
   });
 
   test("extracts a nested provider status from retry errors", () => {
