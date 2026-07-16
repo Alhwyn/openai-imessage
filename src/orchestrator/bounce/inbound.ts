@@ -4,7 +4,6 @@ import {
   runInteractionAgent,
 } from "../agents/index";
 import { registerSpace } from "../handoff/index";
-import { appendHistory } from "../memory/index";
 import {
   createKeyedDebounce,
   deliverOutbound,
@@ -83,11 +82,6 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
         turn.space,
         [{ kind: "reaction", emoji: tapback }],
         { targetMessage: turn.message },
-      );
-      await appendHistory(
-        spaceId,
-        { role: "user", content: inboundText },
-        { role: "assistant", content: `[tapback:${tapback}]` },
       );
       console.log(`[bounce] Completed direct ${tapback} tapback for space ${spaceId}`);
       return;
