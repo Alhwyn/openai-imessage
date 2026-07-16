@@ -1,5 +1,8 @@
 
-import { runInteractionAgent } from "../agents/index";
+import {
+  getTapbackOnlyRequest,
+  runInteractionAgent,
+} from "../agents/index";
 import { registerSpace } from "../handoff/index";
 import {
   createKeyedDebounce,
@@ -72,6 +75,17 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
 
   await turn.space.responding(async () => {
     console.log(`[bounce] Starting interaction for space ${spaceId}`);
+
+    const tapback = getTapbackOnlyRequest(inboundText);
+    if (tapback) {
+      await deliverOutbound(
+        turn.space,
+        [{ kind: "reaction", emoji: tapback }],
+        { targetMessage: turn.message },
+      );
+      console.log(`[bounce] Completed direct ${tapback} tapback for space ${spaceId}`);
+      return;
+    }
 
     let outbound: OutboundItem[];
     try {

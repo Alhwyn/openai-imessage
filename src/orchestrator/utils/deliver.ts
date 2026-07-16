@@ -1,8 +1,10 @@
+import { text } from "@spectrum-ts/core";
+
+import { tapbackEmoji } from "../agents/tapbacks";
+
 import type { DeliverOutboundOptions } from "./types";
 import type { OutboundItem } from "../agents/types";
-import { tapbackEmoji } from "../agents/tapbacks";
 import type { Space } from "@spectrum-ts/core";
-import { text } from "@spectrum-ts/core";
 
 /**
  * Delivers queued outbound items via Spectrum sugar: `message.reply` / `message.react`,
