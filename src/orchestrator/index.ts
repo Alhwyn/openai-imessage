@@ -9,7 +9,12 @@ export type {
 export { buildDebouncedTurn, scheduleOrchestratorTurn } from "./bounce/index";
 export type { OrchestratorTurn } from "./bounce/index";
 export { assertConvexEnv } from "./db/index";
-export { assignTask, notifyOrchestrator, registerSpace } from "./handoff/index";
+export {
+  assignImageTask,
+  assignTask,
+  notifyOrchestrator,
+  registerSpace,
+} from "./handoff/index";
 export {
   assertGmiApiKey,
   createRecentIdTracker,

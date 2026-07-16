@@ -122,16 +122,20 @@ const main = async () => {
     }
   };
 
-  const onSignal = (signal: NodeJS.Signals) => {
-    void stopApp(signal).finally(() => {
-      process.exit(0);
+  const shutdownAndExit = (reason: string, exitCode = 0) => {
+    void stopApp(reason).finally(() => {
+      process.exit(exitCode);
     });
+  };
+
+  const onSignal = (signal: NodeJS.Signals) => {
+    shutdownAndExit(signal, 0);
   };
 
   process.once("SIGINT", onSignal);
   process.once("SIGTERM", onSignal);
-  process.once("beforeExit", () => {
-    void stopApp("beforeExit");
+  process.once("beforeExit", (code) => {
+    shutdownAndExit("beforeExit", code);
   });
 
   console.log(

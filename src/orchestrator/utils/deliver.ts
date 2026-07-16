@@ -1,10 +1,27 @@
-import { text } from "@spectrum-ts/core";
+import { attachment, group, text } from "@spectrum-ts/core";
 
 import { tapbackEmoji } from "../agents/tapbacks";
 
 import type { DeliverOutboundOptions } from "./types";
 import type { OutboundItem } from "../agents/types";
-import type { Space } from "@spectrum-ts/core";
+import type { ContentInput, Space } from "@spectrum-ts/core";
+
+const buildAlbumContent = (paths: string[]): ContentInput => {
+  if (paths.length === 0) {
+    throw new Error("Album outbound item requires at least one path");
+  }
+
+  if (paths.length === 1) {
+    return attachment(paths[0]!);
+  }
+
+  const [first, second, ...rest] = paths.map((path) => attachment(path));
+  if (!first || !second) {
+    throw new Error("Album outbound item requires at least two paths for a group");
+  }
+
+  return group(first, second, ...rest);
+};
 
 /**
  * Delivers queued outbound items via Spectrum sugar: `message.reply` / `message.react`,
@@ -37,6 +54,15 @@ export const deliverOutbound = async (
           break;
         }
         await targetMessage.react(tapbackEmoji(item.emoji));
+        break;
+      }
+      case "album": {
+        const content = buildAlbumContent(item.paths);
+        if (targetMessage) {
+          await targetMessage.reply(content);
+        } else {
+          await space.send(content);
+        }
         break;
       }
       default: {

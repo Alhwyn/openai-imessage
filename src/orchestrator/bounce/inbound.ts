@@ -72,48 +72,46 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
     console.warn("[bounce] Failed to mark message read", error);
   }
 
-  await turn.space.responding(async () => {
-    console.log(`[bounce] Starting interaction for space ${spaceId}`);
+  console.log(`[bounce] Starting interaction for space ${spaceId}`);
 
-    const tapback = getTapbackOnlyRequest(inboundText);
-    if (tapback) {
-      await deliverOutbound(
-        turn.space,
-        [{ kind: "reaction", emoji: tapback }],
-        { targetMessage: turn.message },
-      );
-      console.log(`[bounce] Completed direct ${tapback} tapback for space ${spaceId}`);
-      return;
-    }
+  const tapback = getTapbackOnlyRequest(inboundText);
+  if (tapback) {
+    await deliverOutbound(
+      turn.space,
+      [{ kind: "reaction", emoji: tapback }],
+      { targetMessage: turn.message },
+    );
+    console.log(`[bounce] Completed direct ${tapback} tapback for space ${spaceId}`);
+    return;
+  }
 
-    let outbound: OutboundItem[];
-    try {
-      ({ outbound } = await runInteractionAgent(spaceId, {
-        kind: "user_message",
-        text: inboundText,
-        images: turn.images,
-      }));
-    } catch (error) {
-      console.error(`[bounce] Interaction failed for space ${spaceId}`, getGmiErrorDetails(error));
-      await deliverOutbound(
-        turn.space,
-        [{ kind: "reaction", emoji: "like" }],
-        { targetMessage: turn.message },
-      );
-      return;
-    }
+  let outbound: OutboundItem[];
+  try {
+    ({ outbound } = await runInteractionAgent(spaceId, {
+      kind: "user_message",
+      text: inboundText,
+      images: turn.images,
+    }));
+  } catch (error) {
+    console.error(`[bounce] Interaction failed for space ${spaceId}`, getGmiErrorDetails(error));
+    await deliverOutbound(
+      turn.space,
+      [{ kind: "reaction", emoji: "like" }],
+      { targetMessage: turn.message },
+    );
+    return;
+  }
 
-    if (outbound.length === 0) {
-      console.log(
-        "[bounce] Turn complete (tools already sent, or waiting on sub-agent)",
-      );
-      return;
-    }
+  if (outbound.length === 0) {
+    console.log(
+      "[bounce] Turn complete (tools already sent, or waiting on sub-agent)",
+    );
+    return;
+  }
 
-    console.log(`[bounce] Delivering ${outbound.length} queued outbound item(s) for space ${spaceId}`);
-    await deliverOutbound(turn.space, outbound, { targetMessage: turn.message });
-    console.log(`[bounce] Completed turn for space ${spaceId}`);
-  });
+  console.log(`[bounce] Delivering ${outbound.length} queued outbound item(s) for space ${spaceId}`);
+  await deliverOutbound(turn.space, outbound, { targetMessage: turn.message });
+  console.log(`[bounce] Completed turn for space ${spaceId}`);
 };
 
 /** Debounces pending turns and flushes the latest value for each key. */

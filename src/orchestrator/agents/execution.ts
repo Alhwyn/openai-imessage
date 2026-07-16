@@ -5,9 +5,9 @@ import { executionSystemPrompt } from "../prompts/index";
 import {
   assertGmiApiKey,
   getGmiErrorDetails,
-  getGmiModelId,
   getGmiTemperature,
   GMI_MAX_RETRIES,
+  GMI_MODEL_ID,
   model,
 } from "../utils/index";
 
@@ -60,7 +60,7 @@ export const runExecutionAgent = async (
 
   const startedAt = Date.now();
   console.log("[agent] Starting GMI execution generation", {
-    model: getGmiModelId(),
+    model: GMI_MODEL_ID,
     maxRetries: GMI_MAX_RETRIES,
   });
 

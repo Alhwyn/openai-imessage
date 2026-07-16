@@ -42,3 +42,46 @@ export type RecentIdTracker = {
   /** Number of currently retained IDs (for tests). */
   size: () => number;
 };
+
+/** Local temp paths for a generated image album. */
+export type GeneratedImageAlbum = {
+  paths: string[];
+  tempDir: string;
+};
+
+/** Progress reported while an image album is generated and downloaded. */
+export type ImageGenerationProgress = {
+  phase: "queued" | "processing" | "downloading";
+  completedImages: number;
+  totalImages: number;
+};
+
+/** Test/injection hooks for GMI image generation. */
+export type GenerateGmiImagesOptions = {
+  fetchFn?: typeof fetch;
+  now?: () => number;
+  onProgress?: (progress: ImageGenerationProgress) => void;
+  pollIntervalMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+  timeoutMs?: number;
+};
+
+/** Seedream request body for GMI image generation. */
+export type SeedreamImagePayload = {
+  prompt: string;
+  size: string;
+  output_format: "jpeg" | "png";
+  max_images: number;
+  sequential_image_generation: "auto" | "disabled";
+  watermark: boolean;
+};
+
+/** Queue/status response from the GMI image request API. */
+export type GmiImageResponse = {
+  request_id?: string;
+  status?: string;
+  outcome?: {
+    media_urls?: Array<{ id?: string; url?: string }>;
+  };
+  error?: string | { message?: string };
+};

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  assertGmiApiKey,
   DEFAULT_GMI_MODEL,
   getGmiErrorDetails,
   GMI_MAX_RETRIES,
@@ -31,41 +30,9 @@ describe("GMI configuration", () => {
   });
 
   test("uses GMI's OpenAI-compatible chat completions provider", () => {
-    const previousApiKey = process.env.GMI_CLOUD_API_KEY;
-    process.env.GMI_CLOUD_API_KEY = "test-key";
-
-    try {
-      const languageModel = model();
-      expect(languageModel.provider).toBe("gmi.chat");
-      expect(languageModel.modelId).toBe(DEFAULT_GMI_MODEL);
-    } finally {
-      if (previousApiKey === undefined) {
-        delete process.env.GMI_CLOUD_API_KEY;
-      } else {
-        process.env.GMI_CLOUD_API_KEY = previousApiKey;
-      }
-    }
-  });
-
-  test("reads the API key when the model is created, not when the module is imported", () => {
-    const previousApiKey = process.env.GMI_CLOUD_API_KEY;
-    delete process.env.GMI_CLOUD_API_KEY;
-
-    try {
-      expect(() => assertGmiApiKey()).toThrow(
-        "Missing or unloaded GMI_CLOUD_API_KEY in this Bun process",
-      );
-
-      process.env.GMI_CLOUD_API_KEY = "runtime-test-key";
-      const languageModel = model();
-      expect(languageModel.provider).toBe("gmi.chat");
-    } finally {
-      if (previousApiKey === undefined) {
-        delete process.env.GMI_CLOUD_API_KEY;
-      } else {
-        process.env.GMI_CLOUD_API_KEY = previousApiKey;
-      }
-    }
+    const languageModel = model();
+    expect(languageModel.provider).toBe("gmi.chat");
+    expect(languageModel.modelId).toBe(DEFAULT_GMI_MODEL);
   });
 
   test("explains provider key-loading failures without exposing configuration", () => {

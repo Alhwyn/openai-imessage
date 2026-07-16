@@ -7,7 +7,11 @@ import {
 } from "ai";
 import { z } from "zod";
 
-import { assignTask } from "../handoff/index";
+import {
+  assignImageTask,
+  assignTask,
+  getImageTaskStatus,
+} from "../handoff/index";
 import {
   appendHistory,
   buildSystemPrompt,
@@ -20,9 +24,11 @@ import { interactionSystemPrompt } from "../prompts/index";
 import {
   assertGmiApiKey,
   getGmiErrorDetails,
-  getGmiModelId,
   getGmiTemperature,
+  GMI_IMAGE_MAX_COUNT,
+  GMI_IMAGE_MIN_COUNT,
   GMI_MAX_RETRIES,
+  GMI_MODEL_ID,
   model,
 } from "../utils/index";
 
@@ -35,6 +41,10 @@ import type {
 } from "./types";
 
 const spaceLocks = new Map<string, Promise<void>>();
+
+const approximateMinutes = (seconds: number): number => {
+  return Math.max(1, Math.ceil(seconds / 60));
+};
 
 /**
  * Runs a function after earlier work for the same space has completed.
@@ -83,6 +93,27 @@ const formatEventMessage = (event: InteractionEvent): UserContent => {
     }
     case "subagent_completion":
       return `[sub-agent completed] taskId=${event.taskId}\nresult:\n${event.result}`;
+    case "image_task_completion": {
+      if (event.ok) {
+        return [
+          `[image task completed] taskId=${event.taskId}`,
+          `status=success`,
+          `generated=${event.paths.length} image(s) for prompt: ${event.prompt}`,
+          `The images will be delivered automatically as an album before your reply.`,
+          `Call reply_to_user with one short suggestion for what they might want next.`,
+          `Do not mention file paths, task ids, or that images were pre-attached.`,
+        ].join("\n");
+      }
+
+      return [
+        `[image task completed] taskId=${event.taskId}`,
+        `status=failed`,
+        `requested=${event.count} image(s) for prompt: ${event.prompt}`,
+        `error=${event.error ?? "unknown error"}`,
+        `Call reply_to_user with a short apology that image generation failed.`,
+        `Do not invent image urls or claim the images were sent.`,
+      ].join("\n");
+    }
     default: {
       const _exhaustive: never = event;
       return _exhaustive;
@@ -127,7 +158,7 @@ export const runInteractionAgent = async (
       spaceId,
       eventKind: event.kind,
       historyCount: history.length,
-      model: getGmiModelId(),
+      model: GMI_MODEL_ID,
       maxRetries: GMI_MAX_RETRIES,
     });
 
@@ -140,7 +171,7 @@ export const runInteractionAgent = async (
       tools: {
         assign_task: tool({
           description:
-            "Assign a task to an execution sub-agent. Returns immediately with a taskId; when the worker finishes you will receive a completion event.",
+            "Assign a task to an execution sub-agent. Returns immediately with a taskId; when the worker finishes you will receive a completion event. Do not use this for image generation.",
           inputSchema: z.object({
             task: z.string().describe("Clear task instructions for the worker"),
           }),
@@ -151,6 +182,48 @@ export const runInteractionAgent = async (
               images: event.kind === "user_message" ? event.images : undefined,
             });
             return { taskId, status };
+          },
+        }),
+        assign_image_task: tool({
+          description:
+            "Generate one or more images with the image sub-agent. Immediately sends a natural acknowledgment with an ETA; when ready the images are delivered as an album and you receive a completion event.",
+          inputSchema: z.object({
+            prompt: z
+              .string()
+              .describe("Clear image prompt describing what to generate"),
+            count: z
+              .number()
+              .int()
+              .min(GMI_IMAGE_MIN_COUNT)
+              .max(GMI_IMAGE_MAX_COUNT)
+              .describe("How many images to generate"),
+          }),
+          execute: ({ prompt, count }) => {
+            console.log("[agent] Image request", {
+              spaceId,
+              count,
+              prompt,
+            });
+            const { taskId, status, estimatedSeconds } = assignImageTask({
+              spaceId,
+              prompt,
+              count,
+            });
+            const estimatedMinutes = approximateMinutes(estimatedSeconds);
+            outbound.push({
+              kind: "text",
+              text: `got u, making those now, should take about ${estimatedMinutes} min`,
+            });
+            return { taskId, status, estimatedSeconds };
+          },
+        }),
+        get_image_task_status: tool({
+          description:
+            "Get real progress for the latest image-generation task in this conversation. Use whenever the person asks for image status, progress, completion count, or ETA.",
+          inputSchema: z.object({}),
+          execute: () => {
+            const progress = getImageTaskStatus(spaceId);
+            return progress ?? { state: "not_found" as const };
           },
         }),
         reply_to_user: tool({

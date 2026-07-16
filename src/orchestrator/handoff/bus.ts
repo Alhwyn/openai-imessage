@@ -1,14 +1,27 @@
-
 import { runExecutionAgent } from "../agents/execution";
-import { deliverOutbound, getGmiErrorDetails } from "../utils/index";
+import {
+  cleanupImageAlbum,
+  deliverOutbound,
+  generateGmiImages,
+  getGmiErrorDetails,
+} from "../utils/index";
+
+import {
+  completeImageTask,
+  createImageTaskProgressHook,
+  failImageTask,
+  startImageTask,
+} from "./imageTaskTracker";
 
 import type {
+  AssignImageTaskInput,
+  AssignImageTaskResult,
   AssignTaskInput,
   AssignTaskResult,
   NotifyOrchestratorInput,
   SpaceHandle,
 } from "./types";
-import type { OutboundItem } from "../agents/types";
+import type { InteractionEvent, OutboundItem } from "../agents/types";
 import type { Message, Space } from "@spectrum-ts/core";
 
 const spaces = new Map<string, SpaceHandle>();
@@ -77,6 +90,115 @@ export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
 };
 
 /**
+ * Assigns an image-generation task to a dedicated sub-agent.
+ * @param input - Prompt and image count for generation.
+ * @returns The task ID and status.
+ */
+export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskResult => {
+  taskCounter += 1;
+  const taskId = `image_${Date.now()}_${taskCounter}`;
+  const task = startImageTask(
+    input.spaceId,
+    taskId,
+    input.prompt,
+    input.count,
+  );
+
+  console.log(
+    `[handoff] Assigned ${taskId} for space ${input.spaceId}: generate ${input.count} image(s)`,
+    input.prompt.slice(0, 120),
+  );
+
+  void (async () => {
+    let tempDir: string | undefined;
+    try {
+      console.log(`[image-agent] Starting ${taskId}`, {
+        count: input.count,
+        promptPreview: input.prompt.slice(0, 120),
+      });
+      const album = await generateGmiImages(input.prompt, input.count, {
+        onProgress: createImageTaskProgressHook(task, (progress) => {
+          console.log(`[image-agent] Progress ${taskId}`, {
+            phase: progress.phase,
+            completedImages: progress.completedImages,
+            totalImages: progress.totalImages,
+          });
+        }),
+      });
+      tempDir = album.tempDir;
+      completeImageTask(task, album.paths.length);
+      console.log(`[image-agent] Completed ${taskId}`, {
+        generatedImages: album.paths.length,
+        elapsedMs: (task.finishedAt ?? Date.now()) - task.startedAt,
+      });
+      await notifyOrchestrator({
+        spaceId: input.spaceId,
+        taskId,
+        result: `Generated ${album.paths.length} image(s)`,
+        album: {
+          paths: album.paths,
+          tempDir: album.tempDir,
+          prompt: input.prompt,
+          count: input.count,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failImageTask(task, message);
+      console.error(`[image-agent] Failed ${taskId}`, error);
+      await notifyOrchestrator({
+        spaceId: input.spaceId,
+        taskId,
+        result: `Image generation failed: ${message}`,
+        albumFailure: {
+          prompt: input.prompt,
+          count: input.count,
+          error: message,
+          tempDir,
+        },
+      });
+    }
+  })();
+
+  return {
+    taskId,
+    status: "started",
+    estimatedSeconds: Math.ceil(task.estimatedDurationMs / 1_000),
+  };
+};
+
+const buildCompletionEvent = (input: NotifyOrchestratorInput): InteractionEvent => {
+  if (input.album) {
+    return {
+      kind: "image_task_completion",
+      taskId: input.taskId,
+      ok: true,
+      prompt: input.album.prompt,
+      count: input.album.count,
+      paths: input.album.paths,
+    };
+  }
+
+  if (input.albumFailure) {
+    return {
+      kind: "image_task_completion",
+      taskId: input.taskId,
+      ok: false,
+      prompt: input.albumFailure.prompt,
+      count: input.albumFailure.count,
+      paths: [],
+      error: input.albumFailure.error,
+    };
+  }
+
+  return {
+    kind: "subagent_completion",
+    taskId: input.taskId,
+    result: input.result,
+  };
+};
+
+/**
  * Notifies the orchestrator of a task completion.
  * @param input - The input to notify the orchestrator.
  * @returns Nothing after the completion has been delivered or dropped.
@@ -89,6 +211,7 @@ export const notifyOrchestrator = async (input: NotifyOrchestratorInput): Promis
   }
 
   inFlight.add(lockKey);
+  const tempDir = input.album?.tempDir ?? input.albumFailure?.tempDir;
 
   try {
     console.log(
@@ -106,35 +229,37 @@ export const notifyOrchestrator = async (input: NotifyOrchestratorInput): Promis
     const { runInteractionAgent } = await import("../agents/interaction");
     const targetMessage = spaces.get(input.spaceId)?.lastInboundMessage;
 
-    await space.responding(async () => {
-      let outbound: OutboundItem[];
-      try {
-        ({ outbound } = await runInteractionAgent(input.spaceId, {
-          kind: "subagent_completion",
-          taskId: input.taskId,
-          result: input.result,
-        }));
-      } catch (error) {
-        console.error(
-          `[handoff] Orchestrator failed for ${input.taskId}`,
-          getGmiErrorDetails(error),
-        );
-        await deliverOutbound(
-          space,
-          [{ kind: "reaction", emoji: "like" }],
-          { targetMessage },
-        );
-        return;
-      }
+    let outbound: OutboundItem[];
+    try {
+      ({ outbound } = await runInteractionAgent(
+        input.spaceId,
+        buildCompletionEvent(input),
+      ));
+    } catch (error) {
+      console.error(
+        `[handoff] Orchestrator failed for ${input.taskId}`,
+        getGmiErrorDetails(error),
+      );
+      await deliverOutbound(
+        space,
+        [{ kind: "reaction", emoji: "like" }],
+        { targetMessage },
+      );
+      return;
+    }
 
-      if (outbound.length === 0) {
-        console.log(`[handoff] Turn complete for ${input.taskId} (tools already sent)`);
-        return;
-      }
+    if (input.album?.paths.length) {
+      outbound = [{ kind: "album", paths: input.album.paths }, ...outbound];
+    }
 
-      await deliverOutbound(space, outbound, { targetMessage });
-    });
+    if (outbound.length === 0) {
+      console.log(`[handoff] Turn complete for ${input.taskId} (tools already sent)`);
+      return;
+    }
+
+    await deliverOutbound(space, outbound, { targetMessage });
   } finally {
     inFlight.delete(lockKey);
+    await cleanupImageAlbum(tempDir);
   }
 };
