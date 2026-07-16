@@ -21,6 +21,29 @@ export const TAPBACK_KEYS = TAPBACKS.map((tapback) => tapback.key) as [
 const TAPBACK_ONLY_REQUEST =
   /^(?:(?:can|could|would|will)\s+(?:you|u)\s+|please\s+)?(?:react|tapback)(?:\s+to)?\s+(?:this|that|the|my)(?:\s+(?:message|text))?$/;
 
+const TAPBACK_ACTION_REQUEST =
+  /^(?:(?:can|could|would|will)\s+(?:you|u)\s+|please\s+)?(?:react|tapback)(?:(?:\s+to)?\s+(?:this|that|the|my)(?:\s+(?:message|text))?)?$/;
+
+const TAPBACK_ALIASES: ReadonlyArray<{
+  key: TapbackKey;
+  aliases: readonly string[];
+}> = [
+  { key: "love", aliases: ["love", "heart"] },
+  { key: "like", aliases: ["thumbs up", "like"] },
+  { key: "dislike", aliases: ["thumbs down", "dislike"] },
+  { key: "laugh", aliases: ["laugh", "haha"] },
+  { key: "emphasize", aliases: ["emphasize", "exclamation"] },
+  { key: "question", aliases: ["question mark", "question"] },
+];
+
+const removeAlias = (text: string, alias: string): string | undefined => {
+  const padded = ` ${text} `;
+  const needle = ` ${alias} `;
+  const index = padded.indexOf(needle);
+  if (index === -1) return undefined;
+  return `${padded.slice(0, index)} ${padded.slice(index + needle.length)}`.trim();
+};
+
 /**
  * Resolves an unambiguous tapback-only command without involving the model.
  * A generic reaction uses iMessage's neutral thumbs-up tapback.
@@ -34,7 +57,22 @@ export const getTapbackOnlyRequest = (text: string): TapbackKey | undefined => {
     .replace(/[.!?]+$/g, "")
     .replace(/\s+/g, " ");
 
-  return TAPBACK_ONLY_REQUEST.test(normalized) ? "like" : undefined;
+  if (TAPBACK_ONLY_REQUEST.test(normalized)) return "like";
+
+  for (const { key, aliases } of TAPBACK_ALIASES) {
+    for (const alias of aliases) {
+      const withoutAlias = removeAlias(normalized, alias);
+      if (withoutAlias === undefined) continue;
+
+      const command = withoutAlias
+        .replace(/\b(?:with|a|an)\b/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (TAPBACK_ACTION_REQUEST.test(command)) return key;
+    }
+  }
+
+  return undefined;
 };
 
 /**
