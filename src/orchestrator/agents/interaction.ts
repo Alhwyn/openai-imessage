@@ -21,7 +21,13 @@ import {
   model,
 } from "../utils/index";
 
-import type { InteractionEvent, InteractionResult } from "./types";
+import { TAPBACK_KEYS } from "./tapbacks";
+
+import type {
+  InteractionEvent,
+  InteractionResult,
+  OutboundItem,
+} from "./types";
 
 const spaceLocks = new Map<string, Promise<void>>();
 
@@ -69,147 +75,6 @@ const formatEventMessage = (event: InteractionEvent): string => {
 };
 
 /**
- * Runs an interaction turn without acquiring the per-space lock.
- * @param spaceId - The space ID.
- * @param event - The event to run the interaction agent for.
- * @returns The interaction result.
- */
-const runInteractionAgentUnlocked = async (
-  spaceId: string,
-  event: InteractionEvent,
-): Promise<InteractionResult> => {
-  assertGmiApiKey();
-
-  const replies: string[] = [];
-  const contextStartedAt = Date.now();
-  console.log("[agent] Loading interaction context", {
-    spaceId,
-    eventKind: event.kind,
-  });
-  const [history, memories] = await Promise.all([
-    getHistory(spaceId),
-    getCuratedMemories(spaceId),
-  ]);
-  console.log("[agent] Interaction context loaded", {
-    spaceId,
-    eventKind: event.kind,
-    elapsedMs: Date.now() - contextStartedAt,
-    historyCount: history.length,
-  });
-  const userContent = formatEventMessage(event);
-  const system = buildSystemPrompt(interactionSystemPrompt, memories);
-
-  const startedAt = Date.now();
-  console.log("[agent] Starting GMI interaction generation", {
-    spaceId,
-    eventKind: event.kind,
-    historyCount: history.length,
-    model: getGmiModelId(),
-    maxRetries: GMI_MAX_RETRIES,
-  });
-
-  const result = await generateText({
-    model: model(),
-    temperature: getGmiTemperature(1),
-    maxRetries: GMI_MAX_RETRIES,
-    abortSignal: createGmiAbortSignal(),
-    system,
-    messages: [...history, { role: "user", content: userContent }],
-    tools: {
-      assign_task: tool({
-        description:
-          "Assign a task to an execution sub-agent. Returns immediately with a taskId; when the worker finishes you will receive a completion event.",
-        inputSchema: z.object({
-          task: z.string().describe("Clear task instructions for the worker"),
-        }),
-        execute: ({ task }) => {
-          const { taskId, status } = assignTask({ spaceId, task });
-          return { taskId, status };
-        },
-      }),
-      reply_to_user: tool({
-        description:
-          "Send one compact, single-line message to the person over iMessage. This is the only outbound path.",
-        inputSchema: z.object({
-          message: z.string().describe("Single-line text to send to the person"),
-        }),
-        execute: ({ message }) => {
-          const normalized = message.replace(/\s+/g, " ").trim();
-          if (normalized) replies.push(normalized);
-          return { ok: true, queued: Boolean(normalized) };
-        },
-      }),
-      memory: tool({
-        description:
-          "Update persistent memory. Use kind=user for the person's preferences/profile; kind=agent for lasting notes and conventions. Do not store secrets.",
-        inputSchema: z.object({
-          kind: z.enum(["user", "agent"]).describe("Which memory file to edit"),
-          action: z
-            .enum(["add", "replace", "remove"])
-            .describe("add appends; replace/remove match old_text substring"),
-          text: z
-            .string()
-            .optional()
-            .describe("New text for add/replace"),
-          old_text: z
-            .string()
-            .optional()
-            .describe("Substring to find for replace/remove"),
-        }),
-        execute: async ({ kind, action, text, old_text }) => {
-          const updated = await editMemory({
-            spaceId,
-            kind,
-            action,
-            text,
-            oldText: old_text,
-          });
-          return {
-            ok: true,
-            kind: updated.kind,
-            body: updated.body,
-            updatedAt: updated.updatedAt,
-          };
-        },
-      }),
-    },
-    stopWhen: stepCountIs(10),
-  }).catch((error: unknown) => {
-    console.error("[agent] GMI interaction generation failed", {
-      spaceId,
-      eventKind: event.kind,
-      elapsedMs: Date.now() - startedAt,
-      ...getGmiErrorDetails(error),
-    });
-    throw error;
-  });
-
-  console.log("[agent] GMI interaction generation completed", {
-    spaceId,
-    eventKind: event.kind,
-    elapsedMs: Date.now() - startedAt,
-    finishReason: result.finishReason,
-    stepCount: result.steps.length,
-    replyCount: replies.length,
-  });
-
-  const nextMessages: ModelMessage[] = [
-    ...history,
-    { role: "user", content: userContent },
-    ...result.response.messages,
-  ];
-  await setHistory(spaceId, nextMessages);
-
-  const fallbackReply = result.text.replace(/\s+/g, " ").trim();
-  if (replies.length === 0 && fallbackReply) {
-    replies.push(fallbackReply);
-    await appendHistory(spaceId, { role: "assistant", content: fallbackReply });
-  }
-
-  return { replies, messages: await getHistory(spaceId) };
-};
-
-/**
  * Serializes and runs an interaction turn for a space.
  * @param spaceId - The space ID.
  * @param event - The event to run the interaction agent for.
@@ -219,5 +84,163 @@ export const runInteractionAgent = async (
   spaceId: string,
   event: InteractionEvent,
 ): Promise<InteractionResult> => {
-  return withSpaceLock(spaceId, () => runInteractionAgentUnlocked(spaceId, event));
+  return withSpaceLock(spaceId, async () => {
+    assertGmiApiKey();
+
+    const outbound: OutboundItem[] = [];
+    const contextStartedAt = Date.now();
+    console.log("[agent] Loading interaction context", {
+      spaceId,
+      eventKind: event.kind,
+    });
+    const [history, memories] = await Promise.all([
+      getHistory(spaceId),
+      getCuratedMemories(spaceId),
+    ]);
+    console.log("[agent] Interaction context loaded", {
+      spaceId,
+      eventKind: event.kind,
+      elapsedMs: Date.now() - contextStartedAt,
+      historyCount: history.length,
+    });
+    const userContent = formatEventMessage(event);
+    const system = buildSystemPrompt(interactionSystemPrompt, memories);
+
+    const startedAt = Date.now();
+    console.log("[agent] Starting GMI interaction generation", {
+      spaceId,
+      eventKind: event.kind,
+      historyCount: history.length,
+      model: getGmiModelId(),
+      maxRetries: GMI_MAX_RETRIES,
+    });
+
+    const result = await generateText({
+      model: model(),
+      temperature: getGmiTemperature(1),
+      maxRetries: GMI_MAX_RETRIES,
+      abortSignal: createGmiAbortSignal(),
+      system,
+      messages: [...history, { role: "user", content: userContent }],
+      tools: {
+        assign_task: tool({
+          description:
+            "Assign a task to an execution sub-agent. Returns immediately with a taskId; when the worker finishes you will receive a completion event.",
+          inputSchema: z.object({
+            task: z.string().describe("Clear task instructions for the worker"),
+          }),
+          execute: ({ task }) => {
+            const { taskId, status } = assignTask({ spaceId, task });
+            return { taskId, status };
+          },
+        }),
+        reply_to_user: tool({
+          description:
+            "Send a threaded iMessage text reply. Use react_and_reply instead when the person asks for both a tapback and text.",
+          inputSchema: z.object({
+            message: z.string().describe("Single-line text to send"),
+          }),
+          execute: ({ message }) => {
+            outbound.push({ kind: "text", text: message });
+            return { ok: true };
+          },
+        }),
+        react_and_reply: tool({
+          description:
+            "React to the person's latest message with a real iMessage tapback, then send a threaded text reply. You MUST use this action when they ask to react and also say, send, or reply with text.",
+          inputSchema: z.object({
+            reaction: z
+              .enum(TAPBACK_KEYS)
+              .describe("Tapback: love, like, dislike, laugh, emphasize, question"),
+            message: z.string().describe("Single-line text reply to send after the tapback"),
+          }),
+          execute: ({ reaction, message }) => {
+            outbound.push(
+              { kind: "reaction", emoji: reaction },
+              { kind: "text", text: message },
+            );
+            return { ok: true };
+          },
+        }),
+        react_to_message: tool({
+          description:
+            "Tapback-only on their latest message (love/like/dislike/laugh/emphasize/question). Use react_and_reply when text is also requested. Calling this is the only tapback-only action.",
+          inputSchema: z.object({
+            emoji: z.enum(TAPBACK_KEYS).describe("Tapback key"),
+          }),
+          execute: ({ emoji }) => {
+            outbound.push({ kind: "reaction", emoji });
+            return { ok: true };
+          },
+        }),
+        memory: tool({
+          description:
+            "Update persistent memory. Use kind=user for the person's preferences/profile; kind=agent for lasting notes and conventions. Do not store secrets.",
+          inputSchema: z.object({
+            kind: z.enum(["user", "agent"]).describe("Which memory file to edit"),
+            action: z
+              .enum(["add", "replace", "remove"])
+              .describe("add appends; replace/remove match old_text substring"),
+            text: z
+              .string()
+              .optional()
+              .describe("New text for add/replace"),
+            old_text: z
+              .string()
+              .optional()
+              .describe("Substring to find for replace/remove"),
+          }),
+          execute: async ({ kind, action, text: memoryText, old_text }) => {
+            const updated = await editMemory({
+              spaceId,
+              kind,
+              action,
+              text: memoryText,
+              oldText: old_text,
+            });
+            return {
+              ok: true,
+              kind: updated.kind,
+              body: updated.body,
+              updatedAt: updated.updatedAt,
+            };
+          },
+        }),
+      },
+      stopWhen: stepCountIs(10),
+    }).catch((error: unknown) => {
+      console.error("[agent] GMI interaction generation failed", {
+        spaceId,
+        eventKind: event.kind,
+        elapsedMs: Date.now() - startedAt,
+        ...getGmiErrorDetails(error),
+      });
+      throw error;
+    });
+
+    console.log("[agent] GMI interaction generation completed", {
+      spaceId,
+      eventKind: event.kind,
+      elapsedMs: Date.now() - startedAt,
+      finishReason: result.finishReason,
+      stepCount: result.steps.length,
+      queuedCount: outbound.length,
+    });
+
+    const nextMessages: ModelMessage[] = [
+      ...history,
+      { role: "user", content: userContent },
+      ...result.response.messages,
+    ];
+    await setHistory(spaceId, nextMessages);
+
+    const fallbackReply = result.text.replace(/\s+/g, " ").trim();
+
+    if (outbound.length === 0 && fallbackReply) {
+      outbound.push({ kind: "text", text: fallbackReply });
+      await appendHistory(spaceId, { role: "assistant", content: fallbackReply });
+    }
+
+    return { outbound, messages: await getHistory(spaceId) };
+  });
 };

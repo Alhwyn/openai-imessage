@@ -3,6 +3,7 @@ import { runInteractionAgent } from "../agents/index";
 import { registerSpace } from "../handoff/index";
 import {
   createKeyedDebounce,
+  deliverOutbound,
   deliverReplies,
   getGmiErrorDetails,
   GMI_UNAVAILABLE_REPLY,
@@ -13,6 +14,7 @@ import type {
   OrchestratorTurn,
   ScheduleOrchestratorTurnInput,
 } from "./types";
+import type { OutboundItem } from "../agents/types";
 
 const DEFAULT_DEBOUNCE_MS = 1_500;
 
@@ -58,7 +60,7 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   if (!inboundText) return;
 
   const spaceId = turn.space.id;
-  registerSpace(spaceId, turn.space);
+  registerSpace(spaceId, turn.space, turn.message);
 
   console.log(`[bounce] Flush space ${spaceId}:`, inboundText.slice(0, 120));
 
@@ -71,9 +73,9 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   await turn.space.responding(async () => {
     console.log(`[bounce] Starting interaction for space ${spaceId}`);
 
-    let replies: string[];
+    let outbound: OutboundItem[];
     try {
-      ({ replies } = await runInteractionAgent(spaceId, {
+      ({ outbound } = await runInteractionAgent(spaceId, {
         kind: "user_message",
         text: inboundText,
       }));
@@ -83,15 +85,15 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
       return;
     }
 
-    if (replies.length === 0) {
+    if (outbound.length === 0) {
       console.log(
-        "[bounce] Orchestrator produced no immediate reply (may be waiting on sub-agent)",
+        "[bounce] Turn complete (tools already sent, or waiting on sub-agent)",
       );
       return;
     }
 
-    console.log(`[bounce] Delivering ${replies.length} reply/replies for space ${spaceId}`);
-    await deliverReplies(turn.space, replies);
+    console.log(`[bounce] Delivering ${outbound.length} queued outbound item(s) for space ${spaceId}`);
+    await deliverOutbound(turn.space, outbound, { targetMessage: turn.message });
     console.log(`[bounce] Completed turn for space ${spaceId}`);
   });
 };
@@ -108,7 +110,7 @@ const debounce = createKeyedDebounce<OrchestratorTurn>({
  */
 export const scheduleOrchestratorTurn = (input: ScheduleOrchestratorTurnInput): void => {
   const key = input.senderKey?.trim() || input.space.id;
-  registerSpace(input.space.id, input.space);
+  registerSpace(input.space.id, input.space, input.message);
 
   const next = buildDebouncedTurn(pendingTurns.get(key), input);
   pendingTurns.set(key, next);

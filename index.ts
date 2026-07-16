@@ -71,11 +71,7 @@ const main = async () => {
   assertConvexEnv();
 
   const { projectId, projectSecret, webhookSecret, missing } = getSpectrumEnv();
-  if (missing.length > 0) {
-    throw new Error(`Missing env: ${missing.join(", ")}`);
-  }
-
-  const port = Number.parseInt(process.env.AGENT_PORT?.trim() || "4001", 10);
+  if (missing.length > 0) throw new Error(`Missing env: ${missing.join(", ")}`);
 
   const app = await Spectrum({
     projectId: projectId!,
@@ -84,10 +80,7 @@ const main = async () => {
     webhookSecret,
   });
 
-  console.log(
-    `[app] Orchestrator listening (Spectrum + GMI). Debounced inbound → assign_task → notify → space.send`,
-  );
-  console.log(`[app] AGENT_PORT hint: ${port} (set BASE_URL when using the tunnel)`);
+  console.log(`[app] Orchestrator listening (Spectrum + GMI). Debounced inbound → assign_task → notify → reply/react`);
 
   for await (const [space, message] of app.messages) {
     try {

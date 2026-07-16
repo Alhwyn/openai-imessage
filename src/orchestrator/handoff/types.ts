@@ -1,7 +1,9 @@
-import type { Space } from "@spectrum-ts/core";
+import type { Message, Space } from "@spectrum-ts/core";
 
 export type SpaceHandle = {
   space: Space;
+  /** Latest inbound message; used for tapbacks / threaded replies after handoff. */
+  lastInboundMessage?: Message;
 };
 
 export type AssignTaskInput = {
