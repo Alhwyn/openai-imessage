@@ -13,10 +13,11 @@ export {
 } from "./llm";
 export type { GmiErrorDetails } from "./llm";
 export type { 
+  DeliverOutboundOptions,
   KeyedDebounce,
   KeyedDebounceOptions,
 } from "./types";
 export { createKeyedDebounce } from "./debounce";
 export { extractInboundText } from "./text";
-export { deliverReplies } from "./deliver";
+export { deliverOutbound, deliverReplies } from "./deliver";
 

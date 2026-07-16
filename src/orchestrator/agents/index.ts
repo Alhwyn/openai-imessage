@@ -1,3 +1,14 @@
 export { runExecutionAgent } from "./execution";
 export { runInteractionAgent } from "./interaction";
-export type { InteractionEvent, InteractionResult } from "./types";
+export {
+  getTapbackOnlyRequest,
+  TAPBACKS,
+  TAPBACK_KEYS,
+  tapbackEmoji,
+} from "./tapbacks";
+export type { TapbackKey } from "./tapbacks";
+export type {
+  InteractionEvent,
+  InteractionResult,
+  OutboundItem,
+} from "./types";

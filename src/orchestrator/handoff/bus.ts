@@ -1,6 +1,6 @@
 
 import { runExecutionAgent } from "../agents/execution";
-import { deliverReplies, getGmiErrorDetails, GMI_UNAVAILABLE_REPLY } from "../utils/index";
+import { deliverOutbound, deliverReplies, getGmiErrorDetails, GMI_UNAVAILABLE_REPLY } from "../utils/index";
 
 import type {
   AssignTaskInput,
@@ -8,7 +8,8 @@ import type {
   NotifyOrchestratorInput,
   SpaceHandle,
 } from "./types";
-import type { Space } from "@spectrum-ts/core";
+import type { OutboundItem } from "../agents/types";
+import type { Message, Space } from "@spectrum-ts/core";
 
 const spaces = new Map<string, SpaceHandle>();
 const inFlight = new Set<string>();
@@ -16,12 +17,21 @@ const inFlight = new Set<string>();
 let taskCounter = 0;
 
 /**
- * Registers a space.
+ * Registers a space and optionally remembers the latest inbound message.
  * @param spaceId - The space ID.
  * @param space - The space to register.
+ * @param lastInboundMessage - Latest inbound message for replies/reactions.
  */
-export const registerSpace = (spaceId: string, space: Space): void => {
-  spaces.set(spaceId, { space });
+export const registerSpace = (
+  spaceId: string,
+  space: Space,
+  lastInboundMessage?: Message,
+): void => {
+  const existing = spaces.get(spaceId);
+  spaces.set(spaceId, {
+    space,
+    lastInboundMessage: lastInboundMessage ?? existing?.lastInboundMessage,
+  });
 };
 
 /**
@@ -94,31 +104,31 @@ export const notifyOrchestrator = async (input: NotifyOrchestratorInput): Promis
 
     // Dynamic import avoids a cycle: interaction → assignTask → notify → interaction
     const { runInteractionAgent } = await import("../agents/interaction");
-    let replies: string[];
-    try {
-      ({ replies } = await runInteractionAgent(input.spaceId, {
-        kind: "subagent_completion",
-        taskId: input.taskId,
-        result: input.result,
-      }));
-    } catch (error) {
-      console.error(
-        `[handoff] Orchestrator failed for ${input.taskId}`,
-        getGmiErrorDetails(error),
-      );
-      await space.responding(async () => {
-        await deliverReplies(space, [GMI_UNAVAILABLE_REPLY]);
-      });
-      return;
-    }
-
-    if (replies.length === 0) {
-      console.warn(`[handoff] Orchestrator produced no reply for ${input.taskId}`);
-      return;
-    }
+    const targetMessage = spaces.get(input.spaceId)?.lastInboundMessage;
 
     await space.responding(async () => {
-      await deliverReplies(space, replies);
+      let outbound: OutboundItem[];
+      try {
+        ({ outbound } = await runInteractionAgent(input.spaceId, {
+          kind: "subagent_completion",
+          taskId: input.taskId,
+          result: input.result,
+        }));
+      } catch (error) {
+        console.error(
+          `[handoff] Orchestrator failed for ${input.taskId}`,
+          getGmiErrorDetails(error),
+        );
+        await deliverReplies(space, [GMI_UNAVAILABLE_REPLY]);
+        return;
+      }
+
+      if (outbound.length === 0) {
+        console.log(`[handoff] Turn complete for ${input.taskId} (tools already sent)`);
+        return;
+      }
+
+      await deliverOutbound(space, outbound, { targetMessage });
     });
   } finally {
     inFlight.delete(lockKey);
