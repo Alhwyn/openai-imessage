@@ -13,7 +13,6 @@ import {
   getImageTaskStatus,
 } from "../handoff/index";
 import {
-  appendHistory,
   buildSystemPrompt,
   editMemory,
   getCuratedMemories,
@@ -32,6 +31,7 @@ import {
   model,
 } from "../utils/index";
 
+import { coalesceTextReplies } from "./outbound";
 import { TAPBACK_KEYS } from "./tapbacks";
 
 import type {
@@ -227,7 +227,11 @@ export const runInteractionAgent = async (
           description:
             "Send a threaded iMessage text reply. Use react_and_reply instead when the person asks for both a tapback and text.",
           inputSchema: z.object({
-            message: z.string().describe("Single-line text to send"),
+            message: z
+              .string()
+              .describe(
+                "Plain text to send. Brief replies should be one line; long structured copy may use line breaks and blank lines.",
+              ),
           }),
           execute: ({ message }) => {
             outbound.push({ kind: "text", text: message });
@@ -241,7 +245,11 @@ export const runInteractionAgent = async (
             reaction: z
               .enum(TAPBACK_KEYS)
               .describe("Tapback: love, like, dislike, laugh, emphasize, question"),
-            message: z.string().describe("Single-line text reply to send after the tapback"),
+            message: z
+              .string()
+              .describe(
+                "Plain-text reply to send after the tapback. Long structured copy may use line breaks.",
+              ),
           }),
           execute: ({ reaction, message }) => {
             outbound.push(
@@ -307,13 +315,21 @@ export const runInteractionAgent = async (
       throw error;
     });
 
+    const finalOutbound = coalesceTextReplies(outbound);
+    if (finalOutbound.length < outbound.length) {
+      console.warn("[agent] Coalesced duplicate text replies", {
+        spaceId,
+        removedCount: outbound.length - finalOutbound.length,
+      });
+    }
+
     console.log("[agent] GMI interaction generation completed", {
       spaceId,
       eventKind: event.kind,
       elapsedMs: Date.now() - startedAt,
       finishReason: result.finishReason,
       stepCount: result.steps.length,
-      queuedCount: outbound.length,
+      queuedCount: finalOutbound.length,
     });
 
     const nextMessages: ModelMessage[] = [
@@ -323,12 +339,6 @@ export const runInteractionAgent = async (
     ];
     await setHistory(spaceId, nextMessages);
 
-    const fallbackReply = result.text.replace(/\s+/g, " ").trim();
-    if (outbound.length === 0 && fallbackReply) {
-      outbound.push({ kind: "text", text: fallbackReply });
-      await appendHistory(spaceId, { role: "assistant", content: fallbackReply });
-    }
-
-    return { outbound, messages: await getHistory(spaceId) };
+    return { outbound: finalOutbound, messages: await getHistory(spaceId) };
   });
 };
