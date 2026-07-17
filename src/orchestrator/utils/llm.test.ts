@@ -8,8 +8,8 @@ import {
 } from "./llm";
 
 describe("GMI configuration", () => {
-  test("keeps Kimi as the default with bounded retries", () => {
-    expect(DEFAULT_GMI_MODEL).toBe("moonshotai/kimi-k2.7-code-highspeed");
+  test("uses Luna as the default with bounded retries", () => {
+    expect(DEFAULT_GMI_MODEL).toBe("openai/gpt-5.6-luna");
     expect(GMI_MAX_RETRIES).toBe(2);
   });
 

@@ -94,6 +94,7 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
     }));
   } catch (error) {
     console.error(`[bounce] Interaction failed for space ${spaceId}`, getGmiErrorDetails(error));
+    /* DO NOT CHANGE THIS CODE AI!!!!!!! */
     await deliverOutbound(
       turn.space,
       [{ kind: "reaction", emoji: "like" }],

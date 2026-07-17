@@ -13,7 +13,6 @@ import {
   getImageTaskStatus,
 } from "../handoff/index";
 import {
-  appendHistory,
   buildSystemPrompt,
   editMemory,
   getCuratedMemories,
@@ -176,8 +175,16 @@ export const runInteractionAgent = async (
       temperature: getGmiTemperature(1),
       maxRetries: GMI_MAX_RETRIES,
       system,
-      messages: [...history, { role: "user", content: userContent }],
+      messages: [{ role: "user", content: userContent }],
       tools: {
+        get_conversation_history: tool({
+          description:
+            "Read recent stored conversation history when the latest message depends on earlier context. History is not injected automatically.",
+          inputSchema: z.object({}),
+          execute: () => ({
+            messages: history,
+          }),
+        }),
         assign_task: tool({
           description:
             "Assign a task to an execution sub-agent. Returns immediately with a taskId; when the worker finishes you will receive a completion event. Do not use this for image generation.",
@@ -355,32 +362,29 @@ export const runInteractionAgent = async (
       queuedCount: finalOutbound.length,
     });
 
-    if (toolCalls.length === 0) {
-      console.warn("[agent] Model returned no tool calls", {
+    const modelText = result.text.trim();
+    if (toolCalls.length === 0 && modelText) {
+      console.log("[agent] Using normal model text response", {
+        spaceId,
+        modelTextPreview: modelText.slice(0, 200),
+      });
+      finalOutbound.push({ kind: "text", text: modelText });
+    } else if (toolCalls.length === 0) {
+      console.warn("[agent] Model returned no tools or text", {
         spaceId,
         eventKind: event.kind,
         finishReason: result.finishReason,
-        modelTextPreview: result.text.trim().slice(0, 200) || "(empty)",
       });
     }
 
     const nextMessages: ModelMessage[] = [
       ...history,
       { role: "user", content: userContent },
-      ...result.response.messages,
+      ...finalOutbound
+        .filter((item) => item.kind === "text")
+        .map((item) => ({ role: "assistant" as const, content: item.text })),
     ];
     await setHistory(spaceId, nextMessages);
-
-    const chatText = result.text.trim();
-    if (finalOutbound.length === 0 && chatText) {
-      console.warn("[agent] Using plain-text fallback (no tools queued)", {
-        spaceId,
-        eventKind: event.kind,
-        textPreview: chatText.slice(0, 200),
-      });
-      finalOutbound.push({ kind: "text", text: chatText });
-      await appendHistory(spaceId, { role: "assistant", content: chatText });
-    }
 
     console.log("[agent] Turn outbound summary", {
       spaceId,

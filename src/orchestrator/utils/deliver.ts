@@ -54,9 +54,15 @@ export const deliverOutbound = async (
         break;
       }
       case "album": {
-        console.log("[deliver] Sending album via space.send", {
+        const totalBytes = item.paths.reduce(
+          (total, path) => total + Bun.file(path).size,
+          0,
+        );
+        console.log("[deliver] Sending grouped album via space.send", {
           pathCount: item.paths.length,
           paths: item.paths,
+          totalBytes,
+          totalMebibytes: Number((totalBytes / 1_048_576).toFixed(2)),
         });
         await space.send(buildAlbumContent(item.paths));
         break;

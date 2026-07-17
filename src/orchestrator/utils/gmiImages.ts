@@ -19,7 +19,8 @@ export const GMI_IMAGE_MAX_COUNT = 15;
 export const GMI_IMAGE_TIMEOUT_MS = 120_000;
 export const GMI_IMAGE_POLL_INTERVAL_MS = 2_000;
 export const GMI_IMAGE_SIZE = "2K";
-export const GMI_IMAGE_OUTPUT_FORMAT = "png";
+export const GMI_IMAGE_OUTPUT_FORMAT = "jpeg";
+export const GMI_IMAGE_MAX_FILE_BYTES = 10 * 1_048_576;
 
 const REQUESTS_URL = `${GMI_IMAGE_API_BASE}/api/v1/ie/requestqueue/apikey/requests`;
 
@@ -203,9 +204,19 @@ const downloadAlbum = async (
       if (bytes.byteLength === 0) {
         throw new Error("Downloaded generated image was empty");
       }
+      if (bytes.byteLength > GMI_IMAGE_MAX_FILE_BYTES) {
+        throw new Error(
+          `Generated image exceeds the 10 MiB upload limit (${(bytes.byteLength / 1_048_576).toFixed(2)} MiB)`,
+        );
+      }
 
-      const path = join(tempDir, `image-${index + 1}.png`);
+      const path = join(tempDir, `image-${index + 1}.jpeg`);
       await Bun.write(path, bytes);
+      console.log("[images] Staged generated image", {
+        index: index + 1,
+        bytes: bytes.byteLength,
+        mebibytes: Number((bytes.byteLength / 1_048_576).toFixed(2)),
+      });
       paths.push(path);
     }
 
@@ -218,7 +229,7 @@ const downloadAlbum = async (
 
 /**
  * Generates images via Seedream on GMI, polls when queued, and stages files locally.
- * One Seedream job per prompt, in parallel.
+ * One Seedream job per prompt, processed sequentially to limit peak memory.
  */
 export const generateGmiImages = async (
   prompts: string[],
@@ -250,14 +261,13 @@ export const generateGmiImages = async (
 
   const startedAt = wait.now();
   reportProgress("queued");
-  const mediaUrls = await Promise.all(
-    imagePrompts.map(async (prompt) => {
-      const url = await generateOneImageUrl(prompt, fetchFn, wait, reportProgress);
-      completedImages += 1;
-      reportProgress("processing");
-      return url;
-    }),
-  );
+  const mediaUrls: string[] = [];
+  for (const prompt of imagePrompts) {
+    const url = await generateOneImageUrl(prompt, fetchFn, wait, reportProgress);
+    mediaUrls.push(url);
+    completedImages += 1;
+    reportProgress("processing");
+  }
   reportProgress("downloading");
   const album = await downloadAlbum(mediaUrls, fetchFn);
 

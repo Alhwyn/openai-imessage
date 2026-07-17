@@ -11,6 +11,7 @@ import {
   generateGmiImages,
   getGmiImageModelId,
   GMI_IMAGE_API_BASE,
+  GMI_IMAGE_MAX_FILE_BYTES,
   GMI_IMAGE_MAX_COUNT,
   GMI_IMAGE_MIN_COUNT,
 } from "./gmiImages";
@@ -52,8 +53,8 @@ describe("clampImageCount", () => {
 });
 
 describe("getGmiImageModelId", () => {
-  test("defaults to seedream-5.0-pro and honors GMI_IMAGE_MODEL", () => {
-    expect(DEFAULT_GMI_IMAGE_MODEL).toBe("seedream-5.0-pro");
+  test("defaults to seedream-5.0-lite and honors GMI_IMAGE_MODEL", () => {
+    expect(DEFAULT_GMI_IMAGE_MODEL).toBe("seedream-5.0-lite");
     expect(getGmiImageModelId()).toBe(DEFAULT_GMI_IMAGE_MODEL);
     process.env.GMI_IMAGE_MODEL = "custom-image-model";
     expect(getGmiImageModelId()).toBe("custom-image-model");
@@ -74,7 +75,7 @@ describe("cleanupImageAlbum", () => {
 });
 
 describe("generateGmiImages", () => {
-  test("fans out one Seedream job per image, downloads urls, and stages files", async () => {
+  test("runs one Seedream job per image sequentially, downloads urls, and stages files", async () => {
     let postCount = 0;
     const progress: ImageGenerationProgress[] = [];
     const fetchFn = mock(
@@ -96,11 +97,11 @@ describe("generateGmiImages", () => {
               watermark: boolean;
             };
           };
-          expect(body.model).toBe("seedream-5.0-pro");
+          expect(body.model).toBe("seedream-5.0-lite");
           expect(body.payload.prompt).toBe("a fluffy cat");
           expect(body.payload.max_images).toBe(1);
           expect(body.payload.size).toBe("2K");
-          expect(body.payload.output_format).toBe("png");
+          expect(body.payload.output_format).toBe("jpeg");
           expect(body.payload.sequential_image_generation).toBe("disabled");
           expect(body.payload.watermark).toBe(false);
 
@@ -229,6 +230,46 @@ describe("generateGmiImages", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toContain("moderation blocked");
+    }
+  });
+
+  test("rejects generated images larger than 10 MiB", async () => {
+    const fetchFn = mock((input: string | URL | Request) => {
+      const url = requestUrl(input);
+      if (
+        url === `${GMI_IMAGE_API_BASE}/api/v1/ie/requestqueue/apikey/requests`
+      ) {
+        return Promise.resolve(
+          jsonResponse({
+            request_id: "req-oversized",
+            status: "success",
+            outcome: {
+              media_urls: [{ id: "0", url: "https://cdn.example/oversized.jpeg" }],
+            },
+          }),
+        );
+      }
+
+      if (url === "https://cdn.example/oversized.jpeg") {
+        return Promise.resolve(
+          new Response(new Uint8Array(GMI_IMAGE_MAX_FILE_BYTES + 1)),
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    try {
+      await generateGmiImages(["oversized image"], {
+        fetchFn: fetchFn as unknown as typeof fetch,
+        sleep: noopSleep,
+      });
+      throw new Error("expected generateGmiImages to reject an oversized image");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain(
+        "exceeds the 10 MiB upload limit",
+      );
     }
   });
 

@@ -84,7 +84,11 @@ export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
         result: `Sub-agent failed: ${message}`,
       });
     }
-  })();
+  })().catch((error: unknown) => {
+    console.error(`[handoff] Unhandled task failure for ${taskId}`, {
+      ...getGmiErrorDetails(error),
+    });
+  });
 
   return { taskId, status: "started" };
 };
@@ -164,7 +168,11 @@ export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskRes
         },
       });
     }
-  })();
+  })().catch((error: unknown) => {
+    console.error(`[image-agent] Unhandled task failure for ${taskId}`, {
+      ...getGmiErrorDetails(error),
+    });
+  });
 
   return {
     taskId,

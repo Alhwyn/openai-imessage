@@ -2,7 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 export const GMI_CLOUD_BASE_URL = "https://api.gmi-serving.com/v1";
 export const GMI_API_KEY = process.env.GMI_CLOUD_API_KEY?.trim() ?? "";
-export const DEFAULT_GMI_MODEL = "moonshotai/kimi-k2.7-code-highspeed";
+export const DEFAULT_GMI_MODEL = "openai/gpt-5.6-luna";
 export const GMI_MODEL_ID = process.env.GMI_MODEL?.trim() || DEFAULT_GMI_MODEL;
 /** Match the reference provider's three total attempts without a minute-long silent wait. */
 export const GMI_MAX_RETRIES = 2;
