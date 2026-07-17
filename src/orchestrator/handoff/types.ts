@@ -60,24 +60,3 @@ export type ImageTaskRecord = {
   error?: string;
 };
 
-export type NotifyImageAlbum = {
-  paths: string[];
-  tempDir: string;
-  prompt: string;
-  count: number;
-};
-
-export type NotifyImageFailure = {
-  prompt: string;
-  count: number;
-  error: string;
-  tempDir?: string;
-};
-
-export type NotifyOrchestratorInput = {
-  spaceId: string;
-  taskId: string;
-  result: string;
-  album?: NotifyImageAlbum;
-  albumFailure?: NotifyImageFailure;
-};

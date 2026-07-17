@@ -78,48 +78,17 @@ const withSpaceLock = async <T>(spaceId: string, fn: () => Promise<T>): Promise<
  * @returns The formatted event message.
  */
 const formatEventMessage = (event: InteractionEvent): UserContent => {
-  switch (event.kind) {
-    case "user_message": {
-      if (!event.images?.length) return event.text;
+  if (!event.images?.length) return event.text;
 
-      return [
-        ...(event.text ? [{ type: "text" as const, text: event.text }] : []),
-        ...event.images.map((image) => ({
-          type: "file" as const,
-          data: image.data,
-          filename: image.filename,
-          mediaType: image.mediaType,
-        })),
-      ];
-    }
-    case "subagent_completion":
-      return `[sub-agent completed] taskId=${event.taskId}\nresult:\n${event.result}`;
-    case "image_task_completion": {
-      if (event.ok) {
-        return [
-          `[image task completed] taskId=${event.taskId}`,
-          `status=success`,
-          `generated=${event.paths.length} image(s) for prompt: ${event.prompt}`,
-          `The images will be delivered automatically as an album before your reply.`,
-          `Call reply_to_user with one short suggestion for what they might want next.`,
-          `Do not mention file paths, task ids, or that images were pre-attached.`,
-        ].join("\n");
-      }
-
-      return [
-        `[image task completed] taskId=${event.taskId}`,
-        `status=failed`,
-        `requested=${event.count} image(s) for prompt: ${event.prompt}`,
-        `error=${event.error ?? "unknown error"}`,
-        `Call reply_to_user with a short apology that image generation failed.`,
-        `Do not invent image urls or claim the images were sent.`,
-      ].join("\n");
-    }
-    default: {
-      const _exhaustive: never = event;
-      return _exhaustive;
-    }
-  }
+  return [
+    ...(event.text ? [{ type: "text" as const, text: event.text }] : []),
+    ...event.images.map((image) => ({
+      type: "file" as const,
+      data: image.data,
+      filename: image.filename,
+      mediaType: image.mediaType,
+    })),
+  ];
 };
 
 /**
@@ -161,8 +130,6 @@ export const runInteractionAgent = async (
         imageCount: event.images?.length ?? 0,
       });
     }
-
-    const startedAt = Date.now();
     console.log("[agent] Starting GMI interaction generation", {
       spaceId,
       eventKind: event.kind,
@@ -171,6 +138,7 @@ export const runInteractionAgent = async (
       maxRetries: GMI_MAX_RETRIES,
     });
 
+    const startedAt = Date.now();
     const result = await generateText({
       model: GMI_MODEL,
       temperature: GMI_TEMPERATURE,
@@ -188,7 +156,7 @@ export const runInteractionAgent = async (
         }),
         assign_task: tool({
           description:
-            "Assign a task to an execution sub-agent. Returns immediately with a taskId; when the worker finishes you will receive a completion event. Do not use this for image generation.",
+            "Assign a task to an execution sub-agent. Returns immediately with a taskId; the worker delivers its result directly when finished. Do not use this for image generation.",
           inputSchema: z.object({
             task: z.string().describe("Clear task instructions for the worker"),
           }),
@@ -203,7 +171,7 @@ export const runInteractionAgent = async (
         }),
         assign_image_task: tool({
           description:
-            "Generate images with the image sub-agent. Pass one prompt per image. Immediately sends a natural acknowledgment with an ETA; when ready the images are delivered as an album and you receive a completion event.",
+            "Generate images with the image sub-agent. Pass one prompt per image. Immediately sends a natural acknowledgment with an ETA; when ready the images are delivered as an album directly. Do not send another reply on that turn.",
           inputSchema: z.object({
             prompts: z
               .array(z.string().min(1))
@@ -240,49 +208,9 @@ export const runInteractionAgent = async (
             return progress ?? { state: "not_found" as const };
           },
         }),
-        reply_to_user: tool({
-          description:
-            "Send a chat text message. Use react_and_reply instead when the person asks for both a tapback and text.",
-          inputSchema: z.object({
-            message: z
-              .string()
-              .describe(
-                "Plain text to send. Brief replies should be one line; long structured copy may use line breaks and blank lines.",
-              ),
-          }),
-          execute: ({ message }) => {
-            console.log("[agent] Tool called: reply_to_user", {
-              spaceId,
-              messagePreview: message.slice(0, 120),
-            });
-            outbound.push({ kind: "text", text: message });
-            return { ok: true };
-          },
-        }),
-        react_and_reply: tool({
-          description:
-            "React to the person's latest message with a real iMessage tapback, then send a chat text message. You MUST use this action when they ask to react and also say, send, or reply with text.",
-          inputSchema: z.object({
-            reaction: z
-              .enum(TAPBACK_KEYS)
-              .describe("Tapback: love, like, dislike, laugh, emphasize, question"),
-            message: z
-              .string()
-              .describe(
-                "Plain-text chat message to send after the tapback. Long structured copy may use line breaks.",
-              ),
-          }),
-          execute: ({ reaction, message }) => {
-            outbound.push(
-              { kind: "reaction", emoji: reaction },
-              { kind: "text", text: message },
-            );
-            return { ok: true };
-          },
-        }),
         react_to_message: tool({
           description:
-            "Tapback-only on their latest message (love/like/dislike/laugh/emphasize/question). Use react_and_reply when text is also requested. Calling this is the only tapback-only action.",
+            "Tapback on their latest message (love/like/dislike/laugh/emphasize/question). Use when they want a reaction only, or call this before your text reply when they want both.",
           inputSchema: z.object({
             emoji: z.enum(TAPBACK_KEYS).describe("Tapback key"),
           }),
@@ -364,8 +292,8 @@ export const runInteractionAgent = async (
     });
 
     const modelText = result.text.trim();
-    if (toolCalls.length === 0 && modelText) {
-      console.log("[agent] Using normal model text response", {
+    if (modelText) {
+      console.log("[agent] Using model text response", {
         spaceId,
         modelTextPreview: modelText.slice(0, 200),
       });

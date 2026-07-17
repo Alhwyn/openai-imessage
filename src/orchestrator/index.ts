@@ -12,7 +12,6 @@ export { assertConvexEnv } from "./db/index";
 export {
   assignImageTask,
   assignTask,
-  notifyOrchestrator,
   registerSpace,
 } from "./handoff/index";
 export {

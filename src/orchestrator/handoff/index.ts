@@ -2,7 +2,6 @@ export {
   assignImageTask,
   assignTask,
   getRegisteredSpace,
-  notifyOrchestrator,
   registerSpace,
 } from "./bus";
 export { getImageTaskStatus } from "./imageTaskTracker";
@@ -14,8 +13,5 @@ export type {
   ImageTaskRecord,
   ImageTaskState,
   ImageTaskStatus,
-  NotifyImageAlbum,
-  NotifyImageFailure,
-  NotifyOrchestratorInput,
   SpaceHandle,
 } from "./types";
