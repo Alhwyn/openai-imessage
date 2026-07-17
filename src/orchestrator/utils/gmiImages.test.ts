@@ -3,11 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, mock, test } from "bun:test";
+import sharp from "sharp";
 
 import {
   GMI_IMAGE_API_BASE,
-  GMI_IMAGE_MAX_FILE_BYTES,
   GMI_IMAGE_MAX_COUNT,
+  GMI_IMAGE_MAX_FILE_BYTES,
   GMI_IMAGE_MIN_COUNT,
   GMI_IMAGE_MODEL_ID,
 } from "./constants";
@@ -19,7 +20,19 @@ import {
 
 import type { ImageGenerationProgress } from "./types";
 
-const PNG_BYTES = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+const SOURCE_PNG = await sharp({
+  create: {
+    width: 64,
+    height: 64,
+    channels: 3,
+    background: { r: 40, g: 120, b: 200 },
+  },
+})
+  .png()
+  .toBuffer();
+
+const isJpeg = (bytes: Uint8Array): boolean =>
+  bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8;
 
 const jsonResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
@@ -45,6 +58,7 @@ describe("clampImageCount", () => {
     expect(clampImageCount(0)).toBe(GMI_IMAGE_MIN_COUNT);
     expect(clampImageCount(3.9)).toBe(3);
     expect(clampImageCount(99)).toBe(GMI_IMAGE_MAX_COUNT);
+    expect(GMI_IMAGE_MAX_COUNT).toBe(3);
     expect(clampImageCount(Number.NaN)).toBe(GMI_IMAGE_MIN_COUNT);
   });
 });
@@ -59,7 +73,7 @@ describe("cleanupImageAlbum", () => {
   test("removes a temp directory", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "gmi-cleanup-"));
     const imagePath = join(tempDir, "image-1.png");
-    await Bun.write(imagePath, PNG_BYTES);
+    await Bun.write(imagePath, SOURCE_PNG);
 
     await cleanupImageAlbum(tempDir);
 
@@ -69,7 +83,7 @@ describe("cleanupImageAlbum", () => {
 });
 
 describe("generateGmiImages", () => {
-  test("runs one Seedream job per image sequentially, downloads urls, and stages files", async () => {
+  test("runs one Seedream job per image sequentially, downloads urls, and stages JPEGs", async () => {
     let postCount = 0;
     const progress: ImageGenerationProgress[] = [];
     const fetchFn = mock(
@@ -119,7 +133,7 @@ describe("generateGmiImages", () => {
           url === "https://cdn.example/a.png" ||
           url === "https://cdn.example/b.png"
         ) {
-          return Promise.resolve(new Response(PNG_BYTES));
+          return Promise.resolve(new Response(SOURCE_PNG));
         }
 
         throw new Error(`Unexpected fetch: ${url}`);
@@ -142,8 +156,13 @@ describe("generateGmiImages", () => {
       { phase: "downloading", completedImages: 2, totalImages: 2 },
     ]);
     expect(album.paths).toHaveLength(2);
-    expect(await Bun.file(album.paths[0]!).bytes()).toEqual(PNG_BYTES);
-    expect(await Bun.file(album.paths[1]!).bytes()).toEqual(PNG_BYTES);
+
+    const first = await Bun.file(album.paths[0]!).bytes();
+    const second = await Bun.file(album.paths[1]!).bytes();
+    expect(isJpeg(first)).toBe(true);
+    expect(isJpeg(second)).toBe(true);
+    expect(first.byteLength).toBeLessThanOrEqual(GMI_IMAGE_MAX_FILE_BYTES);
+    expect(second.byteLength).toBeLessThanOrEqual(GMI_IMAGE_MAX_FILE_BYTES);
 
     await cleanupImageAlbum(album.tempDir);
   });
@@ -187,7 +206,7 @@ describe("generateGmiImages", () => {
       }
 
       if (url === "https://cdn.example/one.png") {
-        return Promise.resolve(new Response(PNG_BYTES));
+        return Promise.resolve(new Response(SOURCE_PNG));
       }
 
       throw new Error(`Unexpected fetch: ${url}`);
@@ -201,6 +220,7 @@ describe("generateGmiImages", () => {
 
     expect(polls).toBe(2);
     expect(album.paths).toHaveLength(1);
+    expect(isJpeg(await Bun.file(album.paths[0]!).bytes())).toBe(true);
     await cleanupImageAlbum(album.tempDir);
   });
 
@@ -227,7 +247,7 @@ describe("generateGmiImages", () => {
     }
   });
 
-  test("rejects generated images larger than 10 MiB", async () => {
+  test("rejects non-image downloads during staging", async () => {
     const fetchFn = mock((input: string | URL | Request) => {
       const url = requestUrl(input);
       if (
@@ -235,35 +255,30 @@ describe("generateGmiImages", () => {
       ) {
         return Promise.resolve(
           jsonResponse({
-            request_id: "req-oversized",
+            request_id: "req-bad",
             status: "success",
             outcome: {
-              media_urls: [{ id: "0", url: "https://cdn.example/oversized.jpeg" }],
+              media_urls: [{ id: "0", url: "https://cdn.example/bad.bin" }],
             },
           }),
         );
       }
 
-      if (url === "https://cdn.example/oversized.jpeg") {
-        return Promise.resolve(
-          new Response(new Uint8Array(GMI_IMAGE_MAX_FILE_BYTES + 1)),
-        );
+      if (url === "https://cdn.example/bad.bin") {
+        return Promise.resolve(new Response(new Uint8Array([1, 2, 3, 4])));
       }
 
       throw new Error(`Unexpected fetch: ${url}`);
     });
 
     try {
-      await generateGmiImages(["oversized image"], {
+      await generateGmiImages(["bad bytes"], {
         fetchFn: fetchFn as unknown as typeof fetch,
         sleep: noopSleep,
       });
-      throw new Error("expected generateGmiImages to reject an oversized image");
+      throw new Error("expected generateGmiImages to reject bad image bytes");
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toContain(
-        "exceeds the 10 MiB upload limit",
-      );
     }
   });
 

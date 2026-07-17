@@ -188,17 +188,25 @@ export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskRes
         generatedImages: album.paths.length,
         elapsedMs: (task.finishedAt ?? Date.now()) - task.startedAt,
       });
-
-      const historyText = `[Sent ${album.paths.length} generated image(s)]`;
-      try {
+      await deliverTaskOutput(
+        input.spaceId,
+        taskId,
+        [{ kind: "album", paths: album.paths }],
+        `[Sent ${album.paths.length} generated image(s)]`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!tempDir) {
+        failImageTask(task, message);
+        console.error(`[image-agent] Failed ${taskId}`, error);
+        const apology = "couldnt generate those images, something broke on my end";
         await deliverTaskOutput(
           input.spaceId,
           taskId,
-          [{ kind: "album", paths: album.paths }],
-          historyText,
+          [{ kind: "text", text: apology }],
+          `${apology} (${message})`,
         );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+      } else {
         console.error(`[image-agent] Delivery failed for ${taskId}`, error);
         const apology = "made the images but couldnt send them, upload choked";
         await deliverTaskOutput(
@@ -206,19 +214,8 @@ export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskRes
           `${taskId}:delivery`,
           [{ kind: "text", text: apology }],
           `${apology} (${message})`,
-        );
+        ).catch(() => undefined);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      failImageTask(task, message);
-      console.error(`[image-agent] Failed ${taskId}`, error);
-      const apology = "couldnt generate those images, something broke on my end";
-      await deliverTaskOutput(
-        input.spaceId,
-        taskId,
-        [{ kind: "text", text: apology }],
-        `${apology} (${message})`,
-      );
     } finally {
       await cleanupImageAlbum(tempDir);
     }

@@ -2,6 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import sharp from "sharp";
+
 import {
   GMI_API_KEY,
   GMI_IMAGE_MAX_COUNT,
@@ -192,15 +194,15 @@ const downloadAlbum = async (
         throw new Error(`Failed to download generated image (HTTP ${response.status})`);
       }
 
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.byteLength === 0) {
-        throw new Error("Downloaded generated image was empty");
-      }
-      if (bytes.byteLength > GMI_IMAGE_MAX_FILE_BYTES) {
-        throw new Error(
-          `Generated image exceeds the 10 MiB upload limit (${(bytes.byteLength / 1_048_576).toFixed(2)} MiB)`,
-        );
-      }
+      const bytes = new Uint8Array(
+        await sharp(await response.arrayBuffer())
+          .resize(1280, 1280, { fit: "inside", withoutEnlargement: true })
+          .jpeg({ quality: 80 })
+          .toBuffer(),
+      );
+      if (bytes.byteLength === 0) throw new Error("Downloaded generated image was empty");
+
+      if (bytes.byteLength > GMI_IMAGE_MAX_FILE_BYTES) throw new Error(`Staged image too large (${(bytes.byteLength / 1_048_576).toFixed(2)} MiB)`);
 
       const path = join(tempDir, `image-${index + 1}.jpeg`);
       await Bun.write(path, bytes);
@@ -228,9 +230,8 @@ export const generateGmiImages = async (
   options: GenerateGmiImagesOptions = {},
 ): Promise<GeneratedImageAlbum> => {
   const cleaned = prompts.map((prompt) => prompt.trim()).filter(Boolean);
-  if (cleaned.length === 0) {
-    throw new Error("At least one image prompt is required");
-  }
+  
+  if (cleaned.length === 0) throw new Error("At least one image prompt is required");
 
   const imagePrompts = cleaned.slice(0, GMI_IMAGE_MAX_COUNT);
   const imageCount = imagePrompts.length;
