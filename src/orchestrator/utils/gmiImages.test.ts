@@ -5,17 +5,17 @@ import { join } from "node:path";
 import { describe, expect, mock, test } from "bun:test";
 
 import {
-  cleanupImageAlbum,
-  clampImageCount,
-  generateGmiImages,
-} from "./gmiImages";
-import {
   GMI_IMAGE_API_BASE,
   GMI_IMAGE_MAX_FILE_BYTES,
   GMI_IMAGE_MAX_COUNT,
   GMI_IMAGE_MIN_COUNT,
   GMI_IMAGE_MODEL_ID,
 } from "./constants";
+import {
+  cleanupImageAlbum,
+  clampImageCount,
+  generateGmiImages,
+} from "./gmiImages";
 
 import type { ImageGenerationProgress } from "./types";
 
