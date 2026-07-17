@@ -255,8 +255,17 @@ export const notifyOrchestrator = async (input: NotifyOrchestratorInput): Promis
     }
 
     if (input.album?.paths.length) {
+      console.log(`[handoff] Prepending album for ${input.taskId}`, {
+        pathCount: input.album.paths.length,
+      });
       outbound = [{ kind: "album", paths: input.album.paths }, ...outbound];
     }
+
+    console.log(`[handoff] Delivering completion for ${input.taskId}`, {
+      outboundCount: outbound.length,
+      hasAlbum: Boolean(input.album?.paths.length),
+      ok: Boolean(input.album),
+    });
 
     if (outbound.length === 0) {
       console.log(`[handoff] Turn complete for ${input.taskId} (tools already sent)`);

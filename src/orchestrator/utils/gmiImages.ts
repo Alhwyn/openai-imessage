@@ -13,7 +13,7 @@ import type {
 } from "./types";
 
 export const GMI_IMAGE_API_BASE = "https://console.gmicloud.ai";
-export const DEFAULT_GMI_IMAGE_MODEL = "seedream-5.0-pro";
+export const DEFAULT_GMI_IMAGE_MODEL = "seedream-5.0-lite";
 export const GMI_IMAGE_MIN_COUNT = 1;
 export const GMI_IMAGE_MAX_COUNT = 15;
 export const GMI_IMAGE_TIMEOUT_MS = 120_000;

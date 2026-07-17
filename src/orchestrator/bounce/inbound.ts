@@ -109,7 +109,15 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
     return;
   }
 
-  console.log(`[bounce] Delivering ${outbound.length} queued outbound item(s) for space ${spaceId}`);
+  console.log(`[bounce] Delivering ${outbound.length} queued outbound item(s) for space ${spaceId}`, {
+    items: outbound.map((item) =>
+      item.kind === "text"
+        ? { kind: item.kind, preview: item.text.slice(0, 80) }
+        : item.kind === "album"
+          ? { kind: item.kind, pathCount: item.paths.length }
+          : { kind: item.kind, emoji: item.emoji },
+    ),
+  });
   await deliverOutbound(turn.space, outbound, { targetMessage: turn.message });
   console.log(`[bounce] Completed turn for space ${spaceId}`);
 };

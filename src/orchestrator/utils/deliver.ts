@@ -24,12 +24,9 @@ const buildAlbumContent = (paths: string[]): ContentInput => {
 };
 
 /**
- * Delivers queued outbound items via Spectrum sugar: `message.reply` / `message.react`,
- * falling back to `space.send` for text when there is no target message.
- * @param space - The space to deliver to.
- * @param outbound - Ordered outbound items from the interaction agent.
- * @param options - Optional target message for replies/reactions.
- * @returns Nothing after every item has been sent.
+ * Delivers queued outbound items via Spectrum.
+ * Text and albums always use `space.send` (never threaded reply).
+ * Reactions use `message.react` when a target message is provided.
  */
 export const deliverOutbound = async (
   space: Space,
@@ -41,11 +38,10 @@ export const deliverOutbound = async (
   for (const item of outbound) {
     switch (item.kind) {
       case "text": {
-        if (targetMessage) {
-          await targetMessage.reply(text(item.text));
-        } else {
-          await space.send(text(item.text));
-        }
+        console.log("[deliver] Sending text via space.send", {
+          preview: item.text.slice(0, 120),
+        });
+        await space.send(text(item.text));
         break;
       }
       case "reaction": {
@@ -53,16 +49,16 @@ export const deliverOutbound = async (
           console.warn("[deliver] Skipping reaction; no target message");
           break;
         }
+        console.log("[deliver] Sending reaction", { emoji: item.emoji });
         await targetMessage.react(tapbackEmoji(item.emoji));
         break;
       }
       case "album": {
-        const content = buildAlbumContent(item.paths);
-        if (targetMessage) {
-          await targetMessage.reply(content);
-        } else {
-          await space.send(content);
-        }
+        console.log("[deliver] Sending album via space.send", {
+          pathCount: item.paths.length,
+          paths: item.paths,
+        });
+        await space.send(buildAlbumContent(item.paths));
         break;
       }
       default: {
@@ -74,10 +70,7 @@ export const deliverOutbound = async (
 };
 
 /**
- * Delivers plain text replies via `space.send` (no thread target).
- * @param space - The space to deliver replies to.
- * @param replies - The replies to deliver.
- * @returns Nothing after every reply has been sent.
+ * Delivers plain text via `space.send`.
  */
 export const deliverReplies = async (space: Space, replies: string[]): Promise<void> => {
   await deliverOutbound(

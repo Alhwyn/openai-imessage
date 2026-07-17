@@ -59,16 +59,16 @@ describe("deliverOutbound", () => {
     expect(content).toEqual({ type: "text", text: "hello" });
   });
 
-  test("threads text via message.reply when target is set", async () => {
+  test("sends text via space.send even when a target message is set", async () => {
     const reply = mock(() => Promise.resolve(undefined));
     const send = mock(() => Promise.resolve(undefined));
     const space = asSpace({ send });
     const targetMessage = asMessage({ reply });
 
-    await deliverOutbound(space, [{ kind: "text", text: "threaded" }], { targetMessage });
+    await deliverOutbound(space, [{ kind: "text", text: "chat" }], { targetMessage });
 
-    expect(reply).toHaveBeenCalledTimes(1);
-    expect(send).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(reply).not.toHaveBeenCalled();
   });
 
   test("reacts via message.react", async () => {
@@ -124,7 +124,7 @@ describe("deliverOutbound", () => {
     });
   });
 
-  test("threads album then suggestion text in order", async () => {
+  test("sends album then suggestion text via space.send in order", async () => {
     await withTempImages(2, async (paths) => {
       const reply = mock(() => Promise.resolve(undefined));
       const send = mock(() => Promise.resolve(undefined));
@@ -140,11 +140,11 @@ describe("deliverOutbound", () => {
         { targetMessage },
       );
 
-      expect(reply).toHaveBeenCalledTimes(2);
-      expect(send).not.toHaveBeenCalled();
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(reply).not.toHaveBeenCalled();
 
-      const first = await buildContent(nthArg(reply, 0));
-      const second = await buildContent(nthArg(reply, 1));
+      const first = await buildContent(nthArg(send, 0));
+      const second = await buildContent(nthArg(send, 1));
       expect(first.type).toBe("group");
       expect(second.type).toBe("text");
     });

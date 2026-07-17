@@ -14,7 +14,7 @@ export type KeyedDebounce<T> = {
   cancelAll: () => void;
 };
 
-/** When set, text uses threaded `message.reply` and reactions target this message. */
+/** When set, reactions target this message. Text/albums always use space.send. */
 export type DeliverOutboundOptions = {
   targetMessage?: Message;
 };

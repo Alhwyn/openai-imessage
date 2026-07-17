@@ -13,6 +13,7 @@ import {
   getImageTaskStatus,
 } from "../handoff/index";
 import {
+  appendHistory,
   buildSystemPrompt,
   editMemory,
   getCuratedMemories,
@@ -153,6 +154,14 @@ export const runInteractionAgent = async (
     const userContent = formatEventMessage(event);
     const system = buildSystemPrompt(interactionSystemPrompt, memories);
 
+    if (event.kind === "user_message") {
+      console.log("[agent] Inbound user message", {
+        spaceId,
+        text: event.text.slice(0, 200),
+        imageCount: event.images?.length ?? 0,
+      });
+    }
+
     const startedAt = Date.now();
     console.log("[agent] Starting GMI interaction generation", {
       spaceId,
@@ -225,7 +234,7 @@ export const runInteractionAgent = async (
         }),
         reply_to_user: tool({
           description:
-            "Send a threaded iMessage text reply. Use react_and_reply instead when the person asks for both a tapback and text.",
+            "Send a chat text message. Use react_and_reply instead when the person asks for both a tapback and text.",
           inputSchema: z.object({
             message: z
               .string()
@@ -234,13 +243,17 @@ export const runInteractionAgent = async (
               ),
           }),
           execute: ({ message }) => {
+            console.log("[agent] Tool called: reply_to_user", {
+              spaceId,
+              messagePreview: message.slice(0, 120),
+            });
             outbound.push({ kind: "text", text: message });
             return { ok: true };
           },
         }),
         react_and_reply: tool({
           description:
-            "React to the person's latest message with a real iMessage tapback, then send a threaded text reply. You MUST use this action when they ask to react and also say, send, or reply with text.",
+            "React to the person's latest message with a real iMessage tapback, then send a chat text message. You MUST use this action when they ask to react and also say, send, or reply with text.",
           inputSchema: z.object({
             reaction: z
               .enum(TAPBACK_KEYS)
@@ -248,7 +261,7 @@ export const runInteractionAgent = async (
             message: z
               .string()
               .describe(
-                "Plain-text reply to send after the tapback. Long structured copy may use line breaks.",
+                "Plain-text chat message to send after the tapback. Long structured copy may use line breaks.",
               ),
           }),
           execute: ({ reaction, message }) => {
@@ -323,14 +336,33 @@ export const runInteractionAgent = async (
       });
     }
 
+    const toolCalls = result.steps.flatMap((step) =>
+      step.toolCalls.map((call) => call.toolName),
+    );
+    const toolResults = result.steps.flatMap((step) =>
+      step.toolResults.map((tr) => tr.toolName),
+    );
+
     console.log("[agent] GMI interaction generation completed", {
       spaceId,
       eventKind: event.kind,
       elapsedMs: Date.now() - startedAt,
       finishReason: result.finishReason,
       stepCount: result.steps.length,
+      toolCalls,
+      toolResults,
+      modelTextPreview: result.text.trim().slice(0, 120) || undefined,
       queuedCount: finalOutbound.length,
     });
+
+    if (toolCalls.length === 0) {
+      console.warn("[agent] Model returned no tool calls", {
+        spaceId,
+        eventKind: event.kind,
+        finishReason: result.finishReason,
+        modelTextPreview: result.text.trim().slice(0, 200) || "(empty)",
+      });
+    }
 
     const nextMessages: ModelMessage[] = [
       ...history,
@@ -338,6 +370,29 @@ export const runInteractionAgent = async (
       ...result.response.messages,
     ];
     await setHistory(spaceId, nextMessages);
+
+    const chatText = result.text.trim();
+    if (finalOutbound.length === 0 && chatText) {
+      console.warn("[agent] Using plain-text fallback (no tools queued)", {
+        spaceId,
+        eventKind: event.kind,
+        textPreview: chatText.slice(0, 200),
+      });
+      finalOutbound.push({ kind: "text", text: chatText });
+      await appendHistory(spaceId, { role: "assistant", content: chatText });
+    }
+
+    console.log("[agent] Turn outbound summary", {
+      spaceId,
+      eventKind: event.kind,
+      items: finalOutbound.map((item) =>
+        item.kind === "text"
+          ? { kind: item.kind, preview: item.text.slice(0, 80) }
+          : item.kind === "album"
+            ? { kind: item.kind, pathCount: item.paths.length }
+            : { kind: item.kind, emoji: item.emoji },
+      ),
+    });
 
     return { outbound: finalOutbound, messages: await getHistory(spaceId) };
   });
