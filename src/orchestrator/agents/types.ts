@@ -10,19 +10,12 @@ export type InboundImage = {
   mediaType: string;
 };
 
-/** User message or sub-agent completion. */
-export type InteractionEvent =
-  | { kind: "user_message"; text: string; images?: InboundImage[] }
-  | { kind: "subagent_completion"; taskId: string; result: string }
-  | {
-      kind: "image_task_completion";
-      taskId: string;
-      ok: boolean;
-      prompt: string;
-      count: number;
-      paths: string[];
-      error?: string;
-    };
+/** User message to the interaction agent. */
+export type InteractionEvent = {
+  kind: "user_message";
+  text: string;
+  images?: InboundImage[];
+};
 
 /** Items not already sent by tools (fallback delivery). */
 export type OutboundItem =

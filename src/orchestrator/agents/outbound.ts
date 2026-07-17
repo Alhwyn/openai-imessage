@@ -2,8 +2,8 @@ import type { OutboundItem } from "./types";
 
 /**
  * Keeps only the latest text reply while preserving non-text outbound items.
- * The interaction model may call its reply tool more than once in one turn,
- * but a conversational turn should produce at most one text message.
+ * The interaction model may emit more than one text item in a turn;
+ * a conversational turn should produce at most one text message.
  */
 export const coalesceTextReplies = (items: OutboundItem[]): OutboundItem[] => {
   let foundText = false;
