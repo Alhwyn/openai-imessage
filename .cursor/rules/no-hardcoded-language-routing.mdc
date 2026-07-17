@@ -1,0 +1,21 @@
+---
+description: Forbid hard-coded natural-language intent detection in the orchestrator
+globs: src/orchestrator/**/*.ts
+alwaysApply: false
+---
+
+# No Hard-Coded Language Routing
+
+- Never detect user intent with regexes, keyword lists, phrase matching, or bespoke natural-language parsers.
+- Never route, suppress, or reinterpret agent behavior based on hard-coded wording such as `generate`, `image`, `send`, or similar terms.
+- Let the interaction model choose tools through tool descriptions, schemas, and the system prompt.
+- If tool calling is unreliable, fix the model, provider integration, tool schema, or prompt instead of adding text-matching heuristics.
+- Treat ordinary model text as ordinary chat output. Determine whether work started from actual tool calls and tool results, not from parsing prose.
+
+```typescript
+// Bad: language-specific intent routing
+const wantsImages = /\bgenerate\b/i.test(text) && /\bimages?\b/i.test(text);
+
+// Good: observe the model's structured tool call
+const assignedImages = toolCalls.includes("assign_image_task");
+```

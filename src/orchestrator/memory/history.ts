@@ -7,7 +7,23 @@ import {
 
 import { MAX_HISTORY_MESSAGES } from "./utils";
 
-import type { ModelMessage } from "ai";
+import type { ModelMessage, UserContent } from "ai";
+
+const withoutTransientMedia = (message: ModelMessage): ModelMessage => {
+  if (message.role !== "user" || !Array.isArray(message.content)) return message;
+
+  const content: UserContent = message.content.map((part) => {
+    if (part.type !== "file" && part.type !== "image") return part;
+
+    const filename = "filename" in part ? part.filename : undefined;
+    return {
+      type: "text",
+      text: filename ? `[Image attachment: ${filename}]` : "[Image attachment]",
+    };
+  });
+
+  return { ...message, content };
+};
 
 /**
  * Converts a message to a search text.
@@ -40,10 +56,11 @@ const searchTextFromMessage = (message: ModelMessage): string => {
  * @returns The stored input.
  */
 const toStoredInput = (message: ModelMessage): MessageInput => {
+  const storedMessage = withoutTransientMedia(message);
   return {
-    role: message.role,
-    searchText: searchTextFromMessage(message),
-    payloadJson: JSON.stringify(message),
+    role: storedMessage.role,
+    searchText: searchTextFromMessage(storedMessage),
+    payloadJson: JSON.stringify(storedMessage),
   };
 };
 

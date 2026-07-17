@@ -1,12 +1,22 @@
-import { Spectrum, type Message, type Space } from "@spectrum-ts/core";
+import { Spectrum, type Message, type Space, type SpectrumInstance } from "@spectrum-ts/core";
 import { imessage } from "@spectrum-ts/imessage";
 
 import {
   assertConvexEnv,
   assertGmiApiKey,
+  createRecentIdTracker,
+  extractInboundImages,
   extractInboundText,
   scheduleOrchestratorTurn,
+  SEEN_MESSAGE_MAX,
+  SEEN_MESSAGE_TTL_MS,
 } from "./src/orchestrator/index";
+
+/** Drop provider redeliveries for a few minutes inside one process. */
+const seenInboundMessages = createRecentIdTracker({
+  ttlMs: SEEN_MESSAGE_TTL_MS,
+  maxSize: SEEN_MESSAGE_MAX,
+});
 
 const readEnv = (...keys: string[]) => {
   for (const key of keys) {
@@ -40,7 +50,7 @@ const senderKeyFrom = (space: Space, message: Message): string | undefined => {
   return space.id;
 };
 
-const handleInbound = (space: Space, message: Message): void => {
+const handleInbound = async (space: Space, message: Message): Promise<void> => {
   if (message.direction === "outbound") {
     return;
   }
@@ -50,19 +60,38 @@ const handleInbound = (space: Space, message: Message): void => {
     return;
   }
 
-  const inboundText = extractInboundText(message);
-  if (!inboundText) {
-    console.log("[app] Ignored message without text");
+  if (!seenInboundMessages.claim(message.id)) {
+    console.log("[app] Skipping duplicate inbound message", {
+      messageId: message.id,
+      spaceId: space.id,
+    });
     return;
   }
 
-  console.log("[app] Inbound:", inboundText.slice(0, 80));
+  const inboundText = extractInboundText(message);
+  const inboundImages = await extractInboundImages(message);
+  if (!inboundText && inboundImages.length === 0) {
+    console.log("[app] Ignored unsupported message content", {
+      messageId: message.id,
+      spaceId: space.id,
+    });
+    return;
+  }
+
+  const senderKey = senderKeyFrom(space, message);
+  console.log("[app] Inbound:", inboundText.slice(0, 80), {
+    messageId: message.id,
+    spaceId: space.id,
+    senderKey,
+    images: inboundImages.map((image) => image.filename),
+  });
 
   scheduleOrchestratorTurn({
     space,
     message,
     text: inboundText,
-    senderKey: senderKeyFrom(space, message),
+    images: inboundImages,
+    senderKey,
   });
 };
 
@@ -73,21 +102,55 @@ const main = async () => {
   const { projectId, projectSecret, webhookSecret, missing } = getSpectrumEnv();
   if (missing.length > 0) throw new Error(`Missing env: ${missing.join(", ")}`);
 
-  const app = await Spectrum({
+  const app: SpectrumInstance = await Spectrum({
     projectId: projectId!,
     projectSecret: projectSecret!,
     platforms: [imessage.config()],
     webhookSecret,
   });
 
-  console.log(`[app] Orchestrator listening (Spectrum + GMI). Debounced inbound → assign_task → notify → reply/react`);
-
-  for await (const [space, message] of app.messages) {
+  let stopping = false;
+  const stopApp = async (reason: string) => {
+    if (stopping) return;
+    stopping = true;
+    console.log(`[app] Stopping Spectrum (${reason})`);
     try {
-      handleInbound(space, message);
+      await app.stop();
     } catch (error) {
-      console.error("[app] Failed to handle inbound message", error);
+      console.error("[app] Spectrum stop failed", error);
     }
+  };
+
+  const shutdownAndExit = (reason: string, exitCode = 0) => {
+    void stopApp(reason).finally(() => {
+      process.exit(exitCode);
+    });
+  };
+
+  const onSignal = (signal: NodeJS.Signals) => {
+    shutdownAndExit(signal, 0);
+  };
+
+  process.once("SIGINT", onSignal);
+  process.once("SIGTERM", onSignal);
+  process.once("beforeExit", (code) => {
+    shutdownAndExit("beforeExit", code);
+  });
+
+  console.log(
+    `[app] Orchestrator listening (Spectrum + GMI). Debounced inbound → assign_task → notify → reply/react`,
+  );
+
+  try {
+    for await (const [space, message] of app.messages) {
+      try {
+        await handleInbound(space, message);
+      } catch (error) {
+        console.error("[app] Failed to handle inbound message", error);
+      }
+    }
+  } finally {
+    await stopApp("messages ended");
   }
 };
 

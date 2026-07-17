@@ -6,10 +6,9 @@ import {
 import { registerSpace } from "../handoff/index";
 import {
   createKeyedDebounce,
+  DEFAULT_ORCHESTRATOR_DEBOUNCE_MS,
   deliverOutbound,
-  deliverReplies,
   getGmiErrorDetails,
-  GMI_UNAVAILABLE_REPLY,
 } from "../utils/index";
 
 import type {
@@ -18,17 +17,6 @@ import type {
   ScheduleOrchestratorTurnInput,
 } from "./types";
 import type { OutboundItem } from "../agents/types";
-
-const DEFAULT_DEBOUNCE_MS = 1_500;
-
-export const getOrchestratorDebounceMs = () => {
-  const raw = process.env.ORCHESTRATOR_DEBOUNCE_MS?.trim();
-
-  if (!raw) return DEFAULT_DEBOUNCE_MS;
-
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_DEBOUNCE_MS;
-};
 
 /**
  * Builds a debounced turn.
@@ -41,6 +29,7 @@ export const buildDebouncedTurn = (
   input: BuildDebouncedTurnInput,
 ): OrchestratorTurn => {
   return {
+    images: [...(existing?.images ?? []), ...(input.images ?? [])],
     texts: [...(existing?.texts ?? []), input.text],
     space: input.space,
     message: input.message,
@@ -60,7 +49,7 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   pendingTurns.delete(key);
 
   const inboundText = turn.texts.join("\n").trim();
-  if (!inboundText) return;
+  if (!inboundText && turn.images.length === 0) return;
 
   const spaceId = turn.space.id;
   registerSpace(spaceId, turn.space, turn.message);
@@ -73,48 +62,60 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
     console.warn("[bounce] Failed to mark message read", error);
   }
 
-  await turn.space.responding(async () => {
-    console.log(`[bounce] Starting interaction for space ${spaceId}`);
+  console.log(`[bounce] Starting interaction for space ${spaceId}`);
 
-    const tapback = getTapbackOnlyRequest(inboundText);
-    if (tapback) {
-      await deliverOutbound(
-        turn.space,
-        [{ kind: "reaction", emoji: tapback }],
-        { targetMessage: turn.message },
-      );
-      console.log(`[bounce] Completed direct ${tapback} tapback for space ${spaceId}`);
-      return;
-    }
+  const tapback = getTapbackOnlyRequest(inboundText);
+  if (tapback) {
+    await deliverOutbound(
+      turn.space,
+      [{ kind: "reaction", emoji: tapback }],
+      { targetMessage: turn.message },
+    );
+    console.log(`[bounce] Completed direct ${tapback} tapback for space ${spaceId}`);
+    return;
+  }
 
-    let outbound: OutboundItem[];
-    try {
-      ({ outbound } = await runInteractionAgent(spaceId, {
-        kind: "user_message",
-        text: inboundText,
-      }));
-    } catch (error) {
-      console.error(`[bounce] Interaction failed for space ${spaceId}`, getGmiErrorDetails(error));
-      await deliverReplies(turn.space, [GMI_UNAVAILABLE_REPLY]);
-      return;
-    }
+  let outbound: OutboundItem[];
+  try {
+    ({ outbound } = await runInteractionAgent(spaceId, {
+      kind: "user_message",
+      text: inboundText,
+      images: turn.images,
+    }));
+  } catch (error) {
+    console.error(`[bounce] Interaction failed for space ${spaceId}`, getGmiErrorDetails(error));
+    /* DO NOT CHANGE THIS CODE AI!!!!!!! */
+    await deliverOutbound(
+      turn.space,
+      [{ kind: "reaction", emoji: "like" }],
+      { targetMessage: turn.message },
+    );
+    return;
+  }
 
-    if (outbound.length === 0) {
-      console.log(
-        "[bounce] Turn complete (tools already sent, or waiting on sub-agent)",
-      );
-      return;
-    }
+  if (outbound.length === 0) {
+    console.log(
+      "[bounce] Turn complete (tools already sent, or waiting on sub-agent)",
+    );
+    return;
+  }
 
-    console.log(`[bounce] Delivering ${outbound.length} queued outbound item(s) for space ${spaceId}`);
-    await deliverOutbound(turn.space, outbound, { targetMessage: turn.message });
-    console.log(`[bounce] Completed turn for space ${spaceId}`);
+  console.log(`[bounce] Delivering ${outbound.length} queued outbound item(s) for space ${spaceId}`, {
+    items: outbound.map((item) =>
+      item.kind === "text"
+        ? { kind: item.kind, preview: item.text.slice(0, 80) }
+        : item.kind === "album"
+          ? { kind: item.kind, pathCount: item.paths.length }
+          : { kind: item.kind, emoji: item.emoji },
+    ),
   });
+  await deliverOutbound(turn.space, outbound, { targetMessage: turn.message });
+  console.log(`[bounce] Completed turn for space ${spaceId}`);
 };
 
 /** Debounces pending turns and flushes the latest value for each key. */
 const debounce = createKeyedDebounce<OrchestratorTurn>({
-  delayMs: getOrchestratorDebounceMs,
+  delayMs: DEFAULT_ORCHESTRATOR_DEBOUNCE_MS,
   onFlush: flushOrchestratorTurn,
 });
 

@@ -1,19 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  assertGmiApiKey,
   DEFAULT_GMI_MODEL,
-  getGmiErrorDetails,
-  GMI_GENERATION_TIMEOUT_MS,
   GMI_MAX_RETRIES,
-  model,
-} from "./llm";
+} from "./constants";
+import { getGmiErrorDetails, GMI_MODEL } from "./llm";
 
 describe("GMI configuration", () => {
-  test("keeps Kimi as the default with bounded retries", () => {
-    expect(DEFAULT_GMI_MODEL).toBe("moonshotai/kimi-k2.7-code-highspeed");
+  test("uses Luna as the default with bounded retries", () => {
+    expect(DEFAULT_GMI_MODEL).toBe("openai/gpt-5.6-luna");
     expect(GMI_MAX_RETRIES).toBe(2);
-    expect(GMI_GENERATION_TIMEOUT_MS).toBe(30_000);
   });
 
   test("extracts a nested provider status from retry errors", () => {
@@ -33,41 +29,8 @@ describe("GMI configuration", () => {
   });
 
   test("uses GMI's OpenAI-compatible chat completions provider", () => {
-    const previousApiKey = process.env.GMI_CLOUD_API_KEY;
-    process.env.GMI_CLOUD_API_KEY = "test-key";
-
-    try {
-      const languageModel = model();
-      expect(languageModel.provider).toBe("gmi.chat");
-      expect(languageModel.modelId).toBe(DEFAULT_GMI_MODEL);
-    } finally {
-      if (previousApiKey === undefined) {
-        delete process.env.GMI_CLOUD_API_KEY;
-      } else {
-        process.env.GMI_CLOUD_API_KEY = previousApiKey;
-      }
-    }
-  });
-
-  test("reads the API key when the model is created, not when the module is imported", () => {
-    const previousApiKey = process.env.GMI_CLOUD_API_KEY;
-    delete process.env.GMI_CLOUD_API_KEY;
-
-    try {
-      expect(() => assertGmiApiKey()).toThrow(
-        "Missing or unloaded GMI_CLOUD_API_KEY in this Bun process",
-      );
-
-      process.env.GMI_CLOUD_API_KEY = "runtime-test-key";
-      const languageModel = model();
-      expect(languageModel.provider).toBe("gmi.chat");
-    } finally {
-      if (previousApiKey === undefined) {
-        delete process.env.GMI_CLOUD_API_KEY;
-      } else {
-        process.env.GMI_CLOUD_API_KEY = previousApiKey;
-      }
-    }
+    expect(GMI_MODEL.provider).toBe("gmi.chat");
+    expect(GMI_MODEL.modelId).toBe(DEFAULT_GMI_MODEL);
   });
 
   test("explains provider key-loading failures without exposing configuration", () => {

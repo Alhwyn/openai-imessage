@@ -8,6 +8,7 @@ export {
 } from "./tapbacks";
 export type { TapbackKey } from "./tapbacks";
 export type {
+  InboundImage,
   InteractionEvent,
   InteractionResult,
   OutboundItem,

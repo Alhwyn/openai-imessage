@@ -1,16 +1,18 @@
-import { generateText, stepCountIs, tool } from "ai";
+import { generateText, stepCountIs, tool, type UserContent } from "ai";
 import { z } from "zod";
 
 import { executionSystemPrompt } from "../prompts/index";
 import {
   assertGmiApiKey,
-  createGmiAbortSignal,
+  EXECUTION_AGENT_MAX_STEPS,
   getGmiErrorDetails,
-  getGmiModelId,
-  getGmiTemperature,
   GMI_MAX_RETRIES,
-  model,
+  GMI_MODEL,
+  GMI_MODEL_ID,
+  GMI_TEMPERATURE,
 } from "../utils/index";
+
+import type { InboundImage } from "./types";
 
 const stubTools = {
   echo: tool({
@@ -37,24 +39,42 @@ const stubTools = {
   }),
 };
 
-export const runExecutionAgent = async (task: string): Promise<string> => {
+/** Builds the task content for the GMI execution agent. */
+const buildTaskContent = (task: string, images: InboundImage[]): UserContent => {
+  if (images.length === 0) return task;
+
+  return [
+    { type: "text", text: task },
+    ...images.map((image) => ({
+      type: "file" as const,
+      data: image.data,
+      filename: image.filename,
+      mediaType: image.mediaType,
+    })),
+  ];
+};
+
+/** Runs the GMI execution agent. */
+export const runExecutionAgent = async (
+  task: string,
+  images: InboundImage[] = [],
+): Promise<string> => {
   assertGmiApiKey();
 
   const startedAt = Date.now();
   console.log("[agent] Starting GMI execution generation", {
-    model: getGmiModelId(),
+    model: GMI_MODEL_ID,
     maxRetries: GMI_MAX_RETRIES,
   });
 
   const result = await generateText({
-    model: model(),
-    temperature: getGmiTemperature(1),
+    model: GMI_MODEL,
+    temperature: GMI_TEMPERATURE,
     maxRetries: GMI_MAX_RETRIES,
-    abortSignal: createGmiAbortSignal(),
     system: executionSystemPrompt,
-    prompt: task,
+    messages: [{ role: "user", content: buildTaskContent(task, images) }],
     tools: stubTools,
-    stopWhen: stepCountIs(8),
+    stopWhen: stepCountIs(EXECUTION_AGENT_MAX_STEPS),
   }).catch((error: unknown) => {
     console.error("[agent] GMI execution generation failed", {
       elapsedMs: Date.now() - startedAt,
@@ -77,9 +97,7 @@ export const runExecutionAgent = async (task: string): Promise<string> => {
     .map((tr) => JSON.stringify(tr.output))
     .filter(Boolean);
 
-  if (toolNotes.length > 0) {
-    return `Task completed. Tool outputs: ${toolNotes.join(" | ")}`;
-  }
+  if (toolNotes.length > 0) return `Task completed. Tool outputs: ${toolNotes.join(" | ")}`;
 
   return "Task finished with no textual result.";
 };
