@@ -1,0 +1,2 @@
+export const EXECUTION_AGENT_MAX_STEPS = 8;
+export const INTERACTION_AGENT_MAX_STEPS = 10;

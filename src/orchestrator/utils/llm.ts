@@ -1,11 +1,10 @@
 import { createOpenAI } from "@ai-sdk/openai";
 
-export const GMI_CLOUD_BASE_URL = "https://api.gmi-serving.com/v1";
-export const GMI_API_KEY = process.env.GMI_CLOUD_API_KEY?.trim() ?? "";
-export const DEFAULT_GMI_MODEL = "openai/gpt-5.6-luna";
-export const GMI_MODEL_ID = process.env.GMI_MODEL?.trim() || DEFAULT_GMI_MODEL;
-/** Match the reference provider's three total attempts without a minute-long silent wait. */
-export const GMI_MAX_RETRIES = 2;
+import {
+  GMI_API_KEY,
+  GMI_CLOUD_BASE_URL,
+  GMI_MODEL_ID,
+} from "./constants";
 
 export type GmiErrorDetails = {
   guidance?: string;
@@ -14,24 +13,13 @@ export type GmiErrorDetails = {
   statusCode?: number;
 };
 
-/** Models that only accept a single temperature value. */
-const MODEL_FIXED_TEMPERATURE: Record<string, number> = {
-  "moonshotai/kimi-k2.7-code-highspeed": 1,
-};
+const gmi = createOpenAI({
+  baseURL: GMI_CLOUD_BASE_URL,
+  apiKey: GMI_API_KEY,
+  name: "gmi",
+});
 
-export const model = () => {
-  const gmi = createOpenAI({
-    baseURL: GMI_CLOUD_BASE_URL,
-    apiKey: GMI_API_KEY,
-    name: "gmi",
-  });
-
-  return gmi.chat(GMI_MODEL_ID);
-};
-
-export const getGmiTemperature = (requested = 1): number => {
-  return MODEL_FIXED_TEMPERATURE[GMI_MODEL_ID] ?? requested;
-};
+export const GMI_MODEL = gmi.chat(GMI_MODEL_ID);
 
 const getStatusCode = (error: unknown): number | undefined => {
   if (!error || typeof error !== "object") return undefined;

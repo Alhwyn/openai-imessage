@@ -23,12 +23,13 @@ import { interactionSystemPrompt } from "../prompts/index";
 import {
   assertGmiApiKey,
   getGmiErrorDetails,
-  getGmiTemperature,
   GMI_IMAGE_MAX_COUNT,
   GMI_IMAGE_MIN_COUNT,
   GMI_MAX_RETRIES,
+  GMI_MODEL,
   GMI_MODEL_ID,
-  model,
+  GMI_TEMPERATURE,
+  INTERACTION_AGENT_MAX_STEPS,
 } from "../utils/index";
 
 import { coalesceTextReplies } from "./outbound";
@@ -171,8 +172,8 @@ export const runInteractionAgent = async (
     });
 
     const result = await generateText({
-      model: model(),
-      temperature: getGmiTemperature(1),
+      model: GMI_MODEL,
+      temperature: GMI_TEMPERATURE,
       maxRetries: GMI_MAX_RETRIES,
       system,
       messages: [{ role: "user", content: userContent }],
@@ -324,7 +325,7 @@ export const runInteractionAgent = async (
           },
         }),
       },
-      stopWhen: stepCountIs(10),
+      stopWhen: stepCountIs(INTERACTION_AGENT_MAX_STEPS),
     }).catch((error: unknown) => {
       console.error("[agent] GMI interaction generation failed", {
         spaceId,

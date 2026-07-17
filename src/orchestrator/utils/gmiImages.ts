@@ -2,7 +2,18 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { GMI_API_KEY } from "./llm";
+import {
+  GMI_API_KEY,
+  GMI_IMAGE_MAX_COUNT,
+  GMI_IMAGE_MAX_FILE_BYTES,
+  GMI_IMAGE_MIN_COUNT,
+  GMI_IMAGE_MODEL_ID,
+  GMI_IMAGE_OUTPUT_FORMAT,
+  GMI_IMAGE_POLL_INTERVAL_MS,
+  GMI_IMAGE_REQUESTS_URL,
+  GMI_IMAGE_SIZE,
+  GMI_IMAGE_TIMEOUT_MS,
+} from "./constants";
 
 import type {
   GeneratedImageAlbum,
@@ -12,18 +23,6 @@ import type {
   SeedreamImagePayload,
 } from "./types";
 
-export const GMI_IMAGE_API_BASE = "https://console.gmicloud.ai";
-export const DEFAULT_GMI_IMAGE_MODEL = "seedream-5.0-lite";
-export const GMI_IMAGE_MIN_COUNT = 1;
-export const GMI_IMAGE_MAX_COUNT = 15;
-export const GMI_IMAGE_TIMEOUT_MS = 120_000;
-export const GMI_IMAGE_POLL_INTERVAL_MS = 2_000;
-export const GMI_IMAGE_SIZE = "2K";
-export const GMI_IMAGE_OUTPUT_FORMAT = "jpeg";
-export const GMI_IMAGE_MAX_FILE_BYTES = 10 * 1_048_576;
-
-const REQUESTS_URL = `${GMI_IMAGE_API_BASE}/api/v1/ie/requestqueue/apikey/requests`;
-
 type WaitOptions = Required<
   Pick<GenerateGmiImagesOptions, "now" | "pollIntervalMs" | "sleep" | "timeoutMs">
 >;
@@ -32,13 +31,6 @@ const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
-
-/**
- * Returns the configured GMI image model id.
- */
-export const getGmiImageModelId = (): string => {
-  return process.env.GMI_IMAGE_MODEL?.trim() || DEFAULT_GMI_IMAGE_MODEL;
-};
 
 /**
  * Clamps a requested image count into the Seedream-supported range.
@@ -130,11 +122,11 @@ const submitImageRequest = (
   fetchFn: typeof fetch,
 ): Promise<GmiImageResponse> =>
   gmiFetchJson(
-    REQUESTS_URL,
+    GMI_IMAGE_REQUESTS_URL,
     {
       method: "POST",
       body: JSON.stringify({
-        model: getGmiImageModelId(),
+        model: GMI_IMAGE_MODEL_ID,
         payload: seedreamPayload(prompt),
       }),
     },
@@ -161,7 +153,7 @@ const awaitImageResult = async (
   while (options.now() < deadline) {
     await options.sleep(options.pollIntervalMs);
 
-    const payload = await gmiFetchJson(`${REQUESTS_URL}/${requestId}`, { method: "GET" }, fetchFn);
+    const payload = await gmiFetchJson(`${GMI_IMAGE_REQUESTS_URL}/${requestId}`, { method: "GET" }, fetchFn);
     const status = payload.status?.toLowerCase();
     if (status === "success") return payload;
     if (status === "failed") throw new Error(errorMessage(payload));
@@ -254,7 +246,7 @@ export const generateGmiImages = async (
   };
 
   console.log("[images] Starting GMI image generation", {
-    model: getGmiImageModelId(),
+    model: GMI_IMAGE_MODEL_ID,
     count: imageCount,
     promptPreview: imagePrompts[0]?.slice(0, 120),
   });

@@ -4,11 +4,12 @@ import { z } from "zod";
 import { executionSystemPrompt } from "../prompts/index";
 import {
   assertGmiApiKey,
+  EXECUTION_AGENT_MAX_STEPS,
   getGmiErrorDetails,
-  getGmiTemperature,
   GMI_MAX_RETRIES,
+  GMI_MODEL,
   GMI_MODEL_ID,
-  model,
+  GMI_TEMPERATURE,
 } from "../utils/index";
 
 import type { InboundImage } from "./types";
@@ -38,6 +39,7 @@ const stubTools = {
   }),
 };
 
+/** Builds the task content for the GMI execution agent. */
 const buildTaskContent = (task: string, images: InboundImage[]): UserContent => {
   if (images.length === 0) return task;
 
@@ -52,6 +54,7 @@ const buildTaskContent = (task: string, images: InboundImage[]): UserContent => 
   ];
 };
 
+/** Runs the GMI execution agent. */
 export const runExecutionAgent = async (
   task: string,
   images: InboundImage[] = [],
@@ -65,13 +68,13 @@ export const runExecutionAgent = async (
   });
 
   const result = await generateText({
-    model: model(),
-    temperature: getGmiTemperature(1),
+    model: GMI_MODEL,
+    temperature: GMI_TEMPERATURE,
     maxRetries: GMI_MAX_RETRIES,
     system: executionSystemPrompt,
     messages: [{ role: "user", content: buildTaskContent(task, images) }],
     tools: stubTools,
-    stopWhen: stepCountIs(8),
+    stopWhen: stepCountIs(EXECUTION_AGENT_MAX_STEPS),
   }).catch((error: unknown) => {
     console.error("[agent] GMI execution generation failed", {
       elapsedMs: Date.now() - startedAt,

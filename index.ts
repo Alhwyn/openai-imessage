@@ -8,12 +8,11 @@ import {
   extractInboundImages,
   extractInboundText,
   scheduleOrchestratorTurn,
+  SEEN_MESSAGE_MAX,
+  SEEN_MESSAGE_TTL_MS,
 } from "./src/orchestrator/index";
 
 /** Drop provider redeliveries for a few minutes inside one process. */
-const SEEN_MESSAGE_TTL_MS = 10 * 60_000;
-const SEEN_MESSAGE_MAX = 2_000;
-
 const seenInboundMessages = createRecentIdTracker({
   ttlMs: SEEN_MESSAGE_TTL_MS,
   maxSize: SEEN_MESSAGE_MAX,

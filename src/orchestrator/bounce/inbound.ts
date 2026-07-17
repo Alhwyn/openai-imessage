@@ -6,6 +6,7 @@ import {
 import { registerSpace } from "../handoff/index";
 import {
   createKeyedDebounce,
+  DEFAULT_ORCHESTRATOR_DEBOUNCE_MS,
   deliverOutbound,
   getGmiErrorDetails,
 } from "../utils/index";
@@ -16,17 +17,6 @@ import type {
   ScheduleOrchestratorTurnInput,
 } from "./types";
 import type { OutboundItem } from "../agents/types";
-
-const DEFAULT_DEBOUNCE_MS = 1_500;
-
-export const getOrchestratorDebounceMs = () => {
-  const raw = process.env.ORCHESTRATOR_DEBOUNCE_MS?.trim();
-
-  if (!raw) return DEFAULT_DEBOUNCE_MS;
-
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_DEBOUNCE_MS;
-};
 
 /**
  * Builds a debounced turn.
@@ -125,7 +115,7 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
 
 /** Debounces pending turns and flushes the latest value for each key. */
 const debounce = createKeyedDebounce<OrchestratorTurn>({
-  delayMs: getOrchestratorDebounceMs,
+  delayMs: DEFAULT_ORCHESTRATOR_DEBOUNCE_MS,
   onFlush: flushOrchestratorTurn,
 });
 

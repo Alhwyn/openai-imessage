@@ -2,19 +2,20 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 
 import {
   cleanupImageAlbum,
   clampImageCount,
-  DEFAULT_GMI_IMAGE_MODEL,
   generateGmiImages,
-  getGmiImageModelId,
+} from "./gmiImages";
+import {
   GMI_IMAGE_API_BASE,
   GMI_IMAGE_MAX_FILE_BYTES,
   GMI_IMAGE_MAX_COUNT,
   GMI_IMAGE_MIN_COUNT,
-} from "./gmiImages";
+  GMI_IMAGE_MODEL_ID,
+} from "./constants";
 
 import type { ImageGenerationProgress } from "./types";
 
@@ -39,10 +40,6 @@ const requestBodyText = (body: unknown): string => {
 
 const noopSleep = (): Promise<void> => Promise.resolve();
 
-afterEach(() => {
-  delete process.env.GMI_IMAGE_MODEL;
-});
-
 describe("clampImageCount", () => {
   test("clamps into the supported range", () => {
     expect(clampImageCount(0)).toBe(GMI_IMAGE_MIN_COUNT);
@@ -52,12 +49,9 @@ describe("clampImageCount", () => {
   });
 });
 
-describe("getGmiImageModelId", () => {
-  test("defaults to seedream-5.0-lite and honors GMI_IMAGE_MODEL", () => {
-    expect(DEFAULT_GMI_IMAGE_MODEL).toBe("seedream-5.0-lite");
-    expect(getGmiImageModelId()).toBe(DEFAULT_GMI_IMAGE_MODEL);
-    process.env.GMI_IMAGE_MODEL = "custom-image-model";
-    expect(getGmiImageModelId()).toBe("custom-image-model");
+describe("GMI_IMAGE_MODEL_ID", () => {
+  test("is seedream-5.0-lite", () => {
+    expect(GMI_IMAGE_MODEL_ID).toBe("seedream-5.0-lite");
   });
 });
 

@@ -2,10 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import {
   DEFAULT_GMI_MODEL,
-  getGmiErrorDetails,
   GMI_MAX_RETRIES,
-  model,
-} from "./llm";
+} from "./constants";
+import { getGmiErrorDetails, GMI_MODEL } from "./llm";
 
 describe("GMI configuration", () => {
   test("uses Luna as the default with bounded retries", () => {
@@ -30,9 +29,8 @@ describe("GMI configuration", () => {
   });
 
   test("uses GMI's OpenAI-compatible chat completions provider", () => {
-    const languageModel = model();
-    expect(languageModel.provider).toBe("gmi.chat");
-    expect(languageModel.modelId).toBe(DEFAULT_GMI_MODEL);
+    expect(GMI_MODEL.provider).toBe("gmi.chat");
+    expect(GMI_MODEL.modelId).toBe(DEFAULT_GMI_MODEL);
   });
 
   test("explains provider key-loading failures without exposing configuration", () => {

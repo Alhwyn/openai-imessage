@@ -1,0 +1,4 @@
+export const DEFAULT_ORCHESTRATOR_DEBOUNCE_MS = 1_500;
+
+export const SEEN_MESSAGE_TTL_MS = 10 * 60_000;
+export const SEEN_MESSAGE_MAX = 2_000;

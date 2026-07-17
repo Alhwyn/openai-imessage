@@ -20,6 +20,8 @@ export {
   createRecentIdTracker,
   extractInboundImages,
   extractInboundText,
-  model,
+  GMI_MODEL,
+  SEEN_MESSAGE_MAX,
+  SEEN_MESSAGE_TTL_MS,
 } from "./utils/index";
 export type { RecentIdTracker, RecentIdTrackerOptions } from "./utils/index";
