@@ -9,6 +9,8 @@ import {
   GMI_MAX_RETRIES,
   GMI_MODEL,
   GMI_MODEL_ID,
+  GMI_PROVIDER_OPTIONS,
+  GMI_REASONING,
   GMI_TEMPERATURE,
 } from "../utils/index";
 
@@ -69,6 +71,8 @@ export const runExecutionAgent = async (
     model: GMI_MODEL,
     temperature: GMI_TEMPERATURE,
     maxRetries: GMI_MAX_RETRIES,
+    reasoning: GMI_REASONING,
+    providerOptions: GMI_PROVIDER_OPTIONS,
     system: executionSystemPrompt,
     messages: [{ role: "user", content: buildTaskContent(task, images) }],
     tools: stubTools,

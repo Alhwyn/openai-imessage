@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test";
 import {
   DEFAULT_GMI_MODEL,
   GMI_MAX_RETRIES,
+  GMI_PROVIDER_OPTIONS,
+  GMI_REASONING,
 } from "./constants";
 import { getGmiErrorDetails, GMI_MODEL } from "./llm";
 
@@ -10,6 +12,13 @@ describe("GMI configuration", () => {
   test("uses Luna as the default with bounded retries", () => {
     expect(DEFAULT_GMI_MODEL).toBe("openai/gpt-5.6-luna");
     expect(GMI_MAX_RETRIES).toBe(2);
+  });
+
+  test("disables reasoning so Luna accepts function tools on chat completions", () => {
+    expect(GMI_REASONING).toBe("none");
+    expect(GMI_PROVIDER_OPTIONS).toEqual({
+      openai: { reasoningEffort: "none" },
+    });
   });
 
   test("extracts a nested provider status from retry errors", () => {
@@ -59,6 +68,66 @@ describe("GMI configuration", () => {
       statusCode: 401,
       guidance:
         "GMI rejected the credential. Verify GMI_CLOUD_API_KEY is an active GMI inference API key.",
+    });
+  });
+
+  test("includes truncated responseBody and guidance for 400s", () => {
+    const body = `${"x".repeat(2100)}tail`;
+    const error = Object.assign(
+      new Error("Backend request failed with status 400"),
+      {
+        name: "AI_APICallError",
+        statusCode: 400,
+        responseBody: body,
+      },
+    );
+
+    const details = getGmiErrorDetails(error);
+    expect(details).toEqual({
+      name: "AI_APICallError",
+      message: "Backend request failed with status 400",
+      statusCode: 400,
+      responseBody: `${"x".repeat(2000)}…`,
+      guidance:
+        "GMI rejected the request (for Luna + tools, reasoning_effort must be none on /v1/chat/completions; otherwise inspect responseBody for schema/tool-call issues).",
+    });
+    expect(details.responseBody).not.toContain("tail");
+  });
+
+  test("falls back to serialized data when responseBody is missing", () => {
+    const error = Object.assign(new Error("bad request"), {
+      name: "AI_APICallError",
+      statusCode: 400,
+      data: { error: { message: "invalid tools" } },
+    });
+
+    expect(getGmiErrorDetails(error)).toEqual({
+      name: "AI_APICallError",
+      message: "bad request",
+      statusCode: 400,
+      responseBody: JSON.stringify({ error: { message: "invalid tools" } }),
+      guidance:
+        "GMI rejected the request (for Luna + tools, reasoning_effort must be none on /v1/chat/completions; otherwise inspect responseBody for schema/tool-call issues).",
+    });
+  });
+
+  test("reads responseBody from nested lastError", () => {
+    const providerError = Object.assign(new Error("Backend request failed"), {
+      statusCode: 400,
+      responseBody: '{"detail":"bad schema"}',
+    });
+    const retryError = Object.assign(new Error("retry exhausted"), {
+      name: "AI_RetryError",
+      lastError: providerError,
+    });
+
+    expect(getGmiErrorDetails(retryError)).toEqual({
+      name: "AI_RetryError",
+      message: "retry exhausted",
+      statusCode: 400,
+      responseBody: '{"detail":"bad schema"}',
+      guidance:
+        "GMI rejected the request (for Luna + tools, reasoning_effort must be none on /v1/chat/completions; otherwise inspect responseBody for schema/tool-call issues).",
     });
   });
 });

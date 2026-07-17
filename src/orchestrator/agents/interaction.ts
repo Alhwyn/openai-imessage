@@ -1,6 +1,7 @@
 import {
   generateText,
   stepCountIs,
+  type ToolSet,
   type UserContent,
 } from "ai";
 
@@ -18,6 +19,8 @@ import {
   GMI_MAX_RETRIES,
   GMI_MODEL,
   GMI_MODEL_ID,
+  GMI_PROVIDER_OPTIONS,
+  GMI_REASONING,
   GMI_TEMPERATURE,
   INTERACTION_AGENT_MAX_STEPS,
 } from "../utils/index";
@@ -116,37 +119,97 @@ export const runInteractionAgent = async (
         imageCount: event.images?.length ?? 0,
       });
     }
+
+    const toolBuildInput = {
+      deliveryTarget,
+      event,
+      outbound,
+      spaceId,
+    };
+    const toolsWithComposio = buildInteractionTools({
+      ...toolBuildInput,
+      composioTools,
+    });
+    const composioToolCount = Object.keys(composioTools).length;
+    const toolNames = Object.keys(toolsWithComposio);
+    const composioAttachedCount = Object.keys(composioTools).filter(
+      (name) => toolsWithComposio[name] === composioTools[name],
+    ).length;
+
     console.log("[agent] Starting GMI interaction generation", {
       spaceId,
       eventKind: event.kind,
       model: GMI_MODEL_ID,
       maxRetries: GMI_MAX_RETRIES,
+      toolCount: toolNames.length,
+      composioToolCount,
+      composioAttachedCount,
+      firstPartyToolCount: toolNames.length - composioAttachedCount,
+      toolNames,
     });
 
     const startedAt = Date.now();
-    const result = await generateText({
-      model: GMI_MODEL,
-      temperature: GMI_TEMPERATURE,
-      maxRetries: GMI_MAX_RETRIES,
-      system,
-      messages: [{ role: "user", content: userContent }],
-      tools: buildInteractionTools({
-        composioTools,
-        deliveryTarget,
-        event,
-        outbound,
-        spaceId,
-      }),
-      stopWhen: stepCountIs(INTERACTION_AGENT_MAX_STEPS),
-    }).catch((error: unknown) => {
+
+    const runGeneration = (tools: ToolSet) =>
+      generateText({
+        model: GMI_MODEL,
+        temperature: GMI_TEMPERATURE,
+        maxRetries: GMI_MAX_RETRIES,
+        reasoning: GMI_REASONING,
+        providerOptions: GMI_PROVIDER_OPTIONS,
+        system,
+        messages: [{ role: "user", content: userContent }],
+        tools,
+        stopWhen: stepCountIs(INTERACTION_AGENT_MAX_STEPS),
+        onStepFinish: (step) => {
+          console.log("[agent] GMI interaction step finished", {
+            spaceId,
+            stepNumber: step.stepNumber,
+            finishReason: step.finishReason,
+            toolCalls: step.toolCalls.map((call) => call.toolName),
+          });
+        },
+      });
+
+    let result: Awaited<ReturnType<typeof runGeneration>>;
+    try {
+      result = await runGeneration(toolsWithComposio);
+    } catch (error: unknown) {
+      const details = getGmiErrorDetails(error);
       console.error("[agent] GMI interaction generation failed", {
         spaceId,
         eventKind: event.kind,
         elapsedMs: Date.now() - startedAt,
-        ...getGmiErrorDetails(error),
+        ...details,
       });
-      throw error;
-    });
+
+      if (details.statusCode !== 400 || composioAttachedCount === 0) {
+        throw error;
+      }
+
+      console.warn("[agent] Retrying without Composio tools after GMI 400", {
+        spaceId,
+        eventKind: event.kind,
+      });
+      outbound.length = 0;
+      const firstPartyTools = buildInteractionTools({
+        ...toolBuildInput,
+        composioTools: {},
+      });
+
+      try {
+        result = await runGeneration(firstPartyTools);
+      } catch (retryError: unknown) {
+        console.error("[agent] GMI interaction generation failed", {
+          spaceId,
+          eventKind: event.kind,
+          elapsedMs: Date.now() - startedAt,
+          retryWithoutComposio: true,
+          ...getGmiErrorDetails(retryError),
+        });
+        throw retryError;
+      }
+    }
 
     const finalOutbound = coalesceTextReplies(outbound);
     if (finalOutbound.length < outbound.length) {

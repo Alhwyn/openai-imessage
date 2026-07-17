@@ -5,6 +5,16 @@ export const GMI_MODEL_ID = process.env.GMI_MODEL?.trim() || DEFAULT_GMI_MODEL;
 /** Match the reference provider's three total attempts without a minute-long silent wait. */
 export const GMI_MAX_RETRIES = 2;
 export const GMI_TEMPERATURE = 1;
+/**
+ * Luna rejects function tools on /v1/chat/completions unless reasoning_effort is none.
+ * Pass as generateText `reasoning` and mirror in providerOptions.openai.reasoningEffort.
+ */
+export const GMI_REASONING = "none" as const;
+export const GMI_PROVIDER_OPTIONS = {
+  openai: {
+    reasoningEffort: GMI_REASONING,
+  },
+} as const;
 export const GMI_IMAGE_API_BASE = "https://console.gmicloud.ai";
 export const GMI_IMAGE_MODEL_ID = "seedream-5.0-lite";
 export const GMI_IMAGE_MIN_COUNT = 1;

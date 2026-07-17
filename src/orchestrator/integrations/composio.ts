@@ -46,7 +46,8 @@ const getClient = (apiKey: string): Composio<VercelProvider> => {
   if (!client || clientApiKey !== apiKey) {
     client = new Composio({
       apiKey,
-      provider: new VercelProvider(),
+      // Strip optional schema fields; GMI/Luna often 400s on loose tool JSON Schema.
+      provider: new VercelProvider({ strict: true }),
     });
     clientApiKey = apiKey;
     toolsByUser.clear();
