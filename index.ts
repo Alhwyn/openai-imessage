@@ -7,6 +7,7 @@ import {
   createRecentIdTracker,
   extractInboundImages,
   extractInboundText,
+  flushPendingOrchestratorTurns,
   scheduleOrchestratorTurn,
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
@@ -42,12 +43,12 @@ const getSpectrumEnv = () => {
   return { projectId, projectSecret, webhookSecret, missing };
 };
 
-const senderKeyFrom = (space: Space, message: Message): string | undefined => {
+const senderIdFrom = (message: Message): string | null => {
   const sender = message.sender;
   if (sender && typeof sender === "object" && "id" in sender && typeof sender.id === "string") {
     return sender.id;
   }
-  return space.id;
+  return null;
 };
 
 const handleInbound = async (space: Space, message: Message): Promise<void> => {
@@ -78,11 +79,11 @@ const handleInbound = async (space: Space, message: Message): Promise<void> => {
     return;
   }
 
-  const senderKey = senderKeyFrom(space, message);
+  const senderId = senderIdFrom(message);
   console.log("[app] Inbound:", inboundText.slice(0, 80), {
     messageId: message.id,
     spaceId: space.id,
-    senderKey,
+    senderId,
     images: inboundImages.map((image) => image.filename),
   });
 
@@ -91,7 +92,7 @@ const handleInbound = async (space: Space, message: Message): Promise<void> => {
     message,
     text: inboundText,
     images: inboundImages,
-    senderKey,
+    senderId,
   });
 };
 
@@ -110,11 +111,14 @@ const main = async () => {
   });
 
   let stopping = false;
+  const inboundJobs = new Set<Promise<void>>();
   const stopApp = async (reason: string) => {
     if (stopping) return;
     stopping = true;
     console.log(`[app] Stopping Spectrum (${reason})`);
     try {
+      await Promise.allSettled(inboundJobs);
+      await flushPendingOrchestratorTurns();
       await app.stop();
     } catch (error) {
       console.error("[app] Spectrum stop failed", error);
@@ -143,11 +147,13 @@ const main = async () => {
 
   try {
     for await (const [space, message] of app.messages) {
-      try {
-        await handleInbound(space, message);
-      } catch (error) {
+      const job = handleInbound(space, message).catch((error: unknown) => {
         console.error("[app] Failed to handle inbound message", error);
-      }
+      });
+      inboundJobs.add(job);
+      void job.finally(() => {
+        inboundJobs.delete(job);
+      });
     }
   } finally {
     await stopApp("messages ended");

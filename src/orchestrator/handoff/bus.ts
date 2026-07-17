@@ -1,16 +1,18 @@
-import { runExecutionAgent } from "../agents/execution";
 import { appendHistory } from "../memory/index";
+import { summarizeOutbound } from "../outbound";
 import {
   cleanupImageAlbum,
   deliverOutbound,
   generateGmiImages,
   getGmiErrorDetails,
 } from "../utils/index";
+import { runExecutionAgent } from "../workers/execution";
 
 import {
   completeImageTask,
   createImageTaskProgressHook,
   failImageTask,
+  markImageTaskDelivering,
   startImageTask,
 } from "./imageTaskTracker";
 
@@ -19,48 +21,16 @@ import type {
   AssignImageTaskResult,
   AssignTaskInput,
   AssignTaskResult,
-  SpaceHandle,
+  DeliveryTarget,
 } from "./types";
-import type { OutboundItem } from "../agents/types";
-import type { Message, Space } from "@spectrum-ts/core";
+import type { OutboundItem } from "../contracts";
 
-const spaces = new Map<string, SpaceHandle>();
 const inFlight = new Set<string>();
 
 let taskCounter = 0;
 
-/**
- * Registers a space and optionally remembers the latest inbound message.
- * @param spaceId - The space ID.
- * @param space - The space to register.
- * @param lastInboundMessage - Latest inbound message for replies/reactions.
- */
-export const registerSpace = (
-  spaceId: string,
-  space: Space,
-  lastInboundMessage?: Message,
-): void => {
-  const existing = spaces.get(spaceId);
-  spaces.set(spaceId, {
-    space,
-    lastInboundMessage: lastInboundMessage ?? existing?.lastInboundMessage,
-  });
-};
-
-/**
- * Gets a registered space.
- * @param spaceId - The space ID.
- * @returns The registered space or undefined if not found.
- */
-export const getRegisteredSpace = (spaceId: string): Space | undefined => {
-  return spaces.get(spaceId)?.space;
-};
-
-const deliveryTarget = (spaceId: string): Message | undefined => {
-  return spaces.get(spaceId)?.lastInboundMessage;
-};
-
 const deliverTaskOutput = async (
+  target: DeliveryTarget,
   spaceId: string,
   taskId: string,
   outbound: OutboundItem[],
@@ -74,27 +44,21 @@ const deliverTaskOutput = async (
 
   inFlight.add(lockKey);
   try {
-    const space = getRegisteredSpace(spaceId);
-    if (!space) {
-      console.error(`[handoff] No space registered for ${spaceId}; dropping completion`);
-      return;
-    }
-
     if (outbound.length > 0) {
       console.log(`[handoff] Delivering ${taskId}`, {
         outboundCount: outbound.length,
-        items: outbound.map((item) =>
-          item.kind === "text"
-            ? { kind: item.kind, preview: item.text.slice(0, 80) }
-            : item.kind === "album"
-              ? { kind: item.kind, pathCount: item.paths.length }
-              : { kind: item.kind, emoji: item.emoji },
-        ),
+        items: summarizeOutbound(outbound),
       });
-      await deliverOutbound(space, outbound, { targetMessage: deliveryTarget(spaceId) });
+      await deliverOutbound(target.space, outbound, {
+        targetMessage: target.message,
+      });
     }
 
-    await appendHistory(spaceId, { role: "assistant", content: historyText });
+    try {
+      await appendHistory(spaceId, { role: "assistant", content: historyText });
+    } catch (error) {
+      console.error(`[handoff] Failed to persist history for ${taskId}`, error);
+    }
   } finally {
     inFlight.delete(lockKey);
   }
@@ -115,6 +79,7 @@ export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
     try {
       const result = await runExecutionAgent(input.task, input.images);
       await deliverTaskOutput(
+        input.deliveryTarget,
         input.spaceId,
         taskId,
         [{ kind: "text", text: result }],
@@ -125,6 +90,7 @@ export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
       console.error(`[handoff] Worker failed for ${taskId}`, error);
       const apology = `couldnt finish that task: ${message}`;
       await deliverTaskOutput(
+        input.deliveryTarget,
         input.spaceId,
         taskId,
         [{ kind: "text", text: apology }],
@@ -183,17 +149,19 @@ export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskRes
         }),
       });
       tempDir = album.tempDir;
-      completeImageTask(task, album.paths.length);
-      console.log(`[image-agent] Completed ${taskId}`, {
-        generatedImages: album.paths.length,
-        elapsedMs: (task.finishedAt ?? Date.now()) - task.startedAt,
-      });
+      markImageTaskDelivering(task, album.paths.length);
       await deliverTaskOutput(
+        input.deliveryTarget,
         input.spaceId,
         taskId,
         [{ kind: "album", paths: album.paths }],
         `[Sent ${album.paths.length} generated image(s)]`,
       );
+      completeImageTask(task, album.paths.length);
+      console.log(`[image-agent] Completed ${taskId}`, {
+        generatedImages: album.paths.length,
+        elapsedMs: (task.finishedAt ?? Date.now()) - task.startedAt,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!tempDir) {
@@ -201,15 +169,18 @@ export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskRes
         console.error(`[image-agent] Failed ${taskId}`, error);
         const apology = "couldnt generate those images, something broke on my end";
         await deliverTaskOutput(
+          input.deliveryTarget,
           input.spaceId,
           taskId,
           [{ kind: "text", text: apology }],
           `${apology} (${message})`,
         );
       } else {
+        failImageTask(task, message);
         console.error(`[image-agent] Delivery failed for ${taskId}`, error);
         const apology = "made the images but couldnt send them, upload choked";
         await deliverTaskOutput(
+          input.deliveryTarget,
           input.spaceId,
           `${taskId}:delivery`,
           [{ kind: "text", text: apology }],

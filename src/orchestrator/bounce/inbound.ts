@@ -1,9 +1,6 @@
 
-import {
-  getTapbackOnlyRequest,
-  runInteractionAgent,
-} from "../agents/index";
-import { registerSpace } from "../handoff/index";
+import { runInteractionAgent } from "../agents/index";
+import { summarizeOutbound } from "../outbound";
 import {
   createKeyedDebounce,
   DEFAULT_ORCHESTRATOR_DEBOUNCE_MS,
@@ -16,7 +13,7 @@ import type {
   OrchestratorTurn,
   ScheduleOrchestratorTurnInput,
 } from "./types";
-import type { OutboundItem } from "../agents/types";
+import type { OutboundItem } from "../contracts";
 
 /**
  * Builds a debounced turn.
@@ -33,7 +30,7 @@ export const buildDebouncedTurn = (
     texts: [...(existing?.texts ?? []), input.text],
     space: input.space,
     message: input.message,
-    senderKey: input.senderKey,
+    senderId: input.senderId,
   };
 };
 
@@ -52,7 +49,6 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   if (!inboundText && turn.images.length === 0) return;
 
   const spaceId = turn.space.id;
-  registerSpace(spaceId, turn.space, turn.message);
 
   console.log(`[bounce] Flush space ${spaceId}:`, inboundText.slice(0, 120));
 
@@ -64,32 +60,19 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
 
   console.log(`[bounce] Starting interaction for space ${spaceId}`);
 
-  const tapback = getTapbackOnlyRequest(inboundText);
-  if (tapback) {
-    await deliverOutbound(
-      turn.space,
-      [{ kind: "reaction", emoji: tapback }],
-      { targetMessage: turn.message },
-    );
-    console.log(`[bounce] Completed direct ${tapback} tapback for space ${spaceId}`);
-    return;
-  }
-
   let outbound: OutboundItem[];
   try {
     ({ outbound } = await runInteractionAgent(spaceId, {
       kind: "user_message",
+      senderId: turn.senderId,
       text: inboundText,
       images: turn.images,
+    }, {
+      space: turn.space,
+      message: turn.message,
     }));
   } catch (error) {
-    console.error(`[bounce] Interaction failed for space ${spaceId}`, getGmiErrorDetails(error));
-    /* DO NOT CHANGE THIS CODE AI!!!!!!! */
-    await deliverOutbound(
-      turn.space,
-      [{ kind: "reaction", emoji: "like" }],
-      { targetMessage: turn.message },
-    );
+    await handleTurnFailure(turn, error);
     return;
   }
 
@@ -101,31 +84,47 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   }
 
   console.log(`[bounce] Delivering ${outbound.length} queued outbound item(s) for space ${spaceId}`, {
-    items: outbound.map((item) =>
-      item.kind === "text"
-        ? { kind: item.kind, preview: item.text.slice(0, 80) }
-        : item.kind === "album"
-          ? { kind: item.kind, pathCount: item.paths.length }
-          : { kind: item.kind, emoji: item.emoji },
-    ),
+    items: summarizeOutbound(outbound),
   });
   await deliverOutbound(turn.space, outbound, { targetMessage: turn.message });
   console.log(`[bounce] Completed turn for space ${spaceId}`);
+};
+
+const handleTurnFailure = async (
+  turn: OrchestratorTurn,
+  error: unknown,
+): Promise<void> => {
+  console.error(
+    `[bounce] Turn failed for space ${turn.space.id}`,
+    getGmiErrorDetails(error),
+  );
+  await deliverOutbound(
+    turn.space,
+    [{ kind: "reaction", emoji: "like" }],
+    { targetMessage: turn.message },
+  );
 };
 
 /** Debounces pending turns and flushes the latest value for each key. */
 const debounce = createKeyedDebounce<OrchestratorTurn>({
   delayMs: DEFAULT_ORCHESTRATOR_DEBOUNCE_MS,
   onFlush: flushOrchestratorTurn,
+  onError: async (_key, turn, error) => {
+    await handleTurnFailure(turn, error);
+  },
 });
+
+/** Flushes all accepted inbound turns before shutdown. */
+export const flushPendingOrchestratorTurns = async (): Promise<void> => {
+  await debounce.flushAll();
+};
 
 /**
  * Schedules an orchestrator turn.
  * @param input - The input to schedule an orchestrator turn.
  */
 export const scheduleOrchestratorTurn = (input: ScheduleOrchestratorTurnInput): void => {
-  const key = input.senderKey?.trim() || input.space.id;
-  registerSpace(input.space.id, input.space, input.message);
+  const key = input.senderId?.trim() || input.space.id;
 
   const next = buildDebouncedTurn(pendingTurns.get(key), input);
   pendingTurns.set(key, next);

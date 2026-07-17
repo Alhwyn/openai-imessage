@@ -22,26 +22,6 @@ export const listRecentMessages = async (
 };
 
 /**
- * Replaces the message window for a space.
- * @param spaceId - The space ID.
- * @param messages - The messages to replace the window.
- * @param keep - The number of messages to keep.
- * @returns The number of messages retained.
- */
-export const replaceMessageWindow = async (
-  spaceId: string,
-  messages: MessageInput[],
-  keep: number,
-): Promise<{ count: number }> => {
-  return await getConvexClient().mutation(api.messages.replaceWindow, {
-    secret: getBridgeSecret(),
-    spaceId,
-    messages,
-    keep,
-  });
-};
-
-/**
  * Appends messages to a space.
  * @param spaceId - The space ID.
  * @param messages - The messages to append.

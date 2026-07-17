@@ -45,43 +45,6 @@ export const listRecent = query({
   },
 });
 
-export const replaceWindow = mutation({
-  args: {
-    secret: v.string(),
-    spaceId: v.string(),
-    messages: v.array(messageInput),
-    keep: v.number(),
-  },
-  returns: v.object({ count: v.number() }),
-  handler: async (ctx, args) => {
-    assertBridgeSecret(args.secret);
-
-    const keep = Math.max(1, Math.min(args.keep, 100));
-    const existing = await ctx.db
-      .query("messages")
-      .withIndex("by_space_created", (q) => q.eq("spaceId", args.spaceId))
-      .collect();
-
-    for (const row of existing) {
-      await ctx.db.delete("messages", row._id);
-    }
-
-    const toInsert = args.messages.slice(-keep);
-    const baseTime = Date.now();
-    for (const [i, msg] of toInsert.entries()) {
-      await ctx.db.insert("messages", {
-        spaceId: args.spaceId,
-        role: msg.role,
-        searchText: msg.searchText,
-        payloadJson: msg.payloadJson,
-        createdAt: msg.createdAt ?? baseTime + i,
-      });
-    }
-
-    return { count: toInsert.length };
-  },
-});
-
 export const appendMany = mutation({
   args: {
     secret: v.string(),
@@ -110,7 +73,7 @@ export const appendMany = mutation({
       .query("messages")
       .withIndex("by_space_created", (q) => q.eq("spaceId", args.spaceId))
       .order("asc")
-      .collect();
+      .take(200);
 
     const overflow = all.length - keep;
     if (overflow > 0) {

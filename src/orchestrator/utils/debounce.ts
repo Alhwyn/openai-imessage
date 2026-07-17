@@ -36,7 +36,11 @@ export const createKeyedDebounce = <T>(
     try {
       await Promise.resolve(options.onFlush(key, value));
     } catch (error) {
-      console.warn(`[debounce] Flush failed for key ${key}`, error);
+      if (options.onError) {
+        await options.onError(key, value, error);
+      } else {
+        console.error(`[debounce] Flush failed for key ${key}`, error);
+      }
     }
   };
 
@@ -95,5 +99,10 @@ export const createKeyedDebounce = <T>(
     await enqueueFlush(key, latest);
   };
 
-  return { schedule, flush, cancel, cancelAll };
+  const flushAll = async () => {
+    await Promise.all([...latestValues.keys()].map(flush));
+    await Promise.all(flushQueues.values());
+  };
+
+  return { schedule, flush, flushAll, cancel, cancelAll };
 };

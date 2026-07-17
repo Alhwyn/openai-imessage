@@ -66,6 +66,40 @@ describe("createKeyedDebounce", () => {
     expect(maxActiveFlushes).toBe(1);
     expect(events).toEqual(["start:first", "end:first", "start:second", "end:second"]);
   });
+
+  test("surfaces flush failures through onError", async () => {
+    const failures: string[] = [];
+    const debounce = createKeyedDebounce<string>({
+      delayMs: 0,
+      onFlush: () => {
+        throw new Error("flush broke");
+      },
+      onError: (_key, value, error) => {
+        failures.push(`${value}:${error instanceof Error ? error.message : String(error)}`);
+      },
+    });
+
+    debounce.schedule("a", "message");
+    await debounce.flushAll();
+
+    expect(failures).toEqual(["message:flush broke"]);
+  });
+
+  test("flushAll drains every pending key", async () => {
+    const flushed: string[] = [];
+    const debounce = createKeyedDebounce<string>({
+      delayMs: 60_000,
+      onFlush: (key, value) => {
+        flushed.push(`${key}:${value}`);
+      },
+    });
+
+    debounce.schedule("a", "one");
+    debounce.schedule("b", "two");
+    await debounce.flushAll();
+
+    expect(flushed.sort()).toEqual(["a:one", "b:two"]);
+  });
 });
 
 describe("buildDebouncedTurn", () => {
@@ -77,11 +111,13 @@ describe("buildDebouncedTurn", () => {
       text: "hi",
       space,
       message,
+      senderId: "sender-1",
     });
     const second = buildDebouncedTurn(first, {
       text: "there",
       space,
       message,
+      senderId: "sender-1",
     });
 
     expect(second.texts).toEqual(["hi", "there"]);
@@ -106,12 +142,14 @@ describe("buildDebouncedTurn", () => {
       text: "",
       space,
       message,
+      senderId: "sender-1",
     });
     const second = buildDebouncedTurn(first, {
       images: [secondImage],
       text: "compare these",
       space,
       message,
+      senderId: "sender-1",
     });
 
     expect(second.images).toEqual([firstImage, secondImage]);

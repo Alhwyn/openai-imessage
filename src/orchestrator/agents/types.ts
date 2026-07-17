@@ -1,30 +1,17 @@
-import type { TapbackKey } from "./tapbacks";
-import type { ModelMessage } from "ai";
+import type { InboundImage, OutboundItem } from "../contracts";
 
-export type { TapbackKey } from "./tapbacks";
-
-/** In-memory image input forwarded to a vision-capable model. */
-export type InboundImage = {
-  data: Uint8Array;
-  filename: string;
-  mediaType: string;
-};
+export type { InboundImage, OutboundItem, TapbackKey } from "../contracts";
 
 /** User message to the interaction agent. */
 export type InteractionEvent = {
   kind: "user_message";
+  /** Stable sender identity, or null when the provider did not supply one. */
+  senderId: string | null;
   text: string;
   images?: InboundImage[];
 };
 
-/** Items not already sent by tools (fallback delivery). */
-export type OutboundItem =
-  | { kind: "text"; text: string }
-  | { kind: "reaction"; emoji: TapbackKey }
-  | { kind: "album"; paths: string[] };
-
-/** Outbound queue and updated history for an interaction turn. */
+/** Outbound queue for an interaction turn. */
 export type InteractionResult = {
   outbound: OutboundItem[];
-  messages: ModelMessage[];
 };

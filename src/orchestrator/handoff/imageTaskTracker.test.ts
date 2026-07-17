@@ -5,6 +5,7 @@ import {
   createImageTaskProgressHook,
   failImageTask,
   getImageTaskStatus,
+  markImageTaskDelivering,
   startImageTask,
 } from "./imageTaskTracker";
 
@@ -35,8 +36,13 @@ describe("imageTaskTracker", () => {
     });
     expect(changes).toEqual(["processing:1"]);
 
-    completeImageTask(task, 3);
+    markImageTaskDelivering(task, 3);
+    expect(getImageTaskStatus("space-progress")).toMatchObject({
+      state: "delivering",
+      completedImages: 3,
+    });
 
+    completeImageTask(task, 3);
     expect(getImageTaskStatus("space-progress")).toMatchObject({
       state: "completed",
       completedImages: 3,

@@ -4,12 +4,14 @@ import type { Message } from "@spectrum-ts/core";
 export type KeyedDebounceOptions<T> = {
   delayMs: number | (() => number);
   onFlush: (key: string, value: T) => void | Promise<void>;
+  onError?: (key: string, value: T, error: unknown) => void | Promise<void>;
 };
 
 /** A keyed debounce. */
 export type KeyedDebounce<T> = {
   schedule: (key: string, value: T) => void;
   flush: (key: string) => Promise<void>;
+  flushAll: () => Promise<void>;
   cancel: (key: string) => void;
   cancelAll: () => void;
 };

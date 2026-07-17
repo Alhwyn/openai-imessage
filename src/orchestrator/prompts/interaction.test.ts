@@ -18,3 +18,21 @@ describe("interaction prompt rewrite formatting", () => {
     );
   });
 });
+
+describe("interaction prompt composio auth deep links", () => {
+  test("requires send_auth_link instead of raw or Markdown OAuth URLs", () => {
+    expect(interactionSystemPrompt).toContain("call send_auth_link with that exact URL");
+    expect(interactionSystemPrompt).toContain(
+      "Never paste the authorization URL into chat text",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Never format it as Markdown like [label](url)",
+    );
+    expect(interactionSystemPrompt).toContain(
+      'send_auth_link(url="https://connect.composio.dev/link/ln_abc123")',
+    );
+    expect(interactionSystemPrompt).not.toContain(
+      "reply with that raw URL and a short instruction",
+    );
+  });
+});

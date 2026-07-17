@@ -1,9 +1,9 @@
-import { attachment, group, text } from "@spectrum-ts/core";
+import { app, attachment, group, text } from "@spectrum-ts/core";
 
-import { tapbackEmoji } from "../agents/tapbacks";
+import { tapbackEmoji } from "../tapbacks";
 
 import type { DeliverOutboundOptions } from "./types";
-import type { OutboundItem } from "../agents/types";
+import type { OutboundItem } from "../contracts";
 import type { ContentInput, Space } from "@spectrum-ts/core";
 
 const buildAlbumContent = (paths: string[]): ContentInput => {
@@ -65,6 +65,13 @@ export const deliverOutbound = async (
           totalMebibytes: Number((totalBytes / 1_048_576).toFixed(2)),
         });
         await space.send(buildAlbumContent(item.paths));
+        break;
+      }
+      case "app": {
+        console.log("[deliver] Sending app deep-link via space.send", {
+          url: item.url,
+        });
+        await space.send(app(item.url));
         break;
       }
       default: {
