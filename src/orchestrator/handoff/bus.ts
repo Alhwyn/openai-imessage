@@ -91,32 +91,38 @@ export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
 
 /**
  * Assigns an image-generation task to a dedicated sub-agent.
- * @param input - Prompt and image count for generation.
+ * @param input - One prompt per image to generate.
  * @returns The task ID and status.
  */
 export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskResult => {
+  const prompts = input.prompts.map((prompt) => prompt.trim()).filter(Boolean);
+  if (prompts.length === 0) {
+    throw new Error("At least one image prompt is required");
+  }
+
   taskCounter += 1;
   const taskId = `image_${Date.now()}_${taskCounter}`;
+  const promptSummary = prompts.join("; ");
   const task = startImageTask(
     input.spaceId,
     taskId,
-    input.prompt,
-    input.count,
+    promptSummary,
+    prompts.length,
   );
 
   console.log(
-    `[handoff] Assigned ${taskId} for space ${input.spaceId}: generate ${input.count} image(s)`,
-    input.prompt.slice(0, 120),
+    `[handoff] Assigned ${taskId} for space ${input.spaceId}: generate ${prompts.length} image(s)`,
+    promptSummary.slice(0, 120),
   );
 
   void (async () => {
     let tempDir: string | undefined;
     try {
       console.log(`[image-agent] Starting ${taskId}`, {
-        count: input.count,
-        promptPreview: input.prompt.slice(0, 120),
+        count: prompts.length,
+        promptPreview: promptSummary.slice(0, 120),
       });
-      const album = await generateGmiImages(input.prompt, input.count, {
+      const album = await generateGmiImages(prompts, {
         onProgress: createImageTaskProgressHook(task, (progress) => {
           console.log(`[image-agent] Progress ${taskId}`, {
             phase: progress.phase,
@@ -138,8 +144,8 @@ export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskRes
         album: {
           paths: album.paths,
           tempDir: album.tempDir,
-          prompt: input.prompt,
-          count: input.count,
+          prompt: promptSummary,
+          count: prompts.length,
         },
       });
     } catch (error) {
@@ -151,8 +157,8 @@ export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskRes
         taskId,
         result: `Image generation failed: ${message}`,
         albumFailure: {
-          prompt: input.prompt,
-          count: input.count,
+          prompt: promptSummary,
+          count: prompts.length,
           error: message,
           tempDir,
         },

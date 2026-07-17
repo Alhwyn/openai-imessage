@@ -218,19 +218,19 @@ const downloadAlbum = async (
 
 /**
  * Generates images via Seedream on GMI, polls when queued, and stages files locally.
- * Requests one image per job in parallel so the returned count matches the ask.
+ * One Seedream job per prompt, in parallel.
  */
 export const generateGmiImages = async (
-  prompt: string,
-  count: number,
+  prompts: string[],
   options: GenerateGmiImagesOptions = {},
 ): Promise<GeneratedImageAlbum> => {
-  const trimmedPrompt = prompt.trim();
-  if (!trimmedPrompt) {
-    throw new Error("Image prompt is required");
+  const cleaned = prompts.map((prompt) => prompt.trim()).filter(Boolean);
+  if (cleaned.length === 0) {
+    throw new Error("At least one image prompt is required");
   }
 
-  const imageCount = clampImageCount(count);
+  const imagePrompts = cleaned.slice(0, GMI_IMAGE_MAX_COUNT);
+  const imageCount = imagePrompts.length;
   const fetchFn = options.fetchFn ?? fetch;
   const wait = resolveWaitOptions(options);
   let completedImages = 0;
@@ -245,19 +245,14 @@ export const generateGmiImages = async (
   console.log("[images] Starting GMI image generation", {
     model: getGmiImageModelId(),
     count: imageCount,
-    promptPreview: trimmedPrompt.slice(0, 120),
+    promptPreview: imagePrompts[0]?.slice(0, 120),
   });
 
   const startedAt = wait.now();
   reportProgress("queued");
   const mediaUrls = await Promise.all(
-    Array.from({ length: imageCount }, async () => {
-      const url = await generateOneImageUrl(
-        trimmedPrompt,
-        fetchFn,
-        wait,
-        reportProgress,
-      );
+    imagePrompts.map(async (prompt) => {
+      const url = await generateOneImageUrl(prompt, fetchFn, wait, reportProgress);
       completedImages += 1;
       reportProgress("processing");
       return url;

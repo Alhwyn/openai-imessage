@@ -186,28 +186,25 @@ export const runInteractionAgent = async (
         }),
         assign_image_task: tool({
           description:
-            "Generate one or more images with the image sub-agent. Immediately sends a natural acknowledgment with an ETA; when ready the images are delivered as an album and you receive a completion event.",
+            "Generate images with the image sub-agent. Pass one prompt per image. Immediately sends a natural acknowledgment with an ETA; when ready the images are delivered as an album and you receive a completion event.",
           inputSchema: z.object({
-            prompt: z
-              .string()
-              .describe("Clear image prompt describing what to generate"),
-            count: z
-              .number()
-              .int()
+            prompts: z
+              .array(z.string().min(1))
               .min(GMI_IMAGE_MIN_COUNT)
               .max(GMI_IMAGE_MAX_COUNT)
-              .describe("How many images to generate"),
+              .describe(
+                'One prompt per image. Default shape: ["subject"]. For three cat pics use ["a cat", "a cat", "a cat"]. Vary entries when they want different images.',
+              ),
           }),
-          execute: ({ prompt, count }) => {
+          execute: ({ prompts }) => {
             console.log("[agent] Image request", {
               spaceId,
-              count,
-              prompt,
+              count: prompts.length,
+              prompts,
             });
             const { taskId, status, estimatedSeconds } = assignImageTask({
               spaceId,
-              prompt,
-              count,
+              prompts,
             });
             const estimatedMinutes = approximateMinutes(estimatedSeconds);
             outbound.push({
@@ -327,7 +324,6 @@ export const runInteractionAgent = async (
     await setHistory(spaceId, nextMessages);
 
     const fallbackReply = result.text.replace(/\s+/g, " ").trim();
-
     if (outbound.length === 0 && fallbackReply) {
       outbound.push({ kind: "text", text: fallbackReply });
       await appendHistory(spaceId, { role: "assistant", content: fallbackReply });

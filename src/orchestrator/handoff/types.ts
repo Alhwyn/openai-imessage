@@ -15,8 +15,8 @@ export type AssignTaskInput = {
 
 export type AssignImageTaskInput = {
   spaceId: string;
-  prompt: string;
-  count: number;
+  /** One prompt per image to generate. */
+  prompts: string[];
 };
 
 export type AssignTaskResult = {

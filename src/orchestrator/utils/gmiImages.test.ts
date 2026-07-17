@@ -131,7 +131,7 @@ describe("generateGmiImages", () => {
       },
     );
 
-    const album = await generateGmiImages("a fluffy cat", 2, {
+    const album = await generateGmiImages(["a fluffy cat", "a fluffy cat"], {
       fetchFn: fetchFn as unknown as typeof fetch,
       onProgress: (update) => {
         progress.push(update);
@@ -198,7 +198,7 @@ describe("generateGmiImages", () => {
       throw new Error(`Unexpected fetch: ${url}`);
     });
 
-    const album = await generateGmiImages("sunset", 1, {
+    const album = await generateGmiImages(["sunset"], {
       fetchFn: fetchFn as unknown as typeof fetch,
       pollIntervalMs: 1,
       sleep: noopSleep,
@@ -221,7 +221,7 @@ describe("generateGmiImages", () => {
     );
 
     try {
-      await generateGmiImages("bad prompt", 1, {
+      await generateGmiImages(["bad prompt"], {
         fetchFn: fetchFn as unknown as typeof fetch,
         sleep: noopSleep,
       });
@@ -256,7 +256,7 @@ describe("generateGmiImages", () => {
     });
 
     try {
-      await generateGmiImages("slow prompt", 1, {
+      await generateGmiImages(["slow prompt"], {
         fetchFn: fetchFn as unknown as typeof fetch,
         now: () => {
           now += 50;
