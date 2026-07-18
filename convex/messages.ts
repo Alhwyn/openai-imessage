@@ -1,7 +1,14 @@
 import { v } from "convex/values";
 
-import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { assertBridgeSecret } from "./lib/bridge";
+import {
+  getMessagePruneBatch,
+  MESSAGE_PRUNE_BATCH_SIZE,
+} from "./lib/messageRetention";
+
+import type { MutationCtx } from "./_generated/server";
 
 const messageInput = v.object({
   role: v.string(),
@@ -16,6 +23,36 @@ const messageDoc = v.object({
   payloadJson: v.string(),
   createdAt: v.number(),
 });
+
+const pruneMessageBatch = async (
+  ctx: MutationCtx,
+  spaceId: string,
+  keep: number,
+): Promise<boolean> => {
+  const newestFirst = await ctx.db
+    .query("messages")
+    .withIndex("by_space_created", (q) => q.eq("spaceId", spaceId))
+    .order("desc")
+    .take(keep + MESSAGE_PRUNE_BATCH_SIZE + 1);
+  const batch = getMessagePruneBatch(newestFirst, keep);
+
+  for (const row of batch.rows) {
+    await ctx.db.delete("messages", row._id);
+  }
+
+  return batch.hasMore;
+};
+
+const schedulePruneContinuation = async (
+  ctx: MutationCtx,
+  spaceId: string,
+  keep: number,
+): Promise<void> => {
+  await ctx.scheduler.runAfter(0, internal.messages.pruneOverflow, {
+    spaceId,
+    keep,
+  });
+};
 
 export const listRecent = query({
   args: {
@@ -69,20 +106,27 @@ export const appendMany = mutation({
       });
     }
 
-    const all = await ctx.db
-      .query("messages")
-      .withIndex("by_space_created", (q) => q.eq("spaceId", args.spaceId))
-      .order("asc")
-      .take(200);
-
-    const overflow = all.length - keep;
-    if (overflow > 0) {
-      for (let i = 0; i < overflow; i += 1) {
-        const row = all[i];
-        if (row) await ctx.db.delete("messages", row._id);
-      }
-    }
+    const hasMore = await pruneMessageBatch(ctx, args.spaceId, keep);
+    
+    if (hasMore) await schedulePruneContinuation(ctx, args.spaceId, keep);
 
     return { count: args.messages.length };
+  },
+});
+
+export const pruneOverflow = internalMutation({
+  args: {
+    spaceId: v.string(),
+    keep: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const keep = Math.max(1, Math.min(args.keep, 100));
+    const hasMore = await pruneMessageBatch(ctx, args.spaceId, keep);
+    if (hasMore) {
+      await schedulePruneContinuation(ctx, args.spaceId, keep);
+    }
+
+    return null;
   },
 });
