@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import {
-  captureDesktopScreenshot,
+  captureStableDesktopScreenshot,
   executeComputerAction,
 } from "./desktop";
 
@@ -73,6 +73,7 @@ export class ComputerApprovalRequiredError extends Error {
 
 type RunComputerUseInput = {
   goal: string;
+  sessionId: string;
   onProgress?: (progress: {
     step: number;
     lastAction: string;
@@ -158,7 +159,7 @@ const actionLabel = (actions: ComputerAction[]): string => {
 };
 
 const screenshotOutput = async (callId: string) => {
-  const screenshot = await captureDesktopScreenshot();
+  const screenshot = await captureStableDesktopScreenshot();
   return {
     type: "computer_call_output",
     call_id: callId,
@@ -172,6 +173,7 @@ const screenshotOutput = async (callId: string) => {
 
 export const runComputerUse = async ({
   goal,
+  sessionId,
   onProgress,
 }: RunComputerUseInput): Promise<RunComputerUseResult> => {
   const maximumSteps = Math.max(
@@ -199,6 +201,16 @@ export const runComputerUse = async ({
       instructions,
       reasoning: { effort: "low" },
       input,
+      prompt_cache_key: `computer-session:${sessionId}`,
+      context_management: [
+        {
+          type: "compaction",
+          compact_threshold: Math.max(
+            20_000,
+            Number(process.env.COMPUTER_COMPACT_THRESHOLD ?? 60_000),
+          ),
+        },
+      ],
     };
 
     if (previousResponseId) {

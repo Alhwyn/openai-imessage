@@ -163,6 +163,27 @@ export const captureDesktopScreenshot = async (): Promise<Uint8Array> => {
   }
 };
 
+export const captureStableDesktopScreenshot = async (): Promise<Uint8Array> => {
+  const attempts = Math.max(
+    1,
+    Math.min(6, Number(process.env.COMPUTER_STABILITY_ATTEMPTS ?? 3)),
+  );
+  const delayMs = Math.max(
+    50,
+    Math.min(2_000, Number(process.env.COMPUTER_STABILITY_DELAY_MS ?? 150)),
+  );
+  let previous = await captureDesktopScreenshot();
+
+  for (let attempt = 1; attempt < attempts; attempt += 1) {
+    await Bun.sleep(delayMs);
+    const current = await captureDesktopScreenshot();
+    if (Buffer.from(previous).equals(Buffer.from(current))) return current;
+    previous = current;
+  }
+
+  return previous;
+};
+
 export const executeComputerAction = async (
   action: ComputerAction,
 ): Promise<void> => {

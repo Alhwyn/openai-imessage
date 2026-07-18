@@ -2,8 +2,6 @@ services:
   desktop:
     build:
       context: .
-      args:
-        KASM_TAG: ${COMPUTER_KASM_TAG:-1.18.0}
     init: true
     restart: unless-stopped
     shm_size: "1gb"
@@ -12,6 +10,8 @@ services:
       - "127.0.0.1:${COMPUTER_LIVE_VIEW_PORT:-6901}:6901"
     environment:
       DISPLAY: ":1"
+      COMPUTER_DISPLAY_HEIGHT: "${COMPUTER_DISPLAY_HEIGHT:-800}"
+      COMPUTER_DISPLAY_WIDTH: "${COMPUTER_DISPLAY_WIDTH:-1280}"
       VNC_PW: "${COMPUTER_DESKTOP_PASSWORD:?set COMPUTER_DESKTOP_PASSWORD in your local environment}"
       VNC_RESOLUTION: "${COMPUTER_DISPLAY_WIDTH:-1280}x${COMPUTER_DISPLAY_HEIGHT:-800}"
       VNC_COL_DEPTH: "24"

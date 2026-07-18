@@ -1,5 +1,4 @@
-ARG KASM_TAG=1.18.0
-FROM kasmweb/desktop:${KASM_TAG}
+FROM kasmweb/desktop:1.18.0@sha256:9a94316372b8858d0238134ba507812e867fcb903d0db599c8cfd9ff8bcd0bfb
 
 USER root
 

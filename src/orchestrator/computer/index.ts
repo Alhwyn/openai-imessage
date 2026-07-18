@@ -31,7 +31,11 @@ export const runComputerAgent = async ({
 
   let recordingPath: string | undefined;
   try {
-    const result = await runComputerUse({ goal, onProgress });
+    const result = await runComputerUse({
+      goal,
+      sessionId: runId,
+      onProgress,
+    });
     recordingPath = await stopDesktopRecording(runId);
     return { ...result, recordingPath };
   } catch (error) {
