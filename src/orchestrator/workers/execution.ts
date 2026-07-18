@@ -11,7 +11,6 @@ import {
   GMI_MODEL_ID,
   GMI_PROVIDER_OPTIONS,
   GMI_REASONING,
-  GMI_TEMPERATURE,
 } from "../utils/index";
 
 import type { InboundImage } from "../contracts";
@@ -69,7 +68,6 @@ export const runExecutionAgent = async (
 
   const result = await generateText({
     model: GMI_MODEL,
-    temperature: GMI_TEMPERATURE,
     maxRetries: GMI_MAX_RETRIES,
     reasoning: GMI_REASONING,
     providerOptions: GMI_PROVIDER_OPTIONS,

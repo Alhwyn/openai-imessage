@@ -14,10 +14,14 @@ describe("GMI configuration", () => {
     expect(GMI_MAX_RETRIES).toBe(2);
   });
 
-  test("disables reasoning so Luna accepts function tools on chat completions", () => {
+  test("forces Luna reasoning mode with none effort and stateless store", () => {
     expect(GMI_REASONING).toBe("none");
     expect(GMI_PROVIDER_OPTIONS).toEqual({
-      openai: { reasoningEffort: "none" },
+      openai: {
+        forceReasoning: true,
+        reasoningEffort: "none",
+        store: false,
+      },
     });
   });
 
@@ -37,8 +41,8 @@ describe("GMI configuration", () => {
     });
   });
 
-  test("uses GMI's OpenAI-compatible chat completions provider", () => {
-    expect(GMI_MODEL.provider).toBe("gmi.chat");
+  test("uses GMI's OpenAI-compatible responses provider", () => {
+    expect(GMI_MODEL.provider).toBe("gmi.responses");
     expect(GMI_MODEL.modelId).toBe(DEFAULT_GMI_MODEL);
   });
 
@@ -89,7 +93,7 @@ describe("GMI configuration", () => {
       statusCode: 400,
       responseBody: `${"x".repeat(2000)}…`,
       guidance:
-        "GMI rejected the request (for Luna + tools, reasoning_effort must be none on /v1/chat/completions; otherwise inspect responseBody for schema/tool-call issues).",
+        "GMI rejected the request (Luna + tools require /v1/responses; inspect responseBody for schema/tool-call issues).",
     });
     expect(details.responseBody).not.toContain("tail");
   });
@@ -107,7 +111,7 @@ describe("GMI configuration", () => {
       statusCode: 400,
       responseBody: JSON.stringify({ error: { message: "invalid tools" } }),
       guidance:
-        "GMI rejected the request (for Luna + tools, reasoning_effort must be none on /v1/chat/completions; otherwise inspect responseBody for schema/tool-call issues).",
+        "GMI rejected the request (Luna + tools require /v1/responses; inspect responseBody for schema/tool-call issues).",
     });
   });
 
@@ -127,7 +131,7 @@ describe("GMI configuration", () => {
       statusCode: 400,
       responseBody: '{"detail":"bad schema"}',
       guidance:
-        "GMI rejected the request (for Luna + tools, reasoning_effort must be none on /v1/chat/completions; otherwise inspect responseBody for schema/tool-call issues).",
+        "GMI rejected the request (Luna + tools require /v1/responses; inspect responseBody for schema/tool-call issues).",
     });
   });
 });

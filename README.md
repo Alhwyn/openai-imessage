@@ -103,11 +103,10 @@ Set `BASE_URL=https://agent.alhwyn.com` in `.env` when testing webhooks.
 Layout lives under `src/orchestrator/` (types / utils / agents / bounce / handoff / **db** / **memory** / prompts):
 
 1. Person texts → keyed debounce (`src/orchestrator/bounce/inbound.ts`)
-2. Interaction Agent loads curated memory plus optional connected-app tools, then runs with first-party tools such as `assign_task`, `assign_image_task`, `react_to_message`, and `memory`
-3. Stored conversation history is loaded only when the model calls `get_conversation_history`
-4. Worker runs stubs (`echo`, `search_mock`) in `src/orchestrator/agents/execution.ts`
-5. Handoff delivers worker output to the captured conversation target
-6. Turn transcripts append atomically in Convex; memory edits use their own mutation
+2. Interaction Agent loads curated memory, recent conversation history, and optional connected-app tools, then runs with first-party tools such as `assign_task`, `assign_image_task`, `react_to_message`, and `memory`
+3. Worker runs stubs (`echo`, `search_mock`) in `src/orchestrator/agents/execution.ts`
+4. Handoff delivers worker output to the captured conversation target
+5. Turn transcripts append atomically in Convex; memory edits use their own mutation
 
 `db/` is the only module that talks to Convex; `memory/` calls `db` functions.
 

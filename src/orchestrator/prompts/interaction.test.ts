@@ -36,3 +36,15 @@ describe("interaction prompt composio auth deep links", () => {
     );
   });
 });
+
+describe("interaction prompt conversation history", () => {
+  test("treats recent history as already injected", () => {
+    expect(interactionSystemPrompt).toContain(
+      "Recent conversation history is already included in the message list",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "After the person says they finished connecting, immediately retry the original connected-app request with Composio tools",
+    );
+    expect(interactionSystemPrompt).not.toContain("get_conversation_history");
+  });
+});

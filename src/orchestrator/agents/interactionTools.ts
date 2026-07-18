@@ -7,7 +7,7 @@ import {
   getImageTaskStatus,
 } from "../handoff/index";
 import { isComposioAuthUrl } from "../integrations/index";
-import { editMemory, getHistory } from "../memory/index";
+import { editMemory } from "../memory/index";
 import { TAPBACK_KEYS } from "../tapbacks";
 import {
   GMI_IMAGE_MAX_COUNT,
@@ -38,14 +38,6 @@ export const buildInteractionTools = ({
   spaceId,
 }: BuildInteractionToolsInput): ToolSet => {
   const firstPartyTools = {
-    get_conversation_history: tool({
-      description:
-        "Read recent stored conversation history when the latest message depends on earlier context. History is not injected automatically.",
-      inputSchema: z.object({}),
-      execute: async () => ({
-        messages: await getHistory(spaceId),
-      }),
-    }),
     assign_task: tool({
       description:
         "Assign a task to an execution sub-agent. Returns immediately with a taskId; the worker delivers its result directly when finished. Do not use this for image generation.",

@@ -16,7 +16,6 @@ export {
   GMI_MODEL_ID,
   GMI_PROVIDER_OPTIONS,
   GMI_REASONING,
-  GMI_TEMPERATURE,
 } from "./gmi";
 export { EXECUTION_AGENT_MAX_STEPS, INTERACTION_AGENT_MAX_STEPS } from "./agents";
 export {

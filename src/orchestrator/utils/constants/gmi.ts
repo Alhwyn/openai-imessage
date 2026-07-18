@@ -4,15 +4,18 @@ export const DEFAULT_GMI_MODEL = "openai/gpt-5.6-luna";
 export const GMI_MODEL_ID = process.env.GMI_MODEL?.trim() || DEFAULT_GMI_MODEL;
 /** Match the reference provider's three total attempts without a minute-long silent wait. */
 export const GMI_MAX_RETRIES = 2;
-export const GMI_TEMPERATURE = 1;
 /**
- * Luna rejects function tools on /v1/chat/completions unless reasoning_effort is none.
- * Pass as generateText `reasoning` and mirror in providerOptions.openai.reasoningEffort.
+ * Luna is a reasoning model, but GMI's prefixed ID (`openai/gpt-5.6-luna`) fails AI SDK's
+ * `startsWith("gpt-5")` capability check. Force reasoning mode, keep effort none for
+ * low-latency tool turns, and disable server-side store so multi-step tool continuation
+ * resends encrypted reasoning instead of referencing a missing `rs_...` item.
  */
 export const GMI_REASONING = "none" as const;
 export const GMI_PROVIDER_OPTIONS = {
   openai: {
+    forceReasoning: true,
     reasoningEffort: GMI_REASONING,
+    store: false,
   },
 } as const;
 export const GMI_IMAGE_API_BASE = "https://console.gmicloud.ai";

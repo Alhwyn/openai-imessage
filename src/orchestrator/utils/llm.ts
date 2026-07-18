@@ -22,7 +22,7 @@ const gmi = createOpenAI({
   name: "gmi",
 });
 
-export const GMI_MODEL = gmi.chat(GMI_MODEL_ID);
+export const GMI_MODEL = gmi.responses(GMI_MODEL_ID);
 
 const getStatusCode = (error: unknown): number | undefined => {
   if (!error || typeof error !== "object") return undefined;
@@ -82,7 +82,7 @@ const getGuidance = (
     return "GMI rejected the credential. Verify GMI_CLOUD_API_KEY is an active GMI inference API key.";
   }
   if (statusCode === 400) {
-    return "GMI rejected the request (for Luna + tools, reasoning_effort must be none on /v1/chat/completions; otherwise inspect responseBody for schema/tool-call issues).";
+    return "GMI rejected the request (Luna + tools require /v1/responses; inspect responseBody for schema/tool-call issues).";
   }
   if (name === "AI_LoadAPIKeyError") {
     return "GMI_CLOUD_API_KEY was missing or unloaded when the provider was created. Set it before startup and restart the Bun process.";
