@@ -14,29 +14,29 @@ import {
   GMI_IMAGE_MIN_COUNT,
 } from "../utils/index";
 
+import type { TurnEffectCollector } from "./turnEffects";
 import type { InteractionEvent } from "./types";
-import type { OutboundItem } from "../contracts";
 import type { DeliveryTarget } from "../handoff/types";
 
 type BuildInteractionToolsInput = {
   composioTools: ToolSet;
   deliveryTarget: DeliveryTarget;
+  effects: TurnEffectCollector;
   event: InteractionEvent;
-  outbound: OutboundItem[];
   spaceId: string;
 };
 
 export const buildInteractionTools = ({
   composioTools,
   deliveryTarget,
+  effects,
   event,
-  outbound,
   spaceId,
 }: BuildInteractionToolsInput): ToolSet => {
   const firstPartyTools = {
     assign_task: tool({
       description:
-        "Assign a task to an execution sub-agent. Returns immediately with a taskId; the worker delivers its result directly when finished. Do not use this for image generation.",
+        "Assign a task to an execution sub-agent with the sender's Composio tools. Returns immediately with a taskId; the worker delivers its result directly when finished. Do not use this for image generation.",
       inputSchema: z.object({
         task: z.string().describe("Clear task instructions for the worker"),
       }),
@@ -44,6 +44,7 @@ export const buildInteractionTools = ({
         const { taskId, status } = assignTask({
           deliveryTarget,
           spaceId,
+          senderId: event.senderId,
           task,
           images: event.images,
         });
@@ -52,7 +53,7 @@ export const buildInteractionTools = ({
     }),
     assign_image_task: tool({
       description:
-        "Generate images with the image sub-agent. Pass one prompt per image. Immediately sends a natural acknowledgment with an ETA; when ready the images are delivered as an album directly. Do not send another reply on that turn.",
+        "Generate images with the image sub-agent. Pass one prompt per image. Immediately queues a natural acknowledgment with an ETA; when ready the images are delivered as an album directly. Do not send another reply on that turn.",
       inputSchema: z.object({
         prompts: z
           .array(z.string().min(1))
@@ -68,15 +69,13 @@ export const buildInteractionTools = ({
           count: prompts.length,
           prompts,
         });
-        const { taskId, status, estimatedSeconds } = assignImageTask({
-          deliveryTarget,
-          spaceId,
-          prompts,
-        });
-        outbound.push({
-          kind: "text",
-          text: `got u, making those now, gimme a sec`,
-        });
+        const { taskId, status, estimatedSeconds, acknowledgment } =
+          assignImageTask({
+            deliveryTarget,
+            spaceId,
+            prompts,
+          });
+        effects.push({ kind: "text", text: acknowledgment });
         return { taskId, status, estimatedSeconds };
       },
     }),
@@ -96,7 +95,7 @@ export const buildInteractionTools = ({
         emoji: z.enum(TAPBACK_KEYS).describe("Tapback key"),
       }),
       execute: ({ emoji }) => {
-        outbound.push({ kind: "reaction", emoji });
+        effects.push({ kind: "reaction", emoji });
         return { ok: true };
       },
     }),
@@ -117,32 +116,54 @@ export const buildInteractionTools = ({
               "url must be an https Composio authorization link (connect.composio.dev)",
           };
         }
-        outbound.push({ kind: "app", url: trimmed });
+        effects.push({ kind: "app", url: trimmed });
         return { ok: true };
       },
     }),
     memory: tool({
       description:
         "Update persistent memory. Use kind=user for the person's preferences/profile; kind=agent for lasting notes and conventions. Do not store secrets.",
-      inputSchema: z.object({
-        kind: z.enum(["user", "agent"]).describe("Which memory file to edit"),
-        action: z
-          .enum(["add", "replace", "remove"])
-          .describe("add appends; replace/remove match old_text substring"),
-        text: z.string().optional().describe("New text for add/replace"),
-        old_text: z
-          .string()
-          .optional()
-          .describe("Substring to find for replace/remove"),
-      }),
-      execute: async ({ kind, action, text, old_text }) => {
-        const updated = await editMemory({
-          spaceId,
-          kind,
-          action,
-          text,
-          oldText: old_text,
-        });
+      inputSchema: z.discriminatedUnion("action", [
+        z.object({
+          kind: z.enum(["user", "agent"]).describe("Which memory file to edit"),
+          action: z.literal("add"),
+          text: z.string().describe("New text to append"),
+        }),
+        z.object({
+          kind: z.enum(["user", "agent"]).describe("Which memory file to edit"),
+          action: z.literal("replace"),
+          text: z.string().describe("Replacement text"),
+          old_text: z.string().describe("Substring to find"),
+        }),
+        z.object({
+          kind: z.enum(["user", "agent"]).describe("Which memory file to edit"),
+          action: z.literal("remove"),
+          old_text: z.string().describe("Substring to remove"),
+        }),
+      ]),
+      execute: async (input) => {
+        const updated =
+          input.action === "add"
+            ? await editMemory({
+                spaceId,
+                kind: input.kind,
+                action: "add",
+                text: input.text,
+              })
+            : input.action === "replace"
+              ? await editMemory({
+                  spaceId,
+                  kind: input.kind,
+                  action: "replace",
+                  text: input.text,
+                  oldText: input.old_text,
+                })
+              : await editMemory({
+                  spaceId,
+                  kind: input.kind,
+                  action: "remove",
+                  oldText: input.old_text,
+                });
         return {
           ok: true,
           kind: updated.kind,

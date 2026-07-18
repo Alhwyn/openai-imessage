@@ -11,9 +11,10 @@ export default defineSchema({
 
   messages: defineTable({
     spaceId: v.string(),
-    role: v.string(),
+    role: v.union(v.literal("user"), v.literal("assistant")),
     searchText: v.string(),
     payloadJson: v.string(),
     createdAt: v.number(),
   }).index("by_space_created", ["spaceId", "createdAt"]),
 });
+

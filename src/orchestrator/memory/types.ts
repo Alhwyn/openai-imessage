@@ -1,7 +1,5 @@
 export type MemoryKind = "user" | "agent";
 
-export type MemoryEditAction = "add" | "replace" | "remove";
-
 export type CuratedMemories = {
   user: string;
   agent: string;
@@ -10,7 +8,14 @@ export type CuratedMemories = {
 export type MemoryEditInput = {
   spaceId: string;
   kind: MemoryKind;
-  action: MemoryEditAction;
-  text?: string;
-  oldText?: string;
+} & (
+  | { action: "add"; text: string }
+  | { action: "replace"; oldText: string; text: string }
+  | { action: "remove"; oldText: string }
+);
+
+export type MemoryEditResult = {
+  kind: MemoryKind;
+  body: string;
+  updatedAt: number;
 };

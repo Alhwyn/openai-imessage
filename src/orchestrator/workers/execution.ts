@@ -1,6 +1,7 @@
-import { generateText, stepCountIs, tool, type UserContent } from "ai";
+import { generateText, stepCountIs, tool, type ToolSet } from "ai";
 import { z } from "zod";
 
+import { getComposioTools } from "../integrations/index";
 import { executionSystemPrompt } from "../prompts/index";
 import {
   assertGmiApiKey,
@@ -12,10 +13,11 @@ import {
   GMI_PROVIDER_OPTIONS,
   GMI_REASONING,
 } from "../utils/index";
+import { buildUserContent } from "../utils/userContent";
 
 import type { InboundImage } from "../contracts";
 
-const stubTools = {
+const echoTool = {
   echo: tool({
     description: "Echo back a string. Useful for simple passthrough tasks.",
     inputSchema: z.object({
@@ -23,47 +25,29 @@ const stubTools = {
     }),
     execute: ({ text }) => ({ echoed: text }),
   }),
-  search_mock: tool({
-    description: "Mock search that returns placeholder results for a query.",
-    inputSchema: z.object({
-      query: z.string().describe("Search query"),
-    }),
-    execute: ({ query }) => ({
-      query,
-      results: [
-        {
-          title: `Mock result for "${query}"`,
-          snippet: `This is a stub search hit about ${query}.`,
-        },
-      ],
-    }),
-  }),
-};
+} satisfies ToolSet;
 
-const buildTaskContent = (task: string, images: InboundImage[]): UserContent => {
-  if (images.length === 0) return task;
-
-  return [
-    { type: "text", text: task },
-    ...images.map((image) => ({
-      type: "file" as const,
-      data: image.data,
-      filename: image.filename,
-      mediaType: image.mediaType,
-    })),
-  ];
-};
-
+/**
+ * Runs the execution sub-agent with Composio tools for the sender when available.
+ */
 export const runExecutionAgent = async (
   task: string,
   images: InboundImage[] = [],
+  senderId: string | null = null,
 ): Promise<string> => {
   assertGmiApiKey();
+
+  const composioTools = await getComposioTools(senderId);
+  const tools: ToolSet = { ...composioTools, ...echoTool };
+  const toolNames = Object.keys(tools);
 
   const startedAt = Date.now();
   console.log("[agent] Starting GMI execution generation", {
     model: GMI_MODEL_ID,
     maxRetries: GMI_MAX_RETRIES,
+    toolCount: toolNames.length,
+    composioToolCount: Object.keys(composioTools).length,
+    toolNames,
   });
 
   const result = await generateText({
@@ -72,8 +56,8 @@ export const runExecutionAgent = async (
     reasoning: GMI_REASONING,
     providerOptions: GMI_PROVIDER_OPTIONS,
     system: executionSystemPrompt,
-    messages: [{ role: "user", content: buildTaskContent(task, images) }],
-    tools: stubTools,
+    messages: [{ role: "user", content: buildUserContent(task, images) }],
+    tools,
     stopWhen: stepCountIs(EXECUTION_AGENT_MAX_STEPS),
   }).catch((error: unknown) => {
     console.error("[agent] GMI execution generation failed", {

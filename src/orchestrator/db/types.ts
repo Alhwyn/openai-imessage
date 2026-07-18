@@ -1,21 +1,15 @@
-import type { MemoryKind } from "../memory/types";
+export type MessageRole = "user" | "assistant";
 
 export type StoredMessage = {
-  role: string;
+  role: MessageRole;
   searchText: string;
   payloadJson: string;
   createdAt: number;
 };
 
 export type MessageInput = {
-  role: string;
+  role: MessageRole;
   searchText: string;
   payloadJson: string;
   createdAt?: number;
-};
-
-export type MemoryEditResult = {
-  kind: MemoryKind;
-  body: string;
-  updatedAt: number;
 };

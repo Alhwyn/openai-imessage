@@ -1,4 +1,3 @@
-
 import { runInteractionAgent } from "../agents/index";
 import { summarizeOutbound } from "../outbound";
 import {
@@ -7,6 +6,8 @@ import {
   deliverOutbound,
   getGmiErrorDetails,
 } from "../utils/index";
+
+import { turnFailureOutbound } from "./failurePolicy";
 
 import type {
   BuildDebouncedTurnInput,
@@ -17,9 +18,6 @@ import type { OutboundItem } from "../contracts";
 
 /**
  * Builds a debounced turn.
- * @param existing - The existing orchestrator turn.
- * @param input - The input to build a debounced turn.
- * @returns A turn containing the accumulated inbound texts and latest message.
  */
 export const buildDebouncedTurn = (
   existing: OrchestratorTurn | undefined,
@@ -38,9 +36,6 @@ const pendingTurns = new Map<string, OrchestratorTurn>();
 
 /**
  * Flushes an orchestrator turn.
- * @param key - The key of the orchestrator turn.
- * @param turn - The orchestrator turn to flush.
- * @returns Nothing after the turn has been processed.
  */
 const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
   pendingTurns.delete(key);
@@ -62,15 +57,18 @@ const flushOrchestratorTurn = async (key: string, turn: OrchestratorTurn) => {
 
   let outbound: OutboundItem[];
   try {
-    ({ outbound } = await runInteractionAgent(spaceId, {
-      kind: "user_message",
-      senderId: turn.senderId,
-      text: inboundText,
-      images: turn.images,
-    }, {
-      space: turn.space,
-      message: turn.message,
-    }));
+    ({ outbound } = await runInteractionAgent(
+      spaceId,
+      {
+        senderId: turn.senderId,
+        text: inboundText,
+        images: turn.images,
+      },
+      {
+        space: turn.space,
+        message: turn.message,
+      },
+    ));
   } catch (error) {
     await handleTurnFailure(turn, error);
     return;
@@ -98,11 +96,9 @@ const handleTurnFailure = async (
     `[bounce] Turn failed for space ${turn.space.id}`,
     getGmiErrorDetails(error),
   );
-  await deliverOutbound(
-    turn.space,
-    [{ kind: "reaction", emoji: "like" }],
-    { targetMessage: turn.message },
-  );
+  await deliverOutbound(turn.space, turnFailureOutbound(), {
+    targetMessage: turn.message,
+  });
 };
 
 /** Debounces pending turns and flushes the latest value for each key. */
@@ -121,9 +117,10 @@ export const flushPendingOrchestratorTurns = async (): Promise<void> => {
 
 /**
  * Schedules an orchestrator turn.
- * @param input - The input to schedule an orchestrator turn.
  */
-export const scheduleOrchestratorTurn = (input: ScheduleOrchestratorTurnInput): void => {
+export const scheduleOrchestratorTurn = (
+  input: ScheduleOrchestratorTurnInput,
+): void => {
   const key = input.senderId?.trim() || input.space.id;
 
   const next = buildDebouncedTurn(pendingTurns.get(key), input);

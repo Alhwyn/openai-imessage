@@ -2,12 +2,17 @@ import {
   appendMessages,
   listRecentMessages,
   type MessageInput,
+  type MessageRole,
 } from "../db/index";
 
 import { MAX_HISTORY_MESSAGES } from "./utils";
 
 import type { ModelMessage, UserContent } from "ai";
 
+/**
+ * Text-only history contract: only user/assistant messages with string or
+ * text-part array content are persisted and reloaded.
+ */
 const withoutTransientMedia = (message: ModelMessage): ModelMessage => {
   if (message.role !== "user" || !Array.isArray(message.content)) return message;
 
@@ -24,10 +29,15 @@ const withoutTransientMedia = (message: ModelMessage): ModelMessage => {
   return { ...message, content };
 };
 
+const assertStoredRole = (role: ModelMessage["role"]): MessageRole => {
+  if (role !== "user" && role !== "assistant") {
+    throw new Error(`Only user/assistant messages can be stored, got ${role}`);
+  }
+  return role;
+};
+
 /**
- * Converts a message to a search text.
- * @param message - The message to convert.
- * @returns The search text.
+ * Converts a stored message to search text (text parts only).
  */
 const searchTextFromMessage = (message: ModelMessage): string => {
   const { content } = message;
@@ -36,39 +46,32 @@ const searchTextFromMessage = (message: ModelMessage): string => {
 
   const parts: string[] = [];
   for (const part of content) {
-    if (typeof part === "object" && part !== null && "type" in part) {
-      if (part.type === "text" && "text" in part && typeof part.text === "string") {
-        parts.push(part.text);
-      } else if (part.type === "tool-call" && "toolName" in part) {
-        parts.push(`[tool-call:${String(part.toolName)}]`);
-      } else if (part.type === "tool-result" && "toolName" in part) {
-        parts.push(`[tool-result:${String(part.toolName)}]`);
-      }
+    if (
+      typeof part === "object" &&
+      part !== null &&
+      "type" in part &&
+      part.type === "text" &&
+      "text" in part &&
+      typeof part.text === "string"
+    ) {
+      parts.push(part.text);
     }
   }
   return parts.join(" ").trim() || JSON.stringify(content);
 };
 
-/**
- * Converts a message to a stored input.
- * @param message - The message to convert.
- * @returns The stored input.
- */
 const toStoredInput = (message: ModelMessage): MessageInput => {
   const storedMessage = withoutTransientMedia(message);
+  const role = assertStoredRole(storedMessage.role);
   return {
-    role: storedMessage.role,
+    role,
     searchText: searchTextFromMessage(storedMessage),
-    payloadJson: JSON.stringify(storedMessage),
+    payloadJson: JSON.stringify({ ...storedMessage, role }),
   };
 };
 
-/**
- * Parses a message payload from a string.
- * @param payloadJson - The payload JSON string.
- * @returns The parsed message or null if the payload is invalid.
- */
-const isStoredMessage = (value: unknown): value is ModelMessage => {
+/** True when a payload matches the text-only history contract. */
+export const isStoredHistoryMessage = (value: unknown): value is ModelMessage => {
   if (!value || typeof value !== "object") return false;
   if (!("role" in value) || !("content" in value)) return false;
   if (value.role !== "user" && value.role !== "assistant") return false;
@@ -90,7 +93,7 @@ const isStoredMessage = (value: unknown): value is ModelMessage => {
 const fromStoredPayload = (payloadJson: string): ModelMessage | null => {
   try {
     const parsed: unknown = JSON.parse(payloadJson);
-    if (isStoredMessage(parsed)) return parsed;
+    if (isStoredHistoryMessage(parsed)) return parsed;
     console.warn("[memory] Ignored unsupported message payload");
     return null;
   } catch {
@@ -101,8 +104,6 @@ const fromStoredPayload = (payloadJson: string): ModelMessage | null => {
 
 /**
  * Gets the history for a space.
- * @param spaceId - The space ID.
- * @returns The recent valid model messages.
  */
 export const getHistory = async (spaceId: string): Promise<ModelMessage[]> => {
   const rows = await listRecentMessages(spaceId, MAX_HISTORY_MESSAGES);
@@ -116,9 +117,6 @@ export const getHistory = async (spaceId: string): Promise<ModelMessage[]> => {
 
 /**
  * Appends messages to the history.
- * @param spaceId - The space ID.
- * @param messages - The messages to append.
- * @returns Nothing after the messages have been stored.
  */
 export const appendHistory = async (
   spaceId: string,
@@ -126,4 +124,14 @@ export const appendHistory = async (
 ): Promise<void> => {
   if (messages.length === 0) return;
   await appendMessages(spaceId, messages.map(toStoredInput), MAX_HISTORY_MESSAGES);
+};
+
+/**
+ * Records a plain assistant text message in history.
+ */
+export const recordAssistantText = async (
+  spaceId: string,
+  text: string,
+): Promise<void> => {
+  await appendHistory(spaceId, { role: "assistant", content: text });
 };

@@ -1,12 +1,12 @@
 export {
   applyMemoryEdit as editMemory,
   getMemoriesForSpace as getCuratedMemories,
-} from "../db/index";
-export { appendHistory, getHistory } from "./history";
+} from "../db/memories";
+export { appendHistory, getHistory, recordAssistantText } from "./history";
 export type {
   CuratedMemories,
-  MemoryEditAction,
   MemoryEditInput,
+  MemoryEditResult,
   MemoryKind,
 } from "./types";
 export {

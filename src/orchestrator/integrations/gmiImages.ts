@@ -15,7 +15,7 @@ import {
   GMI_IMAGE_REQUESTS_URL,
   GMI_IMAGE_SIZE,
   GMI_IMAGE_TIMEOUT_MS,
-} from "./constants";
+} from "../utils/constants";
 
 import type {
   GeneratedImageAlbum,
@@ -23,7 +23,7 @@ import type {
   GmiImageResponse,
   ImageGenerationProgress,
   SeedreamImagePayload,
-} from "./types";
+} from "../utils/types";
 
 type WaitOptions = Required<
   Pick<GenerateGmiImagesOptions, "now" | "pollIntervalMs" | "sleep" | "timeoutMs">
@@ -233,7 +233,7 @@ export const generateGmiImages = async (
   
   if (cleaned.length === 0) throw new Error("At least one image prompt is required");
 
-  const imagePrompts = cleaned.slice(0, GMI_IMAGE_MAX_COUNT);
+  const imagePrompts = cleaned.slice(0, clampImageCount(cleaned.length));
   const imageCount = imagePrompts.length;
   const fetchFn = options.fetchFn ?? fetch;
   const wait = resolveWaitOptions(options);

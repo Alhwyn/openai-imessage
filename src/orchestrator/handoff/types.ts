@@ -9,6 +9,8 @@ export type DeliveryTarget = {
 export type AssignTaskInput = {
   deliveryTarget: DeliveryTarget;
   images?: InboundImage[];
+  /** Sender identity for scoped Composio tools in the execution worker. */
+  senderId: string | null;
   spaceId: string;
   task: string;
 };
@@ -27,6 +29,8 @@ export type AssignTaskResult = {
 
 export type AssignImageTaskResult = AssignTaskResult & {
   estimatedSeconds: number;
+  /** Text acknowledgment the interaction turn should deliver immediately. */
+  acknowledgment: string;
 };
 
 export type ImageTaskState =
