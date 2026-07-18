@@ -20,6 +20,12 @@ export type AssignImageTaskInput = {
   prompts: string[];
 };
 
+export type AssignComputerTaskInput = {
+  deliveryTarget: DeliveryTarget;
+  spaceId: string;
+  goal: string;
+};
+
 export type AssignTaskResult = {
   taskId: string;
   status: "started";
@@ -27,6 +33,10 @@ export type AssignTaskResult = {
 
 export type AssignImageTaskResult = AssignTaskResult & {
   estimatedSeconds: number;
+};
+
+export type AssignComputerTaskResult = AssignTaskResult & {
+  liveViewUrl: string;
 };
 
 export type ImageTaskState =

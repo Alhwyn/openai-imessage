@@ -48,3 +48,17 @@ describe("interaction prompt conversation history", () => {
     expect(interactionSystemPrompt).not.toContain("get_conversation_history");
   });
 });
+
+describe("interaction prompt computer use", () => {
+  test("routes full desktop work through durable computer tools", () => {
+    expect(interactionSystemPrompt).toContain(
+      "Use assign_computer_task when the request specifically requires visually operating a full Linux desktop",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "always call get_computer_task_status",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Do not use it for ordinary questions, research, connected-app API actions, or image generation.",
+    );
+  });
+});

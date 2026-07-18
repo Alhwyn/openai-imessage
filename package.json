@@ -6,6 +6,9 @@
   "scripts": {
     "build": "bun build index.ts --outdir dist --target bun",
     "check": "bun run lint && bun run typecheck && bun run test && bun run build",
+    "computer:down": "docker compose -f runtime/computer/compose.yaml down",
+    "computer:logs": "docker compose -f runtime/computer/compose.yaml logs -f desktop",
+    "computer:up": "docker compose -f runtime/computer/compose.yaml up -d --build",
     "start": "bun --watch index.ts",
     "convex:dev": "convex dev",
     "lint": "eslint .",

@@ -11,6 +11,7 @@ Conversation history and Hermes-style curated memory (`USER.md` / `MEMORY.md`) p
 - **GMI Cloud** OpenAI-compatible inference (`GMI_CLOUD_API_KEY`)
 - **Convex** — durable messages + curated memory (`CONVEX_URL`)
 - **Composio** — per-person OAuth connections for Gmail, Google Calendar, and other approved apps
+- **Computer use** — a local KasmVNC/XFCE Linux desktop controlled through OpenAI's screenshot-and-action loop
 
 ## Setup
 
@@ -66,6 +67,15 @@ ORCHESTRATOR_BRIDGE_SECRET=
 # COMPOSIO_USER_ID_SALT=
 # Comma-separated approved toolkit slugs. Defaults to gmail,googlecalendar.
 # COMPOSIO_TOOLKITS=gmail,googlecalendar
+
+# required only for Linux computer-use tasks
+# OPENAI_API_KEY=
+# optional; defaults to gpt-5.6-terra
+# OPENAI_COMPUTER_MODEL=
+# Set a long local-only password before running the desktop container.
+# COMPUTER_DESKTOP_PASSWORD=
+# Set this to an externally reachable HTTPS viewer URL before sending links over iMessage.
+# COMPUTER_LIVE_VIEW_URL=
 ```
 
 ## Run
@@ -77,6 +87,54 @@ bun run convex:dev
 # Terminal 2 — orchestrator
 bun run start
 ```
+
+### Local Linux computer
+
+Computer-use tasks operate a complete XFCE Linux desktop through its X11 mouse
+and keyboard. The model does not use DOM selectors or Playwright. Docker is a
+local development boundary; production tasks should receive separate VMs.
+
+Add `OPENAI_API_KEY` and `COMPUTER_DESKTOP_PASSWORD` to your local `.env`
+yourself, then start the desktop:
+
+```bash
+bun run computer:up
+```
+
+Open `https://127.0.0.1:6901`, accept the local certificate, and sign in as
+`kasm_user` with `COMPUTER_DESKTOP_PASSWORD`. The fixed desktop resolution is
+1280×800 so model coordinates remain stable.
+
+Then run Convex and the orchestrator normally. When the interaction agent calls
+`assign_computer_task`, it:
+
+1. Creates a durable run in Convex.
+2. Records the desktop with FFmpeg.
+3. Sends screenshots to OpenAI only after model action batches.
+4. Executes returned mouse and keyboard actions through `xdotool`.
+5. Saves the final MP4 under `runtime/computer/artifacts/<taskId>/demo.mp4`.
+
+Useful commands:
+
+```bash
+bun run computer:logs
+bun run computer:down
+```
+
+Optional local settings:
+
+```bash
+# fixed coordinate space; both values must match the container
+COMPUTER_DISPLAY_WIDTH=1280
+COMPUTER_DISPLAY_HEIGHT=800
+COMPUTER_MAX_STEPS=30
+COMPUTER_ACTION_SETTLE_MS=300
+COMPUTER_LIVE_VIEW_PORT=6901
+```
+
+For viewing from a phone, put the KasmVNC endpoint behind an authenticated HTTPS
+gateway and set `COMPUTER_LIVE_VIEW_URL` to its short-lived session URL. Do not
+expose port 6901 directly to the public Internet.
 
 ### Dev tunnel (optional, like ngrok)
 
@@ -103,8 +161,8 @@ Set `BASE_URL=https://agent.alhwyn.com` in `.env` when testing webhooks.
 Layout lives under `src/orchestrator/` (types / utils / agents / bounce / handoff / **db** / **memory** / prompts):
 
 1. Person texts → keyed debounce (`src/orchestrator/bounce/inbound.ts`)
-2. Interaction Agent loads curated memory, recent conversation history, and optional connected-app tools, then runs with first-party tools such as `assign_task`, `assign_image_task`, `react_to_message`, and `memory`
-3. Worker runs stubs (`echo`, `search_mock`) in `src/orchestrator/agents/execution.ts`
+2. Interaction Agent loads curated memory, recent conversation history, and optional connected-app tools, then runs with first-party tools such as `assign_task`, `assign_image_task`, `assign_computer_task`, `react_to_message`, and `memory`
+3. Workers run generic tasks or operate the local Linux desktop for computer-use tasks
 4. Handoff delivers worker output to the captured conversation target
 5. Turn transcripts append atomically in Convex; memory edits use their own mutation
 

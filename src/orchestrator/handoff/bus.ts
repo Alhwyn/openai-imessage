@@ -1,6 +1,19 @@
 import { appendHistory } from "../memory/index";
 import { summarizeOutbound } from "../outbound";
 import {
+  ComputerApprovalRequiredError,
+  getComputerLiveViewUrl,
+  runComputerAgent,
+} from "../computer/index";
+import {
+  completeComputerRun,
+  createComputerRun,
+  failComputerRun,
+  getLatestComputerRunForSpace,
+  markComputerRunRunning,
+  updateComputerRunProgress,
+} from "../db/index";
+import {
   cleanupImageAlbum,
   deliverOutbound,
   generateGmiImages,
@@ -17,6 +30,8 @@ import {
 } from "./imageTaskTracker";
 
 import type {
+  AssignComputerTaskInput,
+  AssignComputerTaskResult,
   AssignImageTaskInput,
   AssignImageTaskResult,
   AssignTaskInput,
@@ -105,6 +120,84 @@ export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
 
   return { taskId, status: "started" };
 };
+
+/**
+ * Assigns a task to the local Linux computer-use worker.
+ * @param input - The computer task and delivery target.
+ * @returns Durable task metadata and the live desktop URL.
+ */
+export const assignComputerTask = async (
+  input: AssignComputerTaskInput,
+): Promise<AssignComputerTaskResult> => {
+  const goal = input.goal.trim();
+  if (!goal) throw new Error("Computer task goal is required");
+
+  taskCounter += 1;
+  const taskId = `computer_${Date.now()}_${taskCounter}`;
+  const liveViewUrl = getComputerLiveViewUrl();
+
+  await createComputerRun({
+    taskId,
+    spaceId: input.spaceId,
+    goal,
+    liveViewUrl,
+  });
+
+  console.log(`[handoff] Assigned ${taskId} for space ${input.spaceId}:`, goal.slice(0, 120));
+
+  void (async () => {
+    try {
+      await markComputerRunRunning(taskId);
+      const result = await runComputerAgent({
+        goal,
+        runId: taskId,
+        onProgress: ({ step, lastAction }) =>
+          updateComputerRunProgress(taskId, step, lastAction),
+      });
+      await completeComputerRun({
+        taskId,
+        resultSummary: result.summary,
+        recordingPath: result.recordingPath,
+        step: result.steps,
+      });
+      await deliverTaskOutput(
+        input.deliveryTarget,
+        input.spaceId,
+        taskId,
+        [{ kind: "text", text: result.summary }],
+        result.summary,
+      );
+    } catch (error) {
+      const needsApproval = error instanceof ComputerApprovalRequiredError;
+      const message = error instanceof Error ? error.message : String(error);
+      await failComputerRun({
+        taskId,
+        error: message,
+        awaitingApproval: needsApproval,
+      }).catch((persistenceError: unknown) => {
+        console.error(`[computer-agent] Failed to persist failure for ${taskId}`, persistenceError);
+      });
+      const userMessage = needsApproval
+        ? "computer task paused before a restricted action, use the live viewer to take over"
+        : `couldnt finish that computer task: ${message}`;
+      await deliverTaskOutput(
+        input.deliveryTarget,
+        input.spaceId,
+        taskId,
+        [{ kind: "text", text: userMessage }],
+        userMessage,
+      );
+    }
+  })().catch((error: unknown) => {
+    console.error(`[computer-agent] Unhandled task failure for ${taskId}`, {
+      ...getGmiErrorDetails(error),
+    });
+  });
+
+  return { taskId, status: "started", liveViewUrl };
+};
+
+export const getComputerTaskStatus = getLatestComputerRunForSpace;
 
 /**
  * Assigns an image-generation task to a dedicated sub-agent.

@@ -2,8 +2,10 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
 import {
+  assignComputerTask,
   assignImageTask,
   assignTask,
+  getComputerTaskStatus,
   getImageTaskStatus,
 } from "../handoff/index";
 import { isComposioAuthUrl } from "../integrations/index";
@@ -48,6 +50,40 @@ export const buildInteractionTools = ({
           images: event.images,
         });
         return { taskId, status };
+      },
+    }),
+    assign_computer_task: tool({
+      description:
+        "Assign work that requires visually operating a full Linux desktop with mouse and keyboard, such as opening GUI applications, navigating websites visually, or verifying a UI. Returns immediately while the computer worker continues in the background. Do not use for ordinary research or image generation.",
+      inputSchema: z.object({
+        goal: z.string().min(1).describe("Clear, bounded goal for the Linux computer worker"),
+      }),
+      execute: async ({ goal }) => {
+        const result = await assignComputerTask({
+          deliveryTarget,
+          spaceId,
+          goal,
+        });
+        outbound.push({
+          kind: "text",
+          text: "starting the computer now, u can watch it live",
+        });
+        if (result.liveViewUrl.startsWith("https://")) {
+          outbound.push({ kind: "app", url: result.liveViewUrl });
+        }
+        return result;
+      },
+    }),
+    get_computer_task_status: tool({
+      description:
+        "Get durable status for the latest Linux computer-use task in this conversation, including its current phase, step, last action, live viewer URL, completion result, or error.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        return (
+          (await getComputerTaskStatus(spaceId)) ?? {
+            state: "not_found" as const,
+          }
+        );
       },
     }),
     assign_image_task: tool({

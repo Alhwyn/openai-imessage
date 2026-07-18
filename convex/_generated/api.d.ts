@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as computerRuns from "../computerRuns.js";
 import type * as lib_bridge from "../lib/bridge.js";
+import type * as lib_computer from "../lib/computer.js";
 import type * as memories from "../memories.js";
 import type * as messages from "../messages.js";
 
@@ -19,7 +21,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  computerRuns: typeof computerRuns;
   "lib/bridge": typeof lib_bridge;
+  "lib/computer": typeof lib_computer;
   memories: typeof memories;
   messages: typeof messages;
 }>;

@@ -16,4 +16,36 @@ export default defineSchema({
     payloadJson: v.string(),
     createdAt: v.number(),
   }).index("by_space_created", ["spaceId", "createdAt"]),
+
+  computerRuns: defineTable({
+    taskId: v.string(),
+    spaceId: v.string(),
+    goal: v.string(),
+    state: v.union(
+      v.literal("queued"),
+      v.literal("running"),
+      v.literal("awaiting_approval"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+    ),
+    liveViewUrl: v.optional(v.string()),
+    resultSummary: v.optional(v.string()),
+    recordingPath: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    startedAt: v.optional(v.number()),
+    finishedAt: v.optional(v.number()),
+  })
+    .index("by_taskId", ["taskId"])
+    .index("by_spaceId_and_createdAt", ["spaceId", "createdAt"])
+    .index("by_state_and_createdAt", ["state", "createdAt"]),
+
+  computerRunStatus: defineTable({
+    runId: v.id("computerRuns"),
+    phase: v.string(),
+    step: v.number(),
+    lastAction: v.optional(v.string()),
+    heartbeatAt: v.number(),
+  }).index("by_runId", ["runId"]),
 });

@@ -1,5 +1,14 @@
 export { assertConvexEnv, getBridgeSecret, getConvexClient, getConvexUrl } from "./client";
 export {
+  completeComputerRun,
+  createComputerRun,
+  failComputerRun,
+  getComputerRun,
+  getLatestComputerRunForSpace,
+  markComputerRunRunning,
+  updateComputerRunProgress,
+} from "./computerRuns";
+export {
   applyMemoryEdit,
   getMemoriesForSpace,
 } from "./memories";

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+output="${1:-/tmp/computer-screen.png}"
+display="${DISPLAY:-:1}"
+
+mkdir -p "$(dirname "$output")"
+DISPLAY="$display" maim -u "$output"
+printf '%s\n' "$output"
