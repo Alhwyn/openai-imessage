@@ -1,7 +1,5 @@
 import type { CuratedMemories } from "./types";
 
-export const USER_MEMORY_CHAR_LIMIT = 1_375;
-export const AGENT_MEMORY_CHAR_LIMIT = 2_200;
 export const MAX_HISTORY_MESSAGES = 40;
 
 /**

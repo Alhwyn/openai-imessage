@@ -1,4 +1,5 @@
-export { runExecutionAgent, runInteractionAgent } from "./agents/index";
+export { runInteractionAgent } from "./agents/index";
+export { runExecutionAgent } from "./workers/execution";
 export type {
   InboundImage,
   InteractionEvent,
@@ -6,13 +7,16 @@ export type {
   OutboundItem,
   TapbackKey,
 } from "./agents/index";
-export { buildDebouncedTurn, scheduleOrchestratorTurn } from "./bounce/index";
+export {
+  buildDebouncedTurn,
+  flushPendingOrchestratorTurns,
+  scheduleOrchestratorTurn,
+} from "./bounce/index";
 export type { OrchestratorTurn } from "./bounce/index";
 export { assertConvexEnv } from "./db/index";
 export {
   assignImageTask,
   assignTask,
-  registerSpace,
 } from "./handoff/index";
 export {
   assertGmiApiKey,

@@ -6,6 +6,5 @@ export {
 export {
   appendMessages,
   listRecentMessages,
-  replaceMessageWindow,
 } from "./messages";
 export type { MemoryEditResult, MessageInput, StoredMessage } from "./types";

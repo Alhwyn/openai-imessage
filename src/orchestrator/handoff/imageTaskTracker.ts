@@ -51,6 +51,15 @@ export const createImageTaskProgressHook = (
   };
 };
 
+/** Marks generated images as staged and awaiting delivery. */
+export const markImageTaskDelivering = (
+  task: ImageTaskRecord,
+  completedImages: number,
+): void => {
+  task.state = "delivering";
+  task.completedImages = completedImages;
+};
+
 /** Marks image generation and local staging as complete. */
 export const completeImageTask = (
   task: ImageTaskRecord,

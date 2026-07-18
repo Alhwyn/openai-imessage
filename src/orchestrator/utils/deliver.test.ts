@@ -149,6 +149,46 @@ describe("deliverOutbound", () => {
       expect(second.type).toBe("text");
     });
   });
+
+  test("sends app deep-link via space.send", async () => {
+    const send = mock(() => Promise.resolve(undefined));
+    const space = asSpace({ send });
+    const url = "https://connect.composio.dev/link/ln_abc123";
+
+    await deliverOutbound(space, [{ kind: "app", url }]);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    const content = await buildContent(firstArg(send));
+    expect(content.type).toBe("app");
+    if (content.type !== "app") {
+      throw new Error("expected app content");
+    }
+    expect(await content.url()).toBe(url);
+  });
+
+  test("sends app then instruction text via space.send in order", async () => {
+    const send = mock(() => Promise.resolve(undefined));
+    const space = asSpace({ send });
+    const url = "https://connect.composio.dev/link/ln_abc123";
+
+    await deliverOutbound(space, [
+      { kind: "app", url },
+      { kind: "text", text: "tap that to finish connecting gmail" },
+    ]);
+
+    expect(send).toHaveBeenCalledTimes(2);
+    const first = await buildContent(nthArg(send, 0));
+    const second = await buildContent(nthArg(send, 1));
+    expect(first.type).toBe("app");
+    expect(second).toEqual({
+      type: "text",
+      text: "tap that to finish connecting gmail",
+    });
+    if (first.type !== "app") {
+      throw new Error("expected app content");
+    }
+    expect(await first.url()).toBe(url);
+  });
 });
 
 describe("deliverReplies", () => {

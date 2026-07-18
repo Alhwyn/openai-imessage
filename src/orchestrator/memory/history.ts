@@ -1,7 +1,6 @@
 import {
   appendMessages,
   listRecentMessages,
-  replaceMessageWindow,
   type MessageInput,
 } from "../db/index";
 
@@ -69,9 +68,31 @@ const toStoredInput = (message: ModelMessage): MessageInput => {
  * @param payloadJson - The payload JSON string.
  * @returns The parsed message or null if the payload is invalid.
  */
+const isStoredMessage = (value: unknown): value is ModelMessage => {
+  if (!value || typeof value !== "object") return false;
+  if (!("role" in value) || !("content" in value)) return false;
+  if (value.role !== "user" && value.role !== "assistant") return false;
+  if (typeof value.content === "string") return true;
+  if (!Array.isArray(value.content)) return false;
+
+  const parts = value.content as unknown[];
+  return parts.every(
+    (part) =>
+      part &&
+      typeof part === "object" &&
+      "type" in part &&
+      part.type === "text" &&
+      "text" in part &&
+      typeof part.text === "string",
+  );
+};
+
 const fromStoredPayload = (payloadJson: string): ModelMessage | null => {
   try {
-    return JSON.parse(payloadJson) as ModelMessage;
+    const parsed: unknown = JSON.parse(payloadJson);
+    if (isStoredMessage(parsed)) return parsed;
+    console.warn("[memory] Ignored unsupported message payload");
+    return null;
   } catch {
     console.warn("[memory] Failed to parse message payload");
     return null;
@@ -91,21 +112,6 @@ export const getHistory = async (spaceId: string): Promise<ModelMessage[]> => {
     if (parsed) messages.push(parsed);
   }
   return messages;
-};
-
-/**
- * Sets the history for a space.
- * @param spaceId - The space ID.
- * @param messages - The messages to set.
- * @returns Nothing after the stored history has been replaced.
- */
-export const setHistory = async (spaceId: string, messages: ModelMessage[]): Promise<void> => {
-  const window = messages.slice(-MAX_HISTORY_MESSAGES);
-  await replaceMessageWindow(
-    spaceId,
-    window.map(toStoredInput),
-    MAX_HISTORY_MESSAGES,
-  );
 };
 
 /**

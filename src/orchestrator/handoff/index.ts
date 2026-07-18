@@ -1,8 +1,6 @@
 export {
   assignImageTask,
   assignTask,
-  getRegisteredSpace,
-  registerSpace,
 } from "./bus";
 export { getImageTaskStatus } from "./imageTaskTracker";
 export type {
@@ -10,8 +8,8 @@ export type {
   AssignImageTaskResult,
   AssignTaskInput,
   AssignTaskResult,
+  DeliveryTarget,
   ImageTaskRecord,
   ImageTaskState,
   ImageTaskStatus,
-  SpaceHandle,
 } from "./types";

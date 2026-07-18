@@ -1,4 +1,4 @@
-import type { InboundImage } from "../agents/types";
+import type { InboundImage } from "../contracts";
 import type { Message } from "@spectrum-ts/core";
 
 const SUPPORTED_IMAGE_MEDIA_TYPES = new Set([

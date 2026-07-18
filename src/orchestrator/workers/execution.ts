@@ -9,10 +9,11 @@ import {
   GMI_MAX_RETRIES,
   GMI_MODEL,
   GMI_MODEL_ID,
-  GMI_TEMPERATURE,
+  GMI_PROVIDER_OPTIONS,
+  GMI_REASONING,
 } from "../utils/index";
 
-import type { InboundImage } from "./types";
+import type { InboundImage } from "../contracts";
 
 const stubTools = {
   echo: tool({
@@ -39,7 +40,6 @@ const stubTools = {
   }),
 };
 
-/** Builds the task content for the GMI execution agent. */
 const buildTaskContent = (task: string, images: InboundImage[]): UserContent => {
   if (images.length === 0) return task;
 
@@ -54,7 +54,6 @@ const buildTaskContent = (task: string, images: InboundImage[]): UserContent => 
   ];
 };
 
-/** Runs the GMI execution agent. */
 export const runExecutionAgent = async (
   task: string,
   images: InboundImage[] = [],
@@ -69,8 +68,9 @@ export const runExecutionAgent = async (
 
   const result = await generateText({
     model: GMI_MODEL,
-    temperature: GMI_TEMPERATURE,
     maxRetries: GMI_MAX_RETRIES,
+    reasoning: GMI_REASONING,
+    providerOptions: GMI_PROVIDER_OPTIONS,
     system: executionSystemPrompt,
     messages: [{ role: "user", content: buildTaskContent(task, images) }],
     tools: stubTools,
@@ -94,10 +94,12 @@ export const runExecutionAgent = async (
 
   const toolNotes = result.steps
     .flatMap((step) => step.toolResults)
-    .map((tr) => JSON.stringify(tr.output))
+    .map((toolResult) => JSON.stringify(toolResult.output))
     .filter(Boolean);
 
-  if (toolNotes.length > 0) return `Task completed. Tool outputs: ${toolNotes.join(" | ")}`;
+  if (toolNotes.length > 0) {
+    return `Task completed. Tool outputs: ${toolNotes.join(" | ")}`;
+  }
 
   return "Task finished with no textual result.";
 };
