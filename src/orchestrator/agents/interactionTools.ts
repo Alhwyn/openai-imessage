@@ -26,10 +26,6 @@ type BuildInteractionToolsInput = {
   spaceId: string;
 };
 
-const approximateMinutes = (seconds: number): number => {
-  return Math.max(1, Math.ceil(seconds / 60));
-};
-
 export const buildInteractionTools = ({
   composioTools,
   deliveryTarget,
@@ -77,10 +73,9 @@ export const buildInteractionTools = ({
           spaceId,
           prompts,
         });
-        const estimatedMinutes = approximateMinutes(estimatedSeconds);
         outbound.push({
           kind: "text",
-          text: `got u, making those now, should take about ${estimatedMinutes} min`,
+          text: `got u, making those now, gimme a sec`,
         });
         return { taskId, status, estimatedSeconds };
       },
