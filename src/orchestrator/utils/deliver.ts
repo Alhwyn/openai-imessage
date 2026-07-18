@@ -81,13 +81,3 @@ export const deliverOutbound = async (
     }
   }
 };
-
-/**
- * Delivers plain text via `space.send`.
- */
-export const deliverReplies = async (space: Space, replies: string[]): Promise<void> => {
-  await deliverOutbound(
-    space,
-    replies.map((reply) => ({ kind: "text" as const, text: reply })),
-  );
-};

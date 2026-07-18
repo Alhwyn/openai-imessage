@@ -24,7 +24,6 @@ export {
 } from "./constants";
 export { assertGmiApiKey, GMI_MODEL, getGmiErrorDetails } from "./llm";
 export type { GmiErrorDetails } from "./llm";
-export { cleanupImageAlbum, clampImageCount, generateGmiImages } from "./gmiImages";
 export type {
   DeliverOutboundOptions,
   GeneratedImageAlbum,
@@ -40,4 +39,5 @@ export type {
 export { createKeyedDebounce } from "./debounce";
 export { createRecentIdTracker } from "./recentIds";
 export { extractInboundImages, extractInboundText } from "./text";
-export { deliverOutbound, deliverReplies } from "./deliver";
+export { buildUserContent } from "./userContent";
+export { deliverOutbound } from "./deliver";

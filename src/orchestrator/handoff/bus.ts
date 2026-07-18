@@ -11,14 +11,13 @@ import {
   markComputerRunRunning,
   updateComputerRunProgress,
 } from "../db/index";
-import { appendHistory } from "../memory/index";
-import { summarizeOutbound } from "../outbound";
 import {
   cleanupImageAlbum,
-  deliverOutbound,
   generateGmiImages,
-  getGmiErrorDetails,
-} from "../utils/index";
+} from "../integrations/gmiImages";
+import { recordAssistantText } from "../memory/index";
+import { summarizeOutbound } from "../outbound";
+import { deliverOutbound, getGmiErrorDetails } from "../utils/index";
 import { runExecutionAgent } from "../workers/execution";
 
 import {
@@ -40,9 +39,39 @@ import type {
 } from "./types";
 import type { OutboundItem } from "../contracts";
 
+/** Immediate acknowledgment owned by the image handoff path. */
+export const IMAGE_TASK_ACK_TEXT = "got u, making those now, gimme a sec";
+
 const inFlight = new Set<string>();
 
 let taskCounter = 0;
+
+type HandoffWorkResult = {
+  outbound: OutboundItem[];
+  historyText: string;
+};
+
+type HandoffFailureKind = "work" | "delivery";
+
+type RunHandoffTaskInput = {
+  spaceId: string;
+  deliveryTarget: DeliveryTarget;
+  taskId: string;
+  label: string;
+  execute: () => Promise<HandoffWorkResult>;
+  onFailure?: (error: unknown, kind: HandoffFailureKind) => HandoffWorkResult;
+  afterSuccess?: () => void;
+  afterFailure?: (error: unknown, kind: HandoffFailureKind) => void;
+  cleanup?: () => Promise<void>;
+};
+
+const defaultApology = (message: string): HandoffWorkResult => {
+  const apology = `couldnt finish that task: ${message}`;
+  return {
+    outbound: [{ kind: "text", text: apology }],
+    historyText: apology,
+  };
+};
 
 const deliverTaskOutput = async (
   target: DeliveryTarget,
@@ -70,7 +99,7 @@ const deliverTaskOutput = async (
     }
 
     try {
-      await appendHistory(spaceId, { role: "assistant", content: historyText });
+      await recordAssistantText(spaceId, historyText);
     } catch (error) {
       console.error(`[handoff] Failed to persist history for ${taskId}`, error);
     }
@@ -80,42 +109,78 @@ const deliverTaskOutput = async (
 };
 
 /**
+ * Runs async handoff work once: execute → deliver → history, with normalized failures.
+ */
+const runHandoffTask = (input: RunHandoffTaskInput): void => {
+  void (async () => {
+    let workFinished = false;
+    try {
+      const result = await input.execute();
+      workFinished = true;
+      await deliverTaskOutput(
+        input.deliveryTarget,
+        input.spaceId,
+        input.taskId,
+        result.outbound,
+        result.historyText,
+      );
+      input.afterSuccess?.();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const kind: HandoffFailureKind = workFinished ? "delivery" : "work";
+      console.error(
+        `[handoff] ${input.label} failed (${kind}) for ${input.taskId}`,
+        error,
+      );
+      input.afterFailure?.(error, kind);
+      const failure = input.onFailure?.(error, kind) ?? defaultApology(message);
+      const deliveryTaskId =
+        kind === "delivery" ? `${input.taskId}:delivery` : input.taskId;
+      await deliverTaskOutput(
+        input.deliveryTarget,
+        input.spaceId,
+        deliveryTaskId,
+        failure.outbound,
+        failure.historyText,
+      ).catch(() => undefined);
+    } finally {
+      await input.cleanup?.();
+    }
+  })().catch((error: unknown) => {
+    console.error(`[handoff] Unhandled failure for ${input.taskId}`, {
+      ...getGmiErrorDetails(error),
+    });
+  });
+};
+
+/**
  * Assigns a task to an execution sub-agent.
- * @param input - The input to assign a task.
- * @returns The task ID and status.
  */
 export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
   taskCounter += 1;
   const taskId = `task_${Date.now()}_${taskCounter}`;
 
-  console.log(`[handoff] Assigned ${taskId} for space ${input.spaceId}:`, input.task.slice(0, 120));
+  console.log(
+    `[handoff] Assigned ${taskId} for space ${input.spaceId}:`,
+    input.task.slice(0, 120),
+  );
 
-  void (async () => {
-    try {
-      const result = await runExecutionAgent(input.task, input.images);
-      await deliverTaskOutput(
-        input.deliveryTarget,
-        input.spaceId,
-        taskId,
-        [{ kind: "text", text: result }],
-        result,
+  runHandoffTask({
+    spaceId: input.spaceId,
+    deliveryTarget: input.deliveryTarget,
+    taskId,
+    label: "Worker",
+    execute: async () => {
+      const result = await runExecutionAgent(
+        input.task,
+        input.images,
+        input.senderId,
       );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[handoff] Worker failed for ${taskId}`, error);
-      const apology = `couldnt finish that task: ${message}`;
-      await deliverTaskOutput(
-        input.deliveryTarget,
-        input.spaceId,
-        taskId,
-        [{ kind: "text", text: apology }],
-        apology,
-      );
-    }
-  })().catch((error: unknown) => {
-    console.error(`[handoff] Unhandled task failure for ${taskId}`, {
-      ...getGmiErrorDetails(error),
-    });
+      return {
+        outbound: [{ kind: "text", text: result }],
+        historyText: result,
+      };
+    },
   });
 
   return { taskId, status: "started" };
@@ -201,10 +266,10 @@ export const getComputerTaskStatus = getLatestComputerRunForSpace;
 
 /**
  * Assigns an image-generation task to a dedicated sub-agent.
- * @param input - One prompt per image to generate.
- * @returns The task ID and status.
  */
-export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskResult => {
+export const assignImageTask = (
+  input: AssignImageTaskInput,
+): AssignImageTaskResult => {
   const prompts = input.prompts.map((prompt) => prompt.trim()).filter(Boolean);
   if (prompts.length === 0) {
     throw new Error("At least one image prompt is required");
@@ -225,9 +290,15 @@ export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskRes
     promptSummary.slice(0, 120),
   );
 
-  void (async () => {
-    let tempDir: string | undefined;
-    try {
+  let tempDir: string | undefined;
+  let generatedCount = 0;
+
+  runHandoffTask({
+    spaceId: input.spaceId,
+    deliveryTarget: input.deliveryTarget,
+    taskId,
+    label: "Image agent",
+    execute: async () => {
       console.log(`[image-agent] Starting ${taskId}`, {
         count: prompts.length,
         promptPreview: promptSummary.slice(0, 120),
@@ -242,56 +313,44 @@ export const assignImageTask = (input: AssignImageTaskInput): AssignImageTaskRes
         }),
       });
       tempDir = album.tempDir;
-      markImageTaskDelivering(task, album.paths.length);
-      await deliverTaskOutput(
-        input.deliveryTarget,
-        input.spaceId,
-        taskId,
-        [{ kind: "album", paths: album.paths }],
-        `[Sent ${album.paths.length} generated image(s)]`,
-      );
-      completeImageTask(task, album.paths.length);
+      generatedCount = album.paths.length;
+      markImageTaskDelivering(task, generatedCount);
+      return {
+        outbound: [{ kind: "album", paths: album.paths }],
+        historyText: `[Sent ${album.paths.length} generated image(s)]`,
+      };
+    },
+    onFailure: (error, kind) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const apology =
+        kind === "delivery"
+          ? "made the images but couldnt send them, upload choked"
+          : "couldnt generate those images, something broke on my end";
+      return {
+        outbound: [{ kind: "text", text: apology }],
+        historyText: `${apology} (${message})`,
+      };
+    },
+    afterSuccess: () => {
+      completeImageTask(task, generatedCount);
       console.log(`[image-agent] Completed ${taskId}`, {
-        generatedImages: album.paths.length,
+        generatedImages: generatedCount,
         elapsedMs: (task.finishedAt ?? Date.now()) - task.startedAt,
       });
-    } catch (error) {
+    },
+    afterFailure: (error) => {
       const message = error instanceof Error ? error.message : String(error);
-      if (!tempDir) {
-        failImageTask(task, message);
-        console.error(`[image-agent] Failed ${taskId}`, error);
-        const apology = "couldnt generate those images, something broke on my end";
-        await deliverTaskOutput(
-          input.deliveryTarget,
-          input.spaceId,
-          taskId,
-          [{ kind: "text", text: apology }],
-          `${apology} (${message})`,
-        );
-      } else {
-        failImageTask(task, message);
-        console.error(`[image-agent] Delivery failed for ${taskId}`, error);
-        const apology = "made the images but couldnt send them, upload choked";
-        await deliverTaskOutput(
-          input.deliveryTarget,
-          input.spaceId,
-          `${taskId}:delivery`,
-          [{ kind: "text", text: apology }],
-          `${apology} (${message})`,
-        ).catch(() => undefined);
-      }
-    } finally {
+      failImageTask(task, message);
+    },
+    cleanup: async () => {
       await cleanupImageAlbum(tempDir);
-    }
-  })().catch((error: unknown) => {
-    console.error(`[image-agent] Unhandled task failure for ${taskId}`, {
-      ...getGmiErrorDetails(error),
-    });
+    },
   });
 
   return {
     taskId,
     status: "started",
     estimatedSeconds: Math.ceil(task.estimatedDurationMs / 1_000),
+    acknowledgment: IMAGE_TASK_ACK_TEXT,
   };
 };

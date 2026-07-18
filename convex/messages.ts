@@ -10,19 +10,26 @@ import {
 
 import type { MutationCtx } from "./_generated/server";
 
+/** Machine-only API: ORCHESTRATOR_BRIDGE_SECRET is the sole gate (not for browser clients). */
+
+const messageRole = v.union(v.literal("user"), v.literal("assistant"));
+
 const messageInput = v.object({
-  role: v.string(),
+  role: messageRole,
   searchText: v.string(),
   payloadJson: v.string(),
   createdAt: v.optional(v.number()),
 });
 
 const messageDoc = v.object({
-  role: v.string(),
+  role: messageRole,
   searchText: v.string(),
   payloadJson: v.string(),
   createdAt: v.number(),
 });
+
+/** Max messages accepted in one appendMany call. */
+export const MESSAGE_APPEND_MAX_BATCH = 50;
 
 const pruneMessageBatch = async (
   ctx: MutationCtx,
@@ -93,6 +100,12 @@ export const appendMany = mutation({
   handler: async (ctx, args) => {
     assertBridgeSecret(args.secret);
 
+    if (args.messages.length > MESSAGE_APPEND_MAX_BATCH) {
+      throw new Error(
+        `messages batch exceeds ${MESSAGE_APPEND_MAX_BATCH} item limit`,
+      );
+    }
+
     const keep = Math.max(1, Math.min(args.keep, 100));
     const baseTime = Date.now();
 
@@ -107,7 +120,7 @@ export const appendMany = mutation({
     }
 
     const hasMore = await pruneMessageBatch(ctx, args.spaceId, keep);
-    
+
     if (hasMore) await schedulePruneContinuation(ctx, args.spaceId, keep);
 
     return { count: args.messages.length };

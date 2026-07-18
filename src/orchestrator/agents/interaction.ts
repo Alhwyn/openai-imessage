@@ -2,7 +2,6 @@ import {
   generateText,
   stepCountIs,
   type ModelMessage,
-  type UserContent,
 } from "ai";
 
 import { getComposioTools } from "../integrations/index";
@@ -12,7 +11,7 @@ import {
   getCuratedMemories,
   getHistory,
 } from "../memory/index";
-import { coalesceTextReplies, summarizeOutbound } from "../outbound";
+import { summarizeOutbound } from "../outbound";
 import { interactionSystemPrompt } from "../prompts/index";
 import {
   assertGmiApiKey,
@@ -24,23 +23,18 @@ import {
   GMI_REASONING,
   INTERACTION_AGENT_MAX_STEPS,
 } from "../utils/index";
+import { buildUserContent } from "../utils/userContent";
 
 import { buildInteractionTools } from "./interactionTools";
+import { createTurnEffectCollector } from "./turnEffects";
 
-import type {
-  InteractionEvent,
-  InteractionResult,
-  OutboundItem,
-} from "./types";
+import type { InteractionEvent, InteractionResult } from "./types";
 import type { DeliveryTarget } from "../handoff/types";
 
 const spaceLocks = new Map<string, Promise<void>>();
 
 /**
  * Runs a function after earlier work for the same space has completed.
- * @param spaceId - The space ID.
- * @param fn - The function to run with the space lock.
- * @returns The function result.
  */
 const withSpaceLock = async <T>(spaceId: string, fn: () => Promise<T>): Promise<T> => {
   const previous = spaceLocks.get(spaceId) ?? Promise.resolve();
@@ -62,29 +56,7 @@ const withSpaceLock = async <T>(spaceId: string, fn: () => Promise<T>): Promise<
 };
 
 /**
- * Formats an event message.
- * @param event - The event to format.
- * @returns The formatted event message.
- */
-const formatEventMessage = (event: InteractionEvent): UserContent => {
-  if (!event.images?.length) return event.text;
-
-  return [
-    ...(event.text ? [{ type: "text" as const, text: event.text }] : []),
-    ...event.images.map((image) => ({
-      type: "file" as const,
-      data: image.data,
-      filename: image.filename,
-      mediaType: image.mediaType,
-    })),
-  ];
-};
-
-/**
  * Serializes and runs an interaction turn for a space.
- * @param spaceId - The space ID.
- * @param event - The event to run the interaction agent for.
- * @returns The interaction result.
  */
 export const runInteractionAgent = async (
   spaceId: string,
@@ -94,12 +66,9 @@ export const runInteractionAgent = async (
   return withSpaceLock(spaceId, async () => {
     assertGmiApiKey();
 
-    const outbound: OutboundItem[] = [];
+    const effects = createTurnEffectCollector();
     const contextStartedAt = Date.now();
-    console.log("[agent] Loading interaction context", {
-      spaceId,
-      eventKind: event.kind,
-    });
+    console.log("[agent] Loading interaction context", { spaceId });
     const [memories, composioTools, history] = await Promise.all([
       getCuratedMemories(spaceId),
       getComposioTools(event.senderId),
@@ -107,29 +76,26 @@ export const runInteractionAgent = async (
     ]);
     console.log("[agent] Interaction context loaded", {
       spaceId,
-      eventKind: event.kind,
       historyCount: history.length,
       elapsedMs: Date.now() - contextStartedAt,
     });
-    const userContent = formatEventMessage(event);
+    const userContent = buildUserContent(event.text, event.images);
     const system = buildSystemPrompt(interactionSystemPrompt, memories);
     const messages: ModelMessage[] = [
       ...history,
       { role: "user", content: userContent },
     ];
 
-    if (event.kind === "user_message") {
-      console.log("[agent] Inbound user message", {
-        spaceId,
-        text: event.text.slice(0, 200),
-        imageCount: event.images?.length ?? 0,
-      });
-    }
+    console.log("[agent] Inbound user message", {
+      spaceId,
+      text: event.text.slice(0, 200),
+      imageCount: event.images?.length ?? 0,
+    });
 
     const tools = buildInteractionTools({
       deliveryTarget,
       event,
-      outbound,
+      effects,
       spaceId,
       composioTools,
     });
@@ -141,7 +107,6 @@ export const runInteractionAgent = async (
 
     console.log("[agent] Starting GMI interaction generation", {
       spaceId,
-      eventKind: event.kind,
       model: GMI_MODEL_ID,
       maxRetries: GMI_MAX_RETRIES,
       toolCount: toolNames.length,
@@ -174,21 +139,13 @@ export const runInteractionAgent = async (
     }).catch((error: unknown) => {
       console.error("[agent] GMI interaction generation failed", {
         spaceId,
-        eventKind: event.kind,
         elapsedMs: Date.now() - startedAt,
         ...getGmiErrorDetails(error),
       });
       throw error;
     });
 
-    const finalOutbound = coalesceTextReplies(outbound);
-    if (finalOutbound.length < outbound.length) {
-      console.warn("[agent] Coalesced duplicate text replies", {
-        spaceId,
-        removedCount: outbound.length - finalOutbound.length,
-      });
-    }
-
+    const finalOutbound = effects.finalize(result.text);
     const toolCalls = result.steps.flatMap((step) =>
       step.toolCalls.map((call) => call.toolName),
     );
@@ -198,7 +155,6 @@ export const runInteractionAgent = async (
 
     console.log("[agent] GMI interaction generation completed", {
       spaceId,
-      eventKind: event.kind,
       elapsedMs: Date.now() - startedAt,
       finishReason: result.finishReason,
       stepCount: result.steps.length,
@@ -208,17 +164,9 @@ export const runInteractionAgent = async (
       queuedCount: finalOutbound.length,
     });
 
-    const modelText = result.text.trim();
-    if (modelText) {
-      console.log("[agent] Using model text response", {
-        spaceId,
-        modelTextPreview: modelText.slice(0, 200),
-      });
-      finalOutbound.push({ kind: "text", text: modelText });
-    } else if (toolCalls.length === 0) {
+    if (!result.text.trim() && toolCalls.length === 0) {
       console.warn("[agent] Model returned no tools or text", {
         spaceId,
-        eventKind: event.kind,
         finishReason: result.finishReason,
       });
     }
@@ -233,7 +181,6 @@ export const runInteractionAgent = async (
 
     console.log("[agent] Turn outbound summary", {
       spaceId,
-      eventKind: event.kind,
       items: summarizeOutbound(finalOutbound),
     });
 

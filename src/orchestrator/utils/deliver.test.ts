@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { Emoji } from "@spectrum-ts/core";
 import { describe, expect, mock, test } from "bun:test";
 
-import { deliverOutbound, deliverReplies } from "./deliver";
+import { deliverOutbound } from "./deliver";
 
 import type { ContentBuilder, Message, Space } from "@spectrum-ts/core";
 
@@ -188,16 +188,5 @@ describe("deliverOutbound", () => {
       throw new Error("expected app content");
     }
     expect(await first.url()).toBe(url);
-  });
-});
-
-describe("deliverReplies", () => {
-  test("maps string replies to space.send", async () => {
-    const send = mock(() => Promise.resolve(undefined));
-    const space = asSpace({ send });
-
-    await deliverReplies(space, ["one", "two"]);
-
-    expect(send).toHaveBeenCalledTimes(2);
   });
 });

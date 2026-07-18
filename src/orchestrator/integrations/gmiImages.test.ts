@@ -11,14 +11,15 @@ import {
   GMI_IMAGE_MAX_FILE_BYTES,
   GMI_IMAGE_MIN_COUNT,
   GMI_IMAGE_MODEL_ID,
-} from "./constants";
+} from "../utils/constants";
+
 import {
   cleanupImageAlbum,
   clampImageCount,
   generateGmiImages,
 } from "./gmiImages";
 
-import type { ImageGenerationProgress } from "./types";
+import type { ImageGenerationProgress } from "../utils/types";
 
 const SOURCE_PNG = await sharp({
   create: {
