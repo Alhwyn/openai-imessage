@@ -2,10 +2,13 @@ import { isAbsolute, relative, resolve } from "node:path";
 
 import { getComputerViewerSnapshot } from "../db/computerRuns";
 
-import { getComputerDisplaySize } from "./display";
+import {
+  COMPUTER_DISPLAY_SIZE,
+  COMPUTER_VIEWER_HOST,
+  COMPUTER_VIEWER_PORT,
+} from "./constants";
 import { computerViewerHtml } from "./viewerPage";
 
-const DEFAULT_VIEWER_PORT = 6902;
 const ARTIFACTS_ROOT = resolve("runtime/computer/artifacts");
 
 const htmlResponse = (request: Request): Response => {
@@ -80,7 +83,7 @@ const snapshotResponse = async (request: Request): Promise<Response> => {
     : undefined;
   return jsonResponse({
     ...snapshot,
-    display: getComputerDisplaySize(),
+    display: COMPUTER_DISPLAY_SIZE,
     recordingUrl,
   });
 };
@@ -116,10 +119,9 @@ let viewerServer: ReturnType<typeof Bun.serve> | undefined;
 
 export const startComputerViewer = (): ReturnType<typeof Bun.serve> => {
   if (viewerServer) return viewerServer;
-  const port = Number(process.env.COMPUTER_VIEWER_PORT ?? DEFAULT_VIEWER_PORT);
   viewerServer = Bun.serve({
-    hostname: process.env.COMPUTER_VIEWER_HOST?.trim() || "127.0.0.1",
-    port,
+    hostname: COMPUTER_VIEWER_HOST,
+    port: COMPUTER_VIEWER_PORT,
     fetch: async (request) => {
       const url = new URL(request.url);
       if (request.method !== "GET") return new Response(null, { status: 405 });

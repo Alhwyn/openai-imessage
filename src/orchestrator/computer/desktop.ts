@@ -1,10 +1,15 @@
 import { dirname, resolve } from "node:path";
 
-import { getComputerDisplaySize } from "./display";
+import {
+  COMPUTER_ACTION_SETTLE_MS,
+  COMPUTER_DESKTOP_COMMAND_TIMEOUT_MS,
+  COMPUTER_DESKTOP_SERVICE,
+  COMPUTER_DISPLAY_SIZE,
+  COMPUTER_STABILITY_ATTEMPTS,
+  COMPUTER_STABILITY_DELAY_MS,
+} from "./constants";
 
 import type { ComputerAction } from "./types";
-
-const DEFAULT_SETTLE_MS = 300;
 
 const keyAliases: Record<string, string> = {
   ALT: "alt",
@@ -50,35 +55,16 @@ const buttonNumber = (
   }
 };
 
-const getComposeFile = (): string => {
-  return resolve(
-    process.env.COMPUTER_COMPOSE_FILE?.trim() ||
-      "runtime/computer/compose.yaml",
-  );
-};
-
-const getDesktopService = (): string => {
-  return process.env.COMPUTER_DESKTOP_SERVICE?.trim() || "desktop";
-};
-
-const getComposeProject = (): string => {
-  return (
-    process.env.COMPUTER_COMPOSE_PROJECT?.trim() ||
-    dirname(getComposeFile()).split("/").pop() ||
-    "computer"
-  );
-};
-
-const getDesktopCommandTimeoutMs = (): number => {
-  const parsed = Number(process.env.COMPUTER_DOCKER_TIMEOUT_MS ?? 20_000);
-  return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 20_000;
-};
+const COMPOSE_FILE = resolve("runtime/computer/compose.yaml");
+const COMPOSE_PROJECT =
+  dirname(COMPOSE_FILE).split("/").pop() ||
+  "computer";
 
 const runProcess = async (
   argv: string[],
   options: { allowFailure?: boolean; timeoutMs?: number } = {},
 ): Promise<string> => {
-  const timeoutMs = options.timeoutMs ?? getDesktopCommandTimeoutMs();
+  const timeoutMs = options.timeoutMs ?? COMPUTER_DESKTOP_COMMAND_TIMEOUT_MS;
   const child = Bun.spawn(argv, {
     stdout: "pipe",
     stderr: "pipe",
@@ -123,9 +109,9 @@ const getDesktopContainerId = async (): Promise<string> => {
       "ps",
       "-q",
       "--filter",
-      `label=com.docker.compose.project=${getComposeProject()}`,
+      `label=com.docker.compose.project=${COMPOSE_PROJECT}`,
       "--filter",
-      `label=com.docker.compose.service=${getDesktopService()}`,
+      `label=com.docker.compose.service=${COMPUTER_DESKTOP_SERVICE}`,
     ],
     { allowFailure: true },
   );
@@ -169,7 +155,7 @@ const withModifiers = async (
 };
 
 const movePointer = async (x: number, y: number): Promise<void> => {
-  const { width, height } = getComputerDisplaySize();
+  const { width, height } = COMPUTER_DISPLAY_SIZE;
   await runXdotool(
     "mousemove",
     "--sync",
@@ -188,7 +174,7 @@ export const ensureFixedDisplaySize = async (): Promise<{
   before?: string;
   after?: string;
 }> => {
-  const { width, height } = getComputerDisplaySize();
+  const { width, height } = COMPUTER_DISPLAY_SIZE;
   const readDims =
     "timeout 3 xdpyinfo -display :1 2>/dev/null | awk '/dimensions:/ {print $2; found=1} END { if (!found) exit 0 }' || true";
   const before = await runDocker(["bash", "-lc", readDims], {
@@ -323,18 +309,14 @@ export const captureDesktopScreenshot = async (): Promise<Uint8Array> => {
 };
 
 export const captureStableDesktopScreenshot = async (): Promise<Uint8Array> => {
-  const attempts = Math.max(
-    1,
-    Math.min(6, Number(process.env.COMPUTER_STABILITY_ATTEMPTS ?? 3)),
-  );
-  const delayMs = Math.max(
-    50,
-    Math.min(2_000, Number(process.env.COMPUTER_STABILITY_DELAY_MS ?? 150)),
-  );
   let previous = await captureDesktopScreenshot();
 
-  for (let attempt = 1; attempt < attempts; attempt += 1) {
-    await Bun.sleep(delayMs);
+  for (
+    let attempt = 1;
+    attempt < COMPUTER_STABILITY_ATTEMPTS;
+    attempt += 1
+  ) {
+    await Bun.sleep(COMPUTER_STABILITY_DELAY_MS);
     const current = await captureDesktopScreenshot();
     if (Buffer.from(previous).equals(Buffer.from(current))) return current;
     previous = current;
@@ -432,7 +414,7 @@ export const executeComputerAction = async (
   }
 
   if (action.type !== "wait" && action.type !== "screenshot") await Bun.sleep(
-    Number(process.env.COMPUTER_ACTION_SETTLE_MS ?? DEFAULT_SETTLE_MS),
+    COMPUTER_ACTION_SETTLE_MS,
   );
 
 };
@@ -450,5 +432,5 @@ export const stopDesktopRecording = async (
   );
   if (!output.endsWith("/demo.mp4")) return undefined;
 
-  return resolve(dirname(getComposeFile()), "artifacts", runId, "demo.mp4");
+  return resolve(dirname(COMPOSE_FILE), "artifacts", runId, "demo.mp4");
 };

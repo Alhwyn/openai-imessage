@@ -1,0 +1,12 @@
+---
+description: Keep source index files as import and export barrels
+globs: "src/**/index.ts"
+alwaysApply: false
+---
+
+# Barrel index files
+
+- Explicitly import each public value or type, then export it in a separate block.
+- Do not use `export { value } from "./module"` shorthand.
+- Put implementations, constants, schemas, and local type declarations in named modules.
+- Do not define functions, classes, or runtime logic in a source `index.ts`.

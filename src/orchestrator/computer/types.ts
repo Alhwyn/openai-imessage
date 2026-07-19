@@ -51,6 +51,85 @@ export const computerActionSchema = z.discriminatedUnion("type", [
 
 export type ComputerAction = z.infer<typeof computerActionSchema>;
 
+export type OpenAiComputerResponse = {
+  id: string;
+  output: unknown[];
+  output_text?: string;
+};
+
+export type ComputerCall = {
+  callId: string;
+  actions: ComputerAction[];
+  pendingSafetyChecks?: unknown[];
+};
+
+export type ComputerCallCandidate = {
+  type: "computer_call";
+};
+
+export type ComputerProgress = {
+  step: number;
+  lastAction: string;
+};
+
+export type ComputerActionEvent = {
+  sequence: number;
+  step: number;
+  action: ComputerAction;
+  label: string;
+  x?: number;
+  y?: number;
+  detail?: string;
+};
+
+export type RunComputerUseInput = {
+  goal: string;
+  sessionId: string;
+  signal?: AbortSignal;
+  onProgress?: (progress: ComputerProgress) => Promise<void> | void;
+  onAction?: (event: ComputerActionEvent) => Promise<void> | void;
+};
+
+export type RunComputerUseResult = {
+  summary: string;
+  steps: number;
+};
+
+export type RunComputerAgentInput = {
+  goal: string;
+  runId: string;
+  spaceId: string;
+  signal?: AbortSignal;
+  onProgress?: RunComputerUseInput["onProgress"];
+  onAction?: RunComputerUseInput["onAction"];
+};
+
+export type RunComputerAgentResult = RunComputerUseResult & {
+  recordingPath?: string;
+};
+
+export type ExecuteComputerCallsInput = {
+  calls: ComputerCall[];
+  step: number;
+  actionSequence: number;
+  signal?: AbortSignal;
+  onProgress?: RunComputerUseInput["onProgress"];
+  onAction?: RunComputerUseInput["onAction"];
+};
+
+export type ExecuteComputerCallsResult = {
+  outputs: unknown[];
+  actionSequence: number;
+  desktopActionsTaken: number;
+};
+
+export type ComputerRequestInput = {
+  sessionId: string;
+  instructions: string;
+  modelInput: unknown[];
+  previousResponseId?: string;
+};
+
 export type ComputerRunState =
   | "queued"
   | "running"
@@ -91,4 +170,9 @@ export type ComputerViewerSnapshot = {
   run: ComputerRunStatus;
   streamUrl: string;
   events: ComputerRunEvent[];
+};
+
+export type ComputerPublicUrls = {
+  kasmStreamUrl?: string;
+  viewerPageUrl?: string;
 };

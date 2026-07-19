@@ -1,24 +1,12 @@
-export { runInteractionAgent } from "./agents/index";
-export { runExecutionAgent } from "./workers/execution";
-export type {
-  InboundImage,
-  InteractionEvent,
-  InteractionResult,
-  OutboundItem,
-  TapbackKey,
-} from "./agents/index";
-export {
+import { runInteractionAgent } from "./agents/index";
+import {
   buildDebouncedTurn,
   flushPendingOrchestratorTurns,
   scheduleOrchestratorTurn,
 } from "./bounce/index";
-export type { OrchestratorTurn } from "./bounce/index";
-export { assertConvexEnv, reconcileStaleComputerRuns } from "./db/index";
-export {
-  assignImageTask,
-  assignTask,
-} from "./handoff/index";
-export {
+import { assertConvexEnv, reconcileStaleComputerRuns } from "./db/index";
+import { assignImageTask, assignTask } from "./handoff/index";
+import {
   assertOpenAiApiKey,
   createRecentIdTracker,
   extractInboundImages,
@@ -27,4 +15,43 @@ export {
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
 } from "./utils/index";
-export type { RecentIdTracker, RecentIdTrackerOptions } from "./utils/index";
+import { runExecutionAgent } from "./workers/execution";
+
+import type {
+  InboundImage,
+  InteractionEvent,
+  InteractionResult,
+  OutboundItem,
+  TapbackKey,
+} from "./agents/index";
+import type { OrchestratorTurn } from "./bounce/index";
+import type { RecentIdTracker, RecentIdTrackerOptions } from "./utils/index";
+
+export {
+  assertConvexEnv,
+  assertOpenAiApiKey,
+  assignImageTask,
+  assignTask,
+  buildDebouncedTurn,
+  createRecentIdTracker,
+  extractInboundImages,
+  extractInboundText,
+  flushPendingOrchestratorTurns,
+  OPENAI_TEXT_MODEL,
+  reconcileStaleComputerRuns,
+  runExecutionAgent,
+  runInteractionAgent,
+  scheduleOrchestratorTurn,
+  SEEN_MESSAGE_MAX,
+  SEEN_MESSAGE_TTL_MS,
+};
+export type {
+  InboundImage,
+  InteractionEvent,
+  InteractionResult,
+  OrchestratorTurn,
+  OutboundItem,
+  RecentIdTracker,
+  RecentIdTrackerOptions,
+  TapbackKey,
+};

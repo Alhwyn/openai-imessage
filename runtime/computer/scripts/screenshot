@@ -2,9 +2,9 @@
 set -euo pipefail
 
 output="${1:-/tmp/computer-screen.png}"
-display="${DISPLAY:-:1}"
-width="${COMPUTER_DISPLAY_WIDTH:-1280}"
-height="${COMPUTER_DISPLAY_HEIGHT:-800}"
+display=":1"
+width="1280"
+height="800"
 
 mkdir -p "$(dirname "$output")"
 

@@ -1,65 +1,32 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
-  deriveComputerPublicHostUrl,
   getComputerViewerBaseUrl,
   getKasmStreamUrl,
-  isExternallyReachableHttpUrl,
   resolveComputerPublicUrls,
 } from "../urls";
 
-const originalEnv = {
-  BASE_URL: process.env.BASE_URL,
-  COMPUTER_LIVE_VIEW_URL: process.env.COMPUTER_LIVE_VIEW_URL,
-  COMPUTER_VIEWER_URL: process.env.COMPUTER_VIEWER_URL,
-};
+const originalLiveViewUrl = process.env.COMPUTER_LIVE_VIEW_URL;
 
 afterEach(() => {
-  for (const [key, value] of Object.entries(originalEnv)) if (value === undefined) delete process.env[key];
-  else process.env[key] = value;
-
+  if (originalLiveViewUrl === undefined) delete process.env.COMPUTER_LIVE_VIEW_URL;
+  else process.env.COMPUTER_LIVE_VIEW_URL = originalLiveViewUrl;
 });
 
 describe("public computer URLs", () => {
-  test("accepts externally reachable HTTP URLs", () => {
-    expect(isExternallyReachableHttpUrl("https://viewer.example.com")).toBe(
-      true,
-    );
-  });
-
-  test("rejects local and private URLs", () => {
-    expect(isExternallyReachableHttpUrl("https://127.0.0.1:6901")).toBe(false);
-    expect(isExternallyReachableHttpUrl("http://localhost:6902")).toBe(false);
-    expect(isExternallyReachableHttpUrl("http://192.168.1.5")).toBe(false);
-  });
-
-  test("derives desktop and viewer hosts from BASE_URL", () => {
+  test("returns no URLs without COMPUTER_LIVE_VIEW_URL", () => {
     delete process.env.COMPUTER_LIVE_VIEW_URL;
-    delete process.env.COMPUTER_VIEWER_URL;
-    process.env.BASE_URL = "https://agent.alhwyn.com";
-
-    expect(deriveComputerPublicHostUrl("desktop")).toBe(
-      "https://desktop.alhwyn.com",
-    );
-    expect(deriveComputerPublicHostUrl("viewer")).toBe(
-      "https://viewer.alhwyn.com",
-    );
-    expect(getKasmStreamUrl()).toBe("https://desktop.alhwyn.com/?resize=scale");
-    expect(getComputerViewerBaseUrl()).toBe("https://viewer.alhwyn.com");
+    expect(getKasmStreamUrl()).toBeUndefined();
+    expect(getComputerViewerBaseUrl()).toBeUndefined();
   });
 
-  test("falls back to BASE_URL when COMPUTER_LIVE_VIEW_URL is local-only", () => {
-    process.env.BASE_URL = "https://agent.alhwyn.com";
+  test("uses COMPUTER_LIVE_VIEW_URL without reachability filtering", () => {
     process.env.COMPUTER_LIVE_VIEW_URL = "https://127.0.0.1:6901";
-    delete process.env.COMPUTER_VIEWER_URL;
-
-    expect(getKasmStreamUrl()).toBe("https://desktop.alhwyn.com/?resize=scale");
-    expect(getComputerViewerBaseUrl()).toBe("https://viewer.alhwyn.com");
+    expect(getKasmStreamUrl()).toBe("https://127.0.0.1:6901/?resize=scale");
+    expect(getComputerViewerBaseUrl()).toBeUndefined();
   });
 
   test("resolves viewer page from desktop.* COMPUTER_LIVE_VIEW_URL", () => {
-    delete process.env.BASE_URL;
-    delete process.env.COMPUTER_VIEWER_URL;
     process.env.COMPUTER_LIVE_VIEW_URL = "https://desktop.alhwyn.com";
 
     expect(getKasmStreamUrl()).toBe("https://desktop.alhwyn.com/?resize=scale");

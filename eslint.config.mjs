@@ -38,4 +38,23 @@ export default tseslint.config(
       "no-trailing-spaces": "error",
     },
   },
+  {
+    files: ["src/**/index.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "VariableDeclaration, FunctionDeclaration, ClassDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration, ExpressionStatement",
+          message:
+            "Source index files are barrels only. Move implementations and declarations into named modules.",
+        },
+        {
+          selector: "ExportNamedDeclaration[source], ExportAllDeclaration",
+          message:
+            "Import barrel members first, then export them in a separate block.",
+        },
+      ],
+    },
+  },
 );

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 run_id="${1:?run id is required}"
-display="${DISPLAY:-:1}"
-fps="${COMPUTER_RECORDING_FPS:-15}"
+display=":1"
+fps="15"
 artifact_dir="/artifacts/${run_id}"
 pid_file="${artifact_dir}/recording.pid"
 log_file="${artifact_dir}/recording.log"
@@ -22,8 +22,8 @@ dims="$(timeout 3 xdpyinfo -display "$display" 2>/dev/null | awk '/dimensions:/ 
 width="${dims%x*}"
 height="${dims#*x}"
 if [[ -z "${width}" || -z "${height}" || "${width}" = "${dims}" ]]; then
-  width="${COMPUTER_DISPLAY_WIDTH:-1280}"
-  height="${COMPUTER_DISPLAY_HEIGHT:-800}"
+  width="1280"
+  height="800"
 fi
 
 nohup ffmpeg \

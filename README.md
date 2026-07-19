@@ -43,42 +43,8 @@ Keep `bun run convex:dev` running while developing so functions stay synced.
 
 ### App env
 
-```bash
-# required for text agents, image generation, and computer-use tasks
-OPENAI_API_KEY=
-# optional overrides; defaults shown
-# OPENAI_TEXT_MODEL=gpt-5.6-terra
-# OPENAI_IMAGE_MODEL=gpt-image-2
-# OPENAI_COMPUTER_MODEL=gpt-5.6-terra
-# OPENAI_BASE_URL=https://api.openai.com/v1
-
-SPECTRUM_PROJECT_ID=
-SPECTRUM_PROJECT_SECRET=
-SPECTRUM_SIGNING_WEBHOOK=
-
-CONVEX_URL=
-ORCHESTRATOR_BRIDGE_SECRET=
-
-# optional
-# ORCHESTRATOR_DEBOUNCE_MS=1500
-# AGENT_PORT=4001
-# BASE_URL=https://agent.alhwyn.com
-
-# optional Composio connected-app tools. Leave COMPOSIO_API_KEY unset to run
-# without external-app access.
-# COMPOSIO_API_KEY=
-# Use a long random secret; it hashes iMessage sender IDs before they reach Composio.
-# COMPOSIO_USER_ID_SALT=
-# Comma-separated approved toolkit slugs. Defaults to gmail,googlecalendar.
-# COMPOSIO_TOOLKITS=gmail,googlecalendar
-
-# Set a long local-only password before running the desktop container.
-# COMPUTER_DESKTOP_PASSWORD=
-# Public desktop tunnel for iMessage live-view cards (required for the card).
-# COMPUTER_LIVE_VIEW_URL=https://desktop.alhwyn.com
-# Optional token-gated wrapper page; defaults from BASE_URL when unset.
-# COMPUTER_VIEWER_URL=
-```
+Use only the variable names declared in `.env.example`. Convex manages its
+required `CONVEX_URL` in `.env.local` when you run `bun run convex:dev`.
 
 ## Run
 
@@ -126,31 +92,14 @@ bun run computer:logs
 bun run computer:down
 ```
 
-Optional local settings:
-
-```bash
-# fixed coordinate space; both values must match the container
-COMPUTER_DISPLAY_WIDTH=1280
-COMPUTER_DISPLAY_HEIGHT=800
-COMPUTER_MAX_STEPS=30
-COMPUTER_ACTION_SETTLE_MS=300
-COMPUTER_STABILITY_ATTEMPTS=3
-COMPUTER_STABILITY_DELAY_MS=150
-COMPUTER_COMPACT_THRESHOLD=60000
-COMPUTER_LIVE_VIEW_PORT=6901
-COMPUTER_VIEWER_PORT=6902
-```
-
 Set a public desktop tunnel for live-view cards:
 
 ```bash
 COMPUTER_LIVE_VIEW_URL=https://desktop.alhwyn.com
 ```
 
-That single URL is enough — iMessage gets it as the live-view card. Localhost
-values are ignored. Optionally, with `BASE_URL=https://agent.alhwyn.com` (or
-`COMPUTER_VIEWER_URL`), the card uses the token-gated `viewer.*` page that
-embeds the desktop stream instead.
+That single URL is the source of truth. A `desktop.*` URL is used for the Kasm
+stream and derives the matching token-gated `viewer.*` page.
 
 ### Dev tunnel (optional, like ngrok)
 
@@ -158,7 +107,7 @@ Expose localhost to a stable HTTPS hostname for webhook testing (same Cloudflare
 
 ```bash
 # Terminal 1 — app on :4001
-AGENT_PORT=4001 bun run start
+bun run start
 
 # Terminal 2 — one-off random URL
 bun run tunnel:quick
@@ -175,7 +124,6 @@ bun run tunnel
 - `agent.alhwyn.com` → webhook server on `127.0.0.1:4001`
 
 Set `COMPUTER_LIVE_VIEW_URL=https://desktop.alhwyn.com` for computer cards.
-`BASE_URL=https://agent.alhwyn.com` is still used for webhooks / optional viewer.
 
 ## How orchestration works
 
@@ -195,8 +143,7 @@ The agent caches one Composio Tool Router tool set per sender and toolkit config
 Connections are isolated by sender: the raw Spectrum sender ID is salted and hashed
 before it becomes the Composio user ID. If Spectrum does not provide a sender ID,
 connected-app tools stay disabled for that message. By default, only Gmail and Google Calendar
-are enabled. Add explicitly approved toolkit slugs to `COMPOSIO_TOOLKITS` to enable
-other apps.
+are enabled.
 
 When someone asks to use an unconnected service, the agent uses Composio's
 connection manager and texts back the OAuth URL. The person completes OAuth in

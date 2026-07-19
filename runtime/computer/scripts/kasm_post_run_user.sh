@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Runs after the Kasm desktop session is up. Lock the coordinate space used by
-# the computer-use model (compose sets COMPUTER_DISPLAY_* / VNC_RESOLUTION).
+# the computer-use model.
 set -euo pipefail
 
 echo "Executing kasm_post_run_user.sh"
 
-width="${COMPUTER_DISPLAY_WIDTH:-1280}"
-height="${COMPUTER_DISPLAY_HEIGHT:-800}"
-display="${DISPLAY:-:1}"
+width="1280"
+height="800"
+display=":1"
 
 for _ in $(seq 1 30); do
   if xdpyinfo -display "$display" >/dev/null 2>&1; then

@@ -1,11 +1,8 @@
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim() ?? "";
-export const OPENAI_BASE_URL =
-  process.env.OPENAI_BASE_URL?.trim().replace(/\/+$/, "") ||
-  "https://api.openai.com/v1";
+export const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
 export const DEFAULT_OPENAI_TEXT_MODEL = "gpt-5.6-terra";
-export const OPENAI_TEXT_MODEL_ID =
-  process.env.OPENAI_TEXT_MODEL?.trim() || DEFAULT_OPENAI_TEXT_MODEL;
+export const OPENAI_TEXT_MODEL_ID = DEFAULT_OPENAI_TEXT_MODEL;
 
 /** Match the previous provider's three total attempts without a long silent wait. */
 export const OPENAI_MAX_RETRIES = 2;
@@ -23,8 +20,7 @@ export const OPENAI_PROVIDER_OPTIONS = {
   },
 } as const;
 
-export const OPENAI_IMAGE_MODEL_ID =
-  process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-2";
+export const OPENAI_IMAGE_MODEL_ID = "gpt-image-2";
 export const IMAGE_MIN_COUNT = 1;
 export const IMAGE_MAX_COUNT = 3;
 export const OPENAI_IMAGE_TIMEOUT_MS = 120_000;

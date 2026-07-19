@@ -1,3 +1,4 @@
+import { COMPUTER_WORKER_TIMEOUT_MS } from "../computer/constants";
 import {
   formatComputerDeliveryText,
   formatComputerFailureText,
@@ -254,10 +255,6 @@ export const assignComputerTask = async (
     execute: async () => {
       await markComputerRunRunning(taskId);
       let lastAction: string | undefined;
-      const workerTimeoutMs = Math.max(
-        60_000,
-        Number(process.env.COMPUTER_WORKER_TIMEOUT_MS ?? 8 * 60_000),
-      );
       computerWork = runComputerAgent({
         goal,
         runId: taskId,
@@ -282,10 +279,10 @@ export const assignComputerTask = async (
             abortController.abort();
             reject(
               new Error(
-                `Computer worker timed out after ${Math.round(workerTimeoutMs / 1000)}s with no finish`,
+                `Computer worker timed out after ${Math.round(COMPUTER_WORKER_TIMEOUT_MS / 1000)}s with no finish`,
               ),
             );
-          }, workerTimeoutMs);
+          }, COMPUTER_WORKER_TIMEOUT_MS);
         }),
       ]).finally(() => {
         if (timeout) clearTimeout(timeout);

@@ -4,11 +4,9 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 config="$root/cloudflared/config.yml"
 computer_config="$root/cloudflared/computer.yml"
-tunnel="${TUNNEL_NAME:-webhook-automator}"
-computer_tunnel="${COMPUTER_TUNNEL_NAME:-computer-viewer}"
-host="${TUNNEL_HOSTNAME:-agent.alhwyn.com}"
-zone_host="${TUNNEL_ZONE_HOSTNAME:-${host#*.}}"
-viewer_host="${COMPUTER_VIEWER_TUNNEL_HOSTNAME:-viewer.$zone_host}"
+tunnel="webhook-automator"
+computer_tunnel="computer-viewer"
+viewer_host="viewer.alhwyn.com"
 
 if [[ ! -f "$config" || ! -f "$computer_config" ]]; then
   echo "Missing a Cloudflare tunnel config." >&2

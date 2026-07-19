@@ -1,7 +1,6 @@
-export const interactionSystemPrompt = (
-  await Bun.file(new URL("./interaction.md", import.meta.url)).text()
-).trim();
+import {
+  executionSystemPrompt,
+  interactionSystemPrompt,
+} from "./loader";
 
-export const executionSystemPrompt = (
-  await Bun.file(new URL("./execution.md", import.meta.url)).text()
-).trim();
+export { executionSystemPrompt, interactionSystemPrompt };

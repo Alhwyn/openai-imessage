@@ -2,15 +2,14 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-host="${TUNNEL_HOSTNAME:-agent.alhwyn.com}"
-zone_host="${TUNNEL_ZONE_HOSTNAME:-${host#*.}}"
-viewer_host="${COMPUTER_VIEWER_TUNNEL_HOSTNAME:-viewer.$zone_host}"
-desktop_host="${COMPUTER_TUNNEL_HOSTNAME:-desktop.$zone_host}"
-port="${AGENT_PORT:-4001}"
-viewer_port="${COMPUTER_VIEWER_PORT:-6902}"
-desktop_port="${COMPUTER_LIVE_VIEW_PORT:-6901}"
-tunnel="${TUNNEL_NAME:-webhook-automator}"
-computer_tunnel="${COMPUTER_TUNNEL_NAME:-computer-viewer}"
+host="agent.alhwyn.com"
+viewer_host="viewer.alhwyn.com"
+desktop_host="desktop.alhwyn.com"
+port="4001"
+viewer_port="6902"
+desktop_port="6901"
+tunnel="webhook-automator"
+computer_tunnel="computer-viewer"
 
 if ! command -v cloudflared >/dev/null 2>&1; then
   echo "cloudflared is not installed. Install it first: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/" >&2

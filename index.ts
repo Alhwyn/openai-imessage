@@ -1,6 +1,10 @@
 import { Spectrum, type Message, type Space, type SpectrumInstance } from "@spectrum-ts/core";
 import { imessage } from "@spectrum-ts/imessage";
 
+import {
+  COMPUTER_WATCHDOG_INTERVAL_MS,
+  COMPUTER_WORKER_TIMEOUT_MS,
+} from "./src/orchestrator/computer/constants";
 import { startComputerViewer } from "./src/orchestrator/computer/viewer";
 import {
   assertConvexEnv,
@@ -21,22 +25,10 @@ const seenInboundMessages = createRecentIdTracker({
   maxSize: SEEN_MESSAGE_MAX,
 });
 
-const readEnv = (...keys: string[]) => {
-  for (const key of keys) {
-    const value = process.env[key]?.trim();
-    if (value) return value;
-  }
-  return undefined;
-};
-
 const getSpectrumEnv = () => {
-  const projectId = readEnv("SPECTRUM_PROJECT_ID", "PROJECT_ID");
-  const projectSecret = readEnv("SPECTRUM_PROJECT_SECRET", "PROJECT_SECRET");
-  const webhookSecret = readEnv(
-    "SPECTRUM_SIGNING_WEBHOOK",
-    "SPECTRUM_WEBHOOK_SECRET",
-    "SPECTRUM_SIGNING_SECRET",
-  );
+  const projectId = process.env.SPECTRUM_PROJECT_ID?.trim();
+  const projectSecret = process.env.SPECTRUM_PROJECT_SECRET?.trim();
+  const webhookSecret = process.env.SPECTRUM_SIGNING_WEBHOOK?.trim();
 
   const missing: string[] = [];
   if (!projectId) missing.push("SPECTRUM_PROJECT_ID");
@@ -102,22 +94,17 @@ const main = async () => {
   });
   if (reconciled > 0) console.warn(`[computer-agent] Reconciled ${reconciled} orphaned run(s)`);
 
-  const workerTimeoutMs = Math.max(
-    60_000,
-    Number(process.env.COMPUTER_WORKER_TIMEOUT_MS ?? 8 * 60_000),
-  );
-  const watchdogIntervalMs = Math.max(
-    15_000,
-    Number(process.env.COMPUTER_WATCHDOG_INTERVAL_MS ?? 60_000),
-  );
   const watchdog = setInterval(() => {
     void reconcileStaleComputerRuns({
-      staleBefore: Date.now() - workerTimeoutMs - watchdogIntervalMs,
+      staleBefore:
+        Date.now() -
+        COMPUTER_WORKER_TIMEOUT_MS -
+        COMPUTER_WATCHDOG_INTERVAL_MS,
       error: "Computer worker stopped reporting progress",
     }).catch((error: unknown) => {
       console.error("[computer-agent] Watchdog reconciliation failed", error);
     });
-  }, watchdogIntervalMs);
+  }, COMPUTER_WATCHDOG_INTERVAL_MS);
   watchdog.unref();
 
   const computerViewer = startComputerViewer();
