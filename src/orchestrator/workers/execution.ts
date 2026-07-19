@@ -4,14 +4,14 @@ import { z } from "zod";
 import { getComposioTools } from "../integrations/index";
 import { executionSystemPrompt } from "../prompts/index";
 import {
-  assertGmiApiKey,
+  assertOpenAiApiKey,
   EXECUTION_AGENT_MAX_STEPS,
-  getGmiErrorDetails,
-  GMI_MAX_RETRIES,
-  GMI_MODEL,
-  GMI_MODEL_ID,
-  GMI_PROVIDER_OPTIONS,
-  GMI_REASONING,
+  getOpenAiErrorDetails,
+  OPENAI_MAX_RETRIES,
+  OPENAI_PROVIDER_OPTIONS,
+  OPENAI_REASONING,
+  OPENAI_TEXT_MODEL,
+  OPENAI_TEXT_MODEL_ID,
 } from "../utils/index";
 import { buildUserContent } from "../utils/userContent";
 
@@ -35,39 +35,39 @@ export const runExecutionAgent = async (
   images: InboundImage[] = [],
   senderId: string | null = null,
 ): Promise<string> => {
-  assertGmiApiKey();
+  assertOpenAiApiKey();
 
   const composioTools = await getComposioTools(senderId);
   const tools: ToolSet = { ...composioTools, ...echoTool };
   const toolNames = Object.keys(tools);
 
   const startedAt = Date.now();
-  console.log("[agent] Starting GMI execution generation", {
-    model: GMI_MODEL_ID,
-    maxRetries: GMI_MAX_RETRIES,
+  console.log("[agent] Starting OpenAI execution generation", {
+    model: OPENAI_TEXT_MODEL_ID,
+    maxRetries: OPENAI_MAX_RETRIES,
     toolCount: toolNames.length,
     composioToolCount: Object.keys(composioTools).length,
     toolNames,
   });
 
   const result = await generateText({
-    model: GMI_MODEL,
-    maxRetries: GMI_MAX_RETRIES,
-    reasoning: GMI_REASONING,
-    providerOptions: GMI_PROVIDER_OPTIONS,
+    model: OPENAI_TEXT_MODEL,
+    maxRetries: OPENAI_MAX_RETRIES,
+    reasoning: OPENAI_REASONING,
+    providerOptions: OPENAI_PROVIDER_OPTIONS,
     system: executionSystemPrompt,
     messages: [{ role: "user", content: buildUserContent(task, images) }],
     tools,
     stopWhen: stepCountIs(EXECUTION_AGENT_MAX_STEPS),
   }).catch((error: unknown) => {
-    console.error("[agent] GMI execution generation failed", {
+    console.error("[agent] OpenAI execution generation failed", {
       elapsedMs: Date.now() - startedAt,
-      ...getGmiErrorDetails(error),
+      ...getOpenAiErrorDetails(error),
     });
     throw error;
   });
 
-  console.log("[agent] GMI execution generation completed", {
+  console.log("[agent] OpenAI execution generation completed", {
     elapsedMs: Date.now() - startedAt,
     finishReason: result.finishReason,
     stepCount: result.steps.length,

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { getOpenAiApiKey, getOpenAiBaseUrl } from "../utils/openaiEnv";
+
 import {
   captureStableDesktopScreenshot,
   executeComputerAction,
@@ -120,23 +122,6 @@ type RunComputerUseResult = {
   steps: number;
 };
 
-const getOpenAiApiKey = (): string => {
-  const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) {
-    throw new Error(
-      "Missing OPENAI_API_KEY. Add it to your local .env before assigning computer tasks.",
-    );
-  }
-  return key;
-};
-
-const getOpenAiBaseUrl = (): string => {
-  return (
-    process.env.OPENAI_BASE_URL?.trim().replace(/\/+$/, "") ||
-    "https://api.openai.com/v1"
-  );
-};
-
 const getComputerModel = (): string => {
   return process.env.OPENAI_COMPUTER_MODEL?.trim() || "gpt-5.6-terra";
 };
@@ -174,7 +159,7 @@ const callOpenAi = async (
   const response = await fetch(`${getOpenAiBaseUrl()}/responses`, {
     method: "POST",
     headers: {
-      authorization: `Bearer ${getOpenAiApiKey()}`,
+      authorization: `Bearer ${getOpenAiApiKey("assigning computer tasks")}`,
       "content-type": "application/json",
     },
     body: JSON.stringify(body),

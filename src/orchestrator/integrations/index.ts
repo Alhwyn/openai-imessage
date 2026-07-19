@@ -6,5 +6,5 @@ export {
 export {
   cleanupImageAlbum,
   clampImageCount,
-  generateGmiImages,
-} from "./gmiImages";
+  generateOpenAiImages,
+} from "./openaiImages";

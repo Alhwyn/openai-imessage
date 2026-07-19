@@ -12,8 +12,8 @@ import { isComposioAuthUrl } from "../integrations/index";
 import { editMemory } from "../memory/index";
 import { TAPBACK_KEYS } from "../tapbacks";
 import {
-  GMI_IMAGE_MAX_COUNT,
-  GMI_IMAGE_MIN_COUNT,
+  IMAGE_MAX_COUNT,
+  IMAGE_MIN_COUNT,
 } from "../utils/index";
 
 import type { TurnEffectCollector } from "./turnEffects";
@@ -95,8 +95,8 @@ export const buildInteractionTools = ({
       inputSchema: z.object({
         prompts: z
           .array(z.string().min(1))
-          .min(GMI_IMAGE_MIN_COUNT)
-          .max(GMI_IMAGE_MAX_COUNT)
+          .min(IMAGE_MIN_COUNT)
+          .max(IMAGE_MAX_COUNT)
           .describe(
             'One prompt per image. Default shape: ["subject"]. For three cat pics use ["a cat", "a cat", "a cat"]. Vary entries when they want different images.',
           ),

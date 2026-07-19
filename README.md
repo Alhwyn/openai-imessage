@@ -8,7 +8,7 @@ Conversation history and Hermes-style curated memory (`USER.md` / `MEMORY.md`) p
 
 - **Bun** + Spectrum iMessage (`@spectrum-ts/core`, `@spectrum-ts/imessage`)
 - **Vercel AI SDK** (`ai`, `@ai-sdk/openai`)
-- **GMI Cloud** OpenAI-compatible inference (`GMI_CLOUD_API_KEY`)
+- **OpenAI** — text agents, image generation, and computer use (`OPENAI_API_KEY`)
 - **Convex** — durable messages + curated memory (`CONVEX_URL`)
 - **Composio** — per-person OAuth connections for Gmail, Google Calendar, and other approved apps
 - **Computer use** — a local KasmVNC/XFCE Linux desktop controlled through OpenAI's screenshot-and-action loop
@@ -44,9 +44,13 @@ Keep `bun run convex:dev` running while developing so functions stay synced.
 ### App env
 
 ```bash
-GMI_CLOUD_API_KEY=
-# optional override; default moonshotai/kimi-k2.7-code-highspeed
-# GMI_MODEL=
+# required for text agents, image generation, and computer-use tasks
+OPENAI_API_KEY=
+# optional overrides; defaults shown
+# OPENAI_TEXT_MODEL=gpt-5.6-terra
+# OPENAI_IMAGE_MODEL=gpt-image-2
+# OPENAI_COMPUTER_MODEL=gpt-5.6-terra
+# OPENAI_BASE_URL=https://api.openai.com/v1
 
 SPECTRUM_PROJECT_ID=
 SPECTRUM_PROJECT_SECRET=
@@ -68,10 +72,6 @@ ORCHESTRATOR_BRIDGE_SECRET=
 # Comma-separated approved toolkit slugs. Defaults to gmail,googlecalendar.
 # COMPOSIO_TOOLKITS=gmail,googlecalendar
 
-# required only for Linux computer-use tasks
-# OPENAI_API_KEY=
-# optional; defaults to gpt-5.6-terra
-# OPENAI_COMPUTER_MODEL=
 # Set a long local-only password before running the desktop container.
 # COMPUTER_DESKTOP_PASSWORD=
 # Externally reachable Kasm stream used inside the custom viewer.

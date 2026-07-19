@@ -1,24 +1,23 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  DEFAULT_GMI_MODEL,
-  GMI_MAX_RETRIES,
-  GMI_PROVIDER_OPTIONS,
-  GMI_REASONING,
+  DEFAULT_OPENAI_TEXT_MODEL,
+  OPENAI_MAX_RETRIES,
+  OPENAI_PROVIDER_OPTIONS,
+  OPENAI_REASONING,
 } from "./constants";
-import { getGmiErrorDetails, GMI_MODEL } from "./llm";
+import { getOpenAiErrorDetails, OPENAI_TEXT_MODEL } from "./llm";
 
-describe("GMI configuration", () => {
-  test("uses Luna as the default with bounded retries", () => {
-    expect(DEFAULT_GMI_MODEL).toBe("openai/gpt-5.6-luna");
-    expect(GMI_MAX_RETRIES).toBe(2);
+describe("OpenAI configuration", () => {
+  test("uses Terra as the default with bounded retries", () => {
+    expect(DEFAULT_OPENAI_TEXT_MODEL).toBe("gpt-5.6-terra");
+    expect(OPENAI_MAX_RETRIES).toBe(2);
   });
 
-  test("forces Luna reasoning mode with none effort and stateless store", () => {
-    expect(GMI_REASONING).toBe("none");
-    expect(GMI_PROVIDER_OPTIONS).toEqual({
+  test("keeps low-latency reasoning effort and stateless store", () => {
+    expect(OPENAI_REASONING).toBe("none");
+    expect(OPENAI_PROVIDER_OPTIONS).toEqual({
       openai: {
-        forceReasoning: true,
         reasoningEffort: "none",
         store: false,
       },
@@ -34,16 +33,16 @@ describe("GMI configuration", () => {
       lastError: providerError,
     });
 
-    expect(getGmiErrorDetails(retryError)).toEqual({
+    expect(getOpenAiErrorDetails(retryError)).toEqual({
       name: "AI_RetryError",
       message: "retry exhausted",
       statusCode: 429,
     });
   });
 
-  test("uses GMI's OpenAI-compatible responses provider", () => {
-    expect(GMI_MODEL.provider).toBe("gmi.responses");
-    expect(GMI_MODEL.modelId).toBe(DEFAULT_GMI_MODEL);
+  test("uses OpenAI responses provider", () => {
+    expect(OPENAI_TEXT_MODEL.provider).toBe("openai.responses");
+    expect(OPENAI_TEXT_MODEL.modelId).toBe(DEFAULT_OPENAI_TEXT_MODEL);
   });
 
   test("explains provider key-loading failures without exposing configuration", () => {
@@ -51,12 +50,12 @@ describe("GMI configuration", () => {
       name: "AI_LoadAPIKeyError",
     });
 
-    expect(getGmiErrorDetails(error)).toEqual({
+    expect(getOpenAiErrorDetails(error)).toEqual({
       name: "AI_LoadAPIKeyError",
       message: "OpenAI API key must be a string.",
       statusCode: undefined,
       guidance:
-        "GMI_CLOUD_API_KEY was missing or unloaded when the provider was created. Set it before startup and restart the Bun process.",
+        "OPENAI_API_KEY was missing or unloaded when the provider was created. Set it before startup and restart the Bun process.",
     });
   });
 
@@ -66,12 +65,12 @@ describe("GMI configuration", () => {
       statusCode: 401,
     });
 
-    expect(getGmiErrorDetails(error)).toEqual({
+    expect(getOpenAiErrorDetails(error)).toEqual({
       name: "AI_APICallError",
       message: "Unauthorized",
       statusCode: 401,
       guidance:
-        "GMI rejected the credential. Verify GMI_CLOUD_API_KEY is an active GMI inference API key.",
+        "OpenAI rejected the credential. Verify OPENAI_API_KEY is an active API key.",
     });
   });
 
@@ -86,14 +85,14 @@ describe("GMI configuration", () => {
       },
     );
 
-    const details = getGmiErrorDetails(error);
+    const details = getOpenAiErrorDetails(error);
     expect(details).toEqual({
       name: "AI_APICallError",
       message: "Backend request failed with status 400",
       statusCode: 400,
       responseBody: `${"x".repeat(2000)}…`,
       guidance:
-        "GMI rejected the request (Luna + tools require /v1/responses; inspect responseBody for schema/tool-call issues).",
+        "OpenAI rejected the request (inspect responseBody for schema/tool-call issues).",
     });
     expect(details.responseBody).not.toContain("tail");
   });
@@ -105,13 +104,13 @@ describe("GMI configuration", () => {
       data: { error: { message: "invalid tools" } },
     });
 
-    expect(getGmiErrorDetails(error)).toEqual({
+    expect(getOpenAiErrorDetails(error)).toEqual({
       name: "AI_APICallError",
       message: "bad request",
       statusCode: 400,
       responseBody: JSON.stringify({ error: { message: "invalid tools" } }),
       guidance:
-        "GMI rejected the request (Luna + tools require /v1/responses; inspect responseBody for schema/tool-call issues).",
+        "OpenAI rejected the request (inspect responseBody for schema/tool-call issues).",
     });
   });
 
@@ -125,13 +124,13 @@ describe("GMI configuration", () => {
       lastError: providerError,
     });
 
-    expect(getGmiErrorDetails(retryError)).toEqual({
+    expect(getOpenAiErrorDetails(retryError)).toEqual({
       name: "AI_RetryError",
       message: "retry exhausted",
       statusCode: 400,
       responseBody: '{"detail":"bad schema"}',
       guidance:
-        "GMI rejected the request (Luna + tools require /v1/responses; inspect responseBody for schema/tool-call issues).",
+        "OpenAI rejected the request (inspect responseBody for schema/tool-call issues).",
     });
   });
 });

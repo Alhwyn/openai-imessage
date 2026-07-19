@@ -4,7 +4,7 @@ import { imessage } from "@spectrum-ts/imessage";
 import { startComputerViewer } from "./src/orchestrator/computer/viewer";
 import {
   assertConvexEnv,
-  assertGmiApiKey,
+  assertOpenAiApiKey,
   createRecentIdTracker,
   extractInboundImages,
   extractInboundText,
@@ -99,7 +99,7 @@ const handleInbound = async (space: Space, message: Message): Promise<void> => {
 };
 
 const main = async () => {
-  assertGmiApiKey();
+  assertOpenAiApiKey();
   assertConvexEnv();
   const reconciled = await reconcileStaleComputerRuns({
     staleBefore: Date.now(),
@@ -173,7 +173,7 @@ const main = async () => {
   });
 
   console.log(
-    `[app] Orchestrator listening (Spectrum + GMI). Debounced inbound → assign_task → notify → reply/react`,
+    `[app] Orchestrator listening (Spectrum + OpenAI). Debounced inbound → assign_task → notify → reply/react`,
   );
 
   try {

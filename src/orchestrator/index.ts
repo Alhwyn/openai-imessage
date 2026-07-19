@@ -19,11 +19,11 @@ export {
   assignTask,
 } from "./handoff/index";
 export {
-  assertGmiApiKey,
+  assertOpenAiApiKey,
   createRecentIdTracker,
   extractInboundImages,
   extractInboundText,
-  GMI_MODEL,
+  OPENAI_TEXT_MODEL,
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
 } from "./utils/index";
