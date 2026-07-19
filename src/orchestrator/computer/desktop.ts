@@ -198,14 +198,26 @@ const movePointer = async (x: number, y: number): Promise<void> => {
   );
 };
 
+const withScaleToFit = (value: string): string => {
+  try {
+    const url = new URL(value);
+    url.searchParams.set("resize", "scale");
+    return url.href;
+  } catch {
+    return value;
+  }
+};
+
 export const getComputerLiveViewUrl = (): string => {
   const configured = process.env.COMPUTER_LIVE_VIEW_URL?.trim();
   if (configured) {
     try {
       const hostname = new URL(configured).hostname;
-      if (hostname !== "127.0.0.1" && hostname !== "localhost") return configured;
+      if (hostname !== "127.0.0.1" && hostname !== "localhost") {
+        return withScaleToFit(configured);
+      }
     } catch {
-      return configured;
+      return withScaleToFit(configured);
     }
   }
 
@@ -216,13 +228,13 @@ export const getComputerLiveViewUrl = (): string => {
       const zoneHostname = url.hostname.startsWith("agent.")
         ? url.hostname.slice("agent.".length)
         : url.hostname;
-      return `${url.protocol}//desktop.${zoneHostname}`;
+      return withScaleToFit(`${url.protocol}//desktop.${zoneHostname}`);
     } catch {
       console.warn("[computer-agent] Ignoring invalid BASE_URL for desktop viewer");
     }
   }
 
-  return DEFAULT_PUBLIC_DESKTOP_URL;
+  return withScaleToFit(DEFAULT_PUBLIC_DESKTOP_URL);
 };
 
 /**
@@ -265,6 +277,47 @@ export const assertDesktopReady = async (): Promise<void> => {
   await runDocker(["/opt/computer-agent/bin/screenshot", "/tmp/ready.png"], {
     timeoutMs: 15_000,
   });
+};
+
+/**
+ * Starts each computer task with a clean browser state while preserving Chrome's
+ * installed profile preferences so first-run prompts do not reappear.
+ */
+export const resetDesktopBrowserSession = async (): Promise<void> => {
+  await runDocker(
+    [
+      "bash",
+      "-lc",
+      `
+        pkill -x chrome 2>/dev/null || true
+        pkill -x google-chrome 2>/dev/null || true
+        pkill -x chromium 2>/dev/null || true
+        sleep 1
+        for profile in "$HOME/.config/google-chrome/Default" "$HOME/.config/chromium/Default"; do
+          rm -rf \
+            "$profile/Cache" \
+            "$profile/Code Cache" \
+            "$profile/GPUCache" \
+            "$profile/IndexedDB" \
+            "$profile/Local Storage" \
+            "$profile/Session Storage" \
+            "$profile/Sessions" \
+            "$profile/Service Worker" \
+            "$profile/WebStorage"
+          rm -f \
+            "$profile/Cookies" \
+            "$profile/Cookies-journal" \
+            "$profile/History" \
+            "$profile/History-journal" \
+            "$profile/Network/Cookies" \
+            "$profile/Network/Cookies-journal"
+        done
+        rm -rf "$HOME/.cache/google-chrome" "$HOME/.cache/chromium"
+        rm -f "$HOME/.config/google-chrome/Singleton"* "$HOME/.config/chromium/Singleton"*
+      `,
+    ],
+    { timeoutMs: 15_000 },
+  );
 };
 
 export const captureDesktopScreenshot = async (): Promise<Uint8Array> => {

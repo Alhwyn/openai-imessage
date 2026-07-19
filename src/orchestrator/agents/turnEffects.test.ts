@@ -51,4 +51,19 @@ describe("finalizeTurnOutbound", () => {
       { kind: "text", text: "tap that to finish connecting gmail" },
     ]);
   });
+
+  test("suppresses all text while preserving an app card", () => {
+    expect(
+      finalizeTurnOutbound(
+        [
+          { kind: "text", text: "starting the computer agent" },
+          { kind: "app", url: "https://viewer.example.com/computer/task" },
+        ],
+        "i started it",
+        true,
+      ),
+    ).toEqual([
+      { kind: "app", url: "https://viewer.example.com/computer/task" },
+    ]);
+  });
 });

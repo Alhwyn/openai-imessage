@@ -6,17 +6,23 @@ import type { OutboundItem } from "../contracts";
  */
 export type TurnEffectCollector = {
   push: (item: OutboundItem) => void;
+  suppressText: () => void;
   finalize: (modelText: string) => OutboundItem[];
 };
 
 export const createTurnEffectCollector = (): TurnEffectCollector => {
   const effects: OutboundItem[] = [];
+  let textSuppressed = false;
 
   return {
     push: (item) => {
       effects.push(item);
     },
-    finalize: (modelText) => finalizeTurnOutbound(effects, modelText),
+    suppressText: () => {
+      textSuppressed = true;
+    },
+    finalize: (modelText) =>
+      finalizeTurnOutbound(effects, modelText, textSuppressed),
   };
 };
 
@@ -28,9 +34,12 @@ export const createTurnEffectCollector = (): TurnEffectCollector => {
 export const finalizeTurnOutbound = (
   toolOutbound: OutboundItem[],
   modelText: string,
+  suppressText = false,
 ): OutboundItem[] => {
   const trimmedModelText = modelText.trim();
   const nonText = toolOutbound.filter((item) => item.kind !== "text");
+  if (suppressText) return nonText;
+
   const toolTexts = toolOutbound.filter(
     (item): item is Extract<OutboundItem, { kind: "text" }> => item.kind === "text",
   );

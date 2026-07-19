@@ -1,6 +1,7 @@
 import {
   assertDesktopReady,
   getComputerLiveViewUrl,
+  resetDesktopBrowserSession,
   startDesktopRecording,
   stopDesktopRecording,
 } from "./desktop";
@@ -38,6 +39,7 @@ export const runComputerAgent = async ({
   onProgress,
   onAction,
 }: RunComputerAgentInput): Promise<RunComputerAgentResult> => {
+  await resetDesktopBrowserSession();
   await assertDesktopReady();
   await startDesktopRecording(runId);
 

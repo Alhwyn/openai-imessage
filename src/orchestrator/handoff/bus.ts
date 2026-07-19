@@ -1,7 +1,6 @@
 import {
   ComputerApprovalRequiredError,
   formatComputerDeliveryText,
-  formatComputerFailureText,
   getComputerLiveViewUrl,
   getComputerViewerUrl,
   runComputerAgent,
@@ -273,13 +272,6 @@ export const assignComputerTask = async (
         recordingPath: result.recordingPath,
         step: result.steps,
       });
-      await deliverTaskOutput(
-        input.deliveryTarget,
-        input.spaceId,
-        taskId,
-        [{ kind: "text", text: deliveryText }],
-        `[computer ${taskId}] ${deliveryText}`,
-      );
     } catch (error) {
       const needsApproval = error instanceof ComputerApprovalRequiredError;
       const message = error instanceof Error ? error.message : String(error);
@@ -290,18 +282,6 @@ export const assignComputerTask = async (
       }).catch((persistenceError: unknown) => {
         console.error(`[computer-agent] Failed to persist failure for ${taskId}`, persistenceError);
       });
-      const userMessage = formatComputerFailureText({
-        goal,
-        error: message,
-        awaitingApproval: needsApproval,
-      });
-      await deliverTaskOutput(
-        input.deliveryTarget,
-        input.spaceId,
-        taskId,
-        [{ kind: "text", text: userMessage }],
-        `[computer ${taskId} failed] ${userMessage}`,
-      );
     }
   })().catch((error: unknown) => {
     console.error(`[computer-agent] Unhandled task failure for ${taskId}`, {

@@ -55,7 +55,7 @@ export const buildInteractionTools = ({
     }),
     assign_computer_task: tool({
       description:
-        "Assign work on the local Linux desktop with mouse and keyboard: open Google Chrome/websites, play or solve browser games (Wordle, Worldle/worlds, etc.), click through pages, use GUI apps, or verify on-screen UI. Use this instead of Composio for any browser/desktop work. Returns immediately while the computer worker continues in the background. Do not use for Gmail/Calendar APIs, ordinary research, or image generation.",
+        "Assign work on the local Linux desktop with mouse and keyboard: open Google Chrome/websites, play or solve browser games (Wordle, Worldle/worlds, etc.), click through pages, use GUI apps, or verify on-screen UI. Use this instead of Composio for any browser/desktop work. Returns immediately while the computer worker continues in the background and sends only a live-view app card, never chat text. Do not use for Gmail/Calendar APIs, ordinary research, or image generation.",
       inputSchema: z.object({
         goal: z.string().min(1).describe("Clear, bounded goal for the Linux computer worker"),
       }),
@@ -65,10 +65,7 @@ export const buildInteractionTools = ({
           spaceId,
           goal,
         });
-        effects.push({
-          kind: "text",
-          text: `starting the computer agent...`,
-        });
+        effects.suppressText();
         if (/^https?:\/\//.test(result.liveViewUrl)) {
           effects.push({ kind: "app", url: result.liveViewUrl });
         }
