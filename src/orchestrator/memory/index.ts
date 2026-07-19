@@ -1,16 +1,35 @@
-export {
+import {
   applyMemoryEdit as editMemory,
   getMemoriesForSpace as getCuratedMemories,
 } from "../db/memories";
-export { appendHistory, getHistory, recordAssistantText } from "./history";
-export type {
+
+import { appendHistory, getHistory, recordAssistantText } from "./history";
+import {
+  MAX_HISTORY_MESSAGES,
+  buildSystemPrompt,
+  renderMemoryBlock,
+} from "./utils";
+
+import type {
   CuratedMemories,
   MemoryEditInput,
   MemoryEditResult,
   MemoryKind,
 } from "./types";
+
 export {
-  MAX_HISTORY_MESSAGES,
+  appendHistory,
   buildSystemPrompt,
+  editMemory,
+  getCuratedMemories,
+  getHistory,
+  MAX_HISTORY_MESSAGES,
+  recordAssistantText,
   renderMemoryBlock,
-} from "./utils";
+};
+export type {
+  CuratedMemories,
+  MemoryEditInput,
+  MemoryEditResult,
+  MemoryKind,
+};

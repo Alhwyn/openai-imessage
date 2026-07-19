@@ -17,18 +17,6 @@ let client: Composio<VercelProvider> | undefined;
 let clientApiKey: string | undefined;
 const toolsByUser = new Map<string, Promise<ToolSet>>();
 
-const configuredToolkits = (): string[] => {
-  const value = process.env.COMPOSIO_TOOLKITS?.trim();
-  if (!value) return DEFAULT_TOOLKITS;
-
-  const toolkits = value
-    .split(",")
-    .map((toolkit) => toolkit.trim().toLowerCase())
-    .filter(Boolean);
-
-  return toolkits.length > 0 ? [...new Set(toolkits)] : DEFAULT_TOOLKITS;
-};
-
 const getConfig = (): ComposioConfig | null => {
   const apiKey = process.env.COMPOSIO_API_KEY?.trim();
   if (!apiKey) return null;
@@ -39,14 +27,14 @@ const getConfig = (): ComposioConfig | null => {
     return null;
   }
 
-  return { apiKey, toolkits: configuredToolkits(), userIdSalt };
+  return { apiKey, toolkits: DEFAULT_TOOLKITS, userIdSalt };
 };
 
 const getClient = (apiKey: string): Composio<VercelProvider> => {
   if (!client || clientApiKey !== apiKey) {
     client = new Composio({
       apiKey,
-      // Strip optional schema fields; GMI/Luna often 400s on loose tool JSON Schema.
+      // Strip optional schema fields; loose tool JSON Schema often 400s on providers.
       provider: new VercelProvider({ strict: true }),
     });
     clientApiKey = apiKey;

@@ -2,16 +2,18 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
 import {
+  assignComputerTask,
   assignImageTask,
   assignTask,
+  getComputerTaskStatus,
   getImageTaskStatus,
 } from "../handoff/index";
 import { isComposioAuthUrl } from "../integrations/index";
 import { editMemory } from "../memory/index";
 import { TAPBACK_KEYS } from "../tapbacks";
 import {
-  GMI_IMAGE_MAX_COUNT,
-  GMI_IMAGE_MIN_COUNT,
+  IMAGE_MAX_COUNT,
+  IMAGE_MIN_COUNT,
 } from "../utils/index";
 
 import type { TurnEffectCollector } from "./turnEffects";
@@ -51,14 +53,54 @@ export const buildInteractionTools = ({
         return { taskId, status };
       },
     }),
+    assign_computer_task: tool({
+      description:
+        "Assign work on the local Linux desktop with mouse and keyboard: open Google Chrome/websites, play or solve browser games (Wordle, Worldle/worlds, etc.), click through pages, use GUI apps, or verify on-screen UI. Use this instead of Composio for any browser/desktop work. Returns immediately while the computer worker continues in the background and sends only a live-view app card, never chat text. Do not use for Gmail/Calendar APIs, ordinary research, or image generation.",
+      inputSchema: z.object({
+        goal: z.string().min(1).describe("Clear, bounded goal for the Linux computer worker"),
+      }),
+      execute: async ({ goal }) => {
+        const result = await assignComputerTask({
+          deliveryTarget,
+          spaceId,
+          goal,
+        });
+        if (result.viewerPageUrl) {
+          effects.setTextPolicy("non_text_only");
+          effects.push({
+            kind: "app",
+            presentation: "computer",
+            url: result.viewerPageUrl,
+          });
+        }
+        return result;
+      },
+    }),
+    get_computer_task_status: tool({
+      description:
+        "Get durable status for a Linux computer-use task in this conversation, including its current phase, step, last action, live viewer URL, completion result, or error. Pass taskId when asking about a specific assignment; omit it for the latest task.",
+      inputSchema: z.object({
+        taskId: z
+          .string()
+          .optional()
+          .describe("Task ID returned by assign_computer_task"),
+      }),
+      execute: async ({ taskId }) => {
+        return (
+          (await getComputerTaskStatus(spaceId, taskId)) ?? {
+            state: "not_found" as const,
+          }
+        );
+      },
+    }),
     assign_image_task: tool({
       description:
         "Generate images with the image sub-agent. Pass one prompt per image. Immediately queues a natural acknowledgment with an ETA; when ready the images are delivered as an album directly. Do not send another reply on that turn.",
       inputSchema: z.object({
         prompts: z
           .array(z.string().min(1))
-          .min(GMI_IMAGE_MIN_COUNT)
-          .max(GMI_IMAGE_MAX_COUNT)
+          .min(IMAGE_MIN_COUNT)
+          .max(IMAGE_MAX_COUNT)
           .describe(
             'One prompt per image. Default shape: ["subject"]. For three cat pics use ["a cat", "a cat", "a cat"]. Vary entries when they want different images.',
           ),
@@ -75,6 +117,8 @@ export const buildInteractionTools = ({
             spaceId,
             prompts,
           });
+        // Tool ack is the only user-facing text; drop model commentary/planning.
+        effects.setTextPolicy("tools_only");
         effects.push({ kind: "text", text: acknowledgment });
         return { taskId, status, estimatedSeconds };
       },
@@ -109,13 +153,12 @@ export const buildInteractionTools = ({
       }),
       execute: ({ url }) => {
         const trimmed = url.trim();
-        if (!isComposioAuthUrl(trimmed)) {
-          return {
-            ok: false,
-            error:
+        if (!isComposioAuthUrl(trimmed)) return {
+          ok: false,
+          error:
               "url must be an https Composio authorization link (connect.composio.dev)",
-          };
-        }
+        };
+
         effects.push({ kind: "app", url: trimmed });
         return { ok: true };
       },
@@ -145,25 +188,25 @@ export const buildInteractionTools = ({
         const updated =
           input.action === "add"
             ? await editMemory({
-                spaceId,
-                kind: input.kind,
-                action: "add",
-                text: input.text,
-              })
+              spaceId,
+              kind: input.kind,
+              action: "add",
+              text: input.text,
+            })
             : input.action === "replace"
               ? await editMemory({
-                  spaceId,
-                  kind: input.kind,
-                  action: "replace",
-                  text: input.text,
-                  oldText: input.old_text,
-                })
+                spaceId,
+                kind: input.kind,
+                action: "replace",
+                text: input.text,
+                oldText: input.old_text,
+              })
               : await editMemory({
-                  spaceId,
-                  kind: input.kind,
-                  action: "remove",
-                  oldText: input.old_text,
-                });
+                spaceId,
+                kind: input.kind,
+                action: "remove",
+                oldText: input.old_text,
+              });
         return {
           ok: true,
           kind: updated.kind,

@@ -1,0 +1,11 @@
+tunnel: computer-viewer
+credentials-file: ~/.cloudflared/TUNNEL_ID.json
+
+ingress:
+  - hostname: viewer.alhwyn.com
+    service: http://127.0.0.1:6902
+  - hostname: desktop.alhwyn.com
+    service: https://127.0.0.1:6901
+    originRequest:
+      noTLSVerify: true
+  - service: http_status:404

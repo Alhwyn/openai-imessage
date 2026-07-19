@@ -6,6 +6,9 @@
   "scripts": {
     "build": "bun build index.ts --outdir dist --target bun",
     "check": "bun run lint && bun run typecheck && bun run test && bun run build",
+    "computer:down": "docker compose --env-file .env -f runtime/computer/compose.yaml down",
+    "computer:logs": "docker compose --env-file .env -f runtime/computer/compose.yaml logs -f desktop",
+    "computer:up": "docker compose --env-file .env -f runtime/computer/compose.yaml up -d --build",
     "start": "bun --watch index.ts",
     "convex:dev": "convex dev",
     "lint": "eslint .",
@@ -19,6 +22,7 @@
   "devDependencies": {
     "@convex-dev/eslint-plugin": "^2.0.0",
     "@types/bun": "latest",
+    "@types/node": "^26.1.1",
     "eslint": "^9",
     "eslint-plugin-import": "^2.32.0",
     "typescript-eslint": "^8.64.0"

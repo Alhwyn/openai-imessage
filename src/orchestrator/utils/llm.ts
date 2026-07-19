@@ -1,14 +1,15 @@
 import { createOpenAI } from "@ai-sdk/openai";
 
 import {
-  GMI_API_KEY,
-  GMI_CLOUD_BASE_URL,
-  GMI_MODEL_ID,
+  OPENAI_API_KEY,
+  OPENAI_BASE_URL,
+  OPENAI_TEXT_MODEL_ID,
 } from "./constants";
+import { getOpenAiApiKey } from "./openaiEnv";
 
 const RESPONSE_BODY_MAX_CHARS = 2000;
 
-export type GmiErrorDetails = {
+export type OpenAiErrorDetails = {
   guidance?: string;
   message: string;
   name: string;
@@ -16,24 +17,19 @@ export type GmiErrorDetails = {
   statusCode?: number;
 };
 
-const gmi = createOpenAI({
-  baseURL: GMI_CLOUD_BASE_URL,
-  apiKey: GMI_API_KEY,
-  name: "gmi",
+const openai = createOpenAI({
+  apiKey: OPENAI_API_KEY,
+  baseURL: OPENAI_BASE_URL,
 });
 
-export const GMI_MODEL = gmi.responses(GMI_MODEL_ID);
+export const OPENAI_TEXT_MODEL = openai.responses(OPENAI_TEXT_MODEL_ID);
 
 const getStatusCode = (error: unknown): number | undefined => {
   if (!error || typeof error !== "object") return undefined;
 
-  if ("statusCode" in error && typeof error.statusCode === "number") {
-    return error.statusCode;
-  }
+  if ("statusCode" in error && typeof error.statusCode === "number") return error.statusCode;
 
-  if ("lastError" in error) {
-    return getStatusCode(error.lastError);
-  }
+  if ("lastError" in error) return getStatusCode(error.lastError);
 
   return undefined;
 };
@@ -42,13 +38,9 @@ const getNestedField = (error: unknown, field: string): unknown => {
   if (!error || typeof error !== "object") return undefined;
 
   const record = error as Record<string, unknown>;
-  if (field in record) {
-    return record[field];
-  }
+  if (field in record) return record[field];
 
-  if ("lastError" in record) {
-    return getNestedField(record.lastError, field);
-  }
+  if ("lastError" in record) return getNestedField(record.lastError, field);
 
   return undefined;
 };
@@ -60,9 +52,7 @@ const truncate = (value: string): string => {
 
 const getResponseBody = (error: unknown): string | undefined => {
   const responseBody = getNestedField(error, "responseBody");
-  if (typeof responseBody === "string" && responseBody.length > 0) {
-    return truncate(responseBody);
-  }
+  if (typeof responseBody === "string" && responseBody.length > 0) return truncate(responseBody);
 
   const data = getNestedField(error, "data");
   if (data === undefined || data === null) return undefined;
@@ -78,33 +68,28 @@ const getGuidance = (
   statusCode: number | undefined,
   name: string,
 ): string | undefined => {
-  if (statusCode === 401) {
-    return "GMI rejected the credential. Verify GMI_CLOUD_API_KEY is an active GMI inference API key.";
-  }
-  if (statusCode === 400) {
-    return "GMI rejected the request (Luna + tools require /v1/responses; inspect responseBody for schema/tool-call issues).";
-  }
-  if (name === "AI_LoadAPIKeyError") {
-    return "GMI_CLOUD_API_KEY was missing or unloaded when the provider was created. Set it before startup and restart the Bun process.";
-  }
+  if (statusCode === 401) return "OpenAI rejected the credential. Verify OPENAI_API_KEY is an active API key.";
+
+  if (statusCode === 400) return "OpenAI rejected the request (inspect responseBody for schema/tool-call issues).";
+
+  if (name === "AI_LoadAPIKeyError") return "OPENAI_API_KEY was missing or unloaded when the provider was created. Set it before startup and restart the Bun process.";
+
   return undefined;
 };
 
-export const getGmiErrorDetails = (error: unknown): GmiErrorDetails => {
+export const getOpenAiErrorDetails = (error: unknown): OpenAiErrorDetails => {
   const statusCode = getStatusCode(error);
   const name = error instanceof Error ? error.name : "UnknownError";
   const guidance = getGuidance(statusCode, name);
   const responseBody = getResponseBody(error);
 
-  if (error instanceof Error) {
-    return {
-      name,
-      message: error.message,
-      statusCode,
-      ...(responseBody ? { responseBody } : {}),
-      ...(guidance ? { guidance } : {}),
-    };
-  }
+  if (error instanceof Error) return {
+    name,
+    message: error.message,
+    statusCode,
+    ...(responseBody ? { responseBody } : {}),
+    ...(guidance ? { guidance } : {}),
+  };
 
   return {
     name,
@@ -115,6 +100,6 @@ export const getGmiErrorDetails = (error: unknown): GmiErrorDetails => {
   };
 };
 
-export const assertGmiApiKey = (): void => {
-  if (!GMI_API_KEY) throw new Error("Missing GMI_CLOUD_API_KEY");
+export const assertOpenAiApiKey = (): void => {
+  getOpenAiApiKey("starting the orchestrator");
 };

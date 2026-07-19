@@ -1,10 +1,27 @@
+import { COMPUTER_WORKER_TIMEOUT_MS } from "../computer/constants";
+import {
+  formatComputerDeliveryText,
+  formatComputerFailureText,
+  resolveComputerPublicUrls,
+  runComputerAgent,
+} from "../computer/index";
+import {
+  appendComputerRunEvent,
+  completeComputerRun,
+  createComputerRun,
+  failComputerRun,
+  getComputerRun,
+  getLatestComputerRunForSpace,
+  markComputerRunRunning,
+  updateComputerRunProgress,
+} from "../db/index";
 import {
   cleanupImageAlbum,
-  generateGmiImages,
-} from "../integrations/gmiImages";
+  generateOpenAiImages,
+} from "../integrations/openaiImages";
 import { recordAssistantText } from "../memory/index";
 import { summarizeOutbound } from "../outbound";
-import { deliverOutbound, getGmiErrorDetails } from "../utils/index";
+import { deliverOutbound, getOpenAiErrorDetails } from "../utils/index";
 import { runExecutionAgent } from "../workers/execution";
 
 import {
@@ -16,6 +33,8 @@ import {
 } from "./imageTaskTracker";
 
 import type {
+  AssignComputerTaskInput,
+  AssignComputerTaskResult,
   AssignImageTaskInput,
   AssignImageTaskResult,
   AssignTaskInput,
@@ -28,6 +47,7 @@ import type { OutboundItem } from "../contracts";
 export const IMAGE_TASK_ACK_TEXT = "got u, making those now, gimme a sec";
 
 const inFlight = new Set<string>();
+let activeComputerTaskId: string | undefined;
 
 let taskCounter = 0;
 
@@ -46,8 +66,11 @@ type RunHandoffTaskInput = {
   execute: () => Promise<HandoffWorkResult>;
   onFailure?: (error: unknown, kind: HandoffFailureKind) => HandoffWorkResult;
   afterSuccess?: () => void;
-  afterFailure?: (error: unknown, kind: HandoffFailureKind) => void;
-  cleanup?: () => Promise<void>;
+  afterFailure?: (
+    error: unknown,
+    kind: HandoffFailureKind,
+  ) => void | Promise<void>;
+  cleanup?: () => void | Promise<void>;
 };
 
 const defaultApology = (message: string): HandoffWorkResult => {
@@ -117,7 +140,7 @@ const runHandoffTask = (input: RunHandoffTaskInput): void => {
         `[handoff] ${input.label} failed (${kind}) for ${input.taskId}`,
         error,
       );
-      input.afterFailure?.(error, kind);
+      await input.afterFailure?.(error, kind);
       const failure = input.onFailure?.(error, kind) ?? defaultApology(message);
       const deliveryTaskId =
         kind === "delivery" ? `${input.taskId}:delivery` : input.taskId;
@@ -133,7 +156,7 @@ const runHandoffTask = (input: RunHandoffTaskInput): void => {
     }
   })().catch((error: unknown) => {
     console.error(`[handoff] Unhandled failure for ${input.taskId}`, {
-      ...getGmiErrorDetails(error),
+      ...getOpenAiErrorDetails(error),
     });
   });
 };
@@ -172,15 +195,161 @@ export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
 };
 
 /**
+ * Assigns a task to the local Linux computer-use worker.
+ * Card URL is the custom viewer page only (never raw Kasm).
+ */
+export const assignComputerTask = async (
+  input: AssignComputerTaskInput,
+): Promise<AssignComputerTaskResult> => {
+  const goal = input.goal.trim();
+  if (!goal) throw new Error("Computer task goal is required");
+
+  taskCounter += 1;
+  const taskId = `computer_${Date.now()}_${taskCounter}`;
+  if (activeComputerTaskId) throw new Error(
+    `The shared desktop is already running task ${activeComputerTaskId}. Wait for it to finish before starting another task.`,
+  );
+
+  activeComputerTaskId = taskId;
+
+  const viewerToken = crypto.randomUUID();
+  const { kasmStreamUrl, viewerPageUrl } = resolveComputerPublicUrls(
+    taskId,
+    viewerToken,
+  );
+  if (!kasmStreamUrl) console.warn(
+    "[handoff] No public COMPUTER_LIVE_VIEW_URL; computer task has no desktop stream.",
+  );
+  else if (!viewerPageUrl) console.warn(
+    "[handoff] No public viewer host; skipping iMessage card so iPhone does not show KasmVNC. Tunnel viewer.* → port 6902.",
+  );
+
+  try {
+    await createComputerRun({
+      taskId,
+      spaceId: input.spaceId,
+      goal,
+      // Convex fields: liveViewUrl = card, streamUrl = Kasm iframe
+      liveViewUrl: viewerPageUrl,
+      streamUrl: kasmStreamUrl,
+      viewerToken: viewerPageUrl ? viewerToken : undefined,
+    });
+  } catch (error) {
+    activeComputerTaskId = undefined;
+    throw error;
+  }
+
+  console.log(
+    `[handoff] Assigned ${taskId} for space ${input.spaceId}:`,
+    goal.slice(0, 120),
+  );
+
+  const abortController = new AbortController();
+  let computerWork: ReturnType<typeof runComputerAgent> | undefined;
+
+  runHandoffTask({
+    spaceId: input.spaceId,
+    deliveryTarget: input.deliveryTarget,
+    taskId,
+    label: "Computer agent",
+    execute: async () => {
+      await markComputerRunRunning(taskId);
+      let lastAction: string | undefined;
+      computerWork = runComputerAgent({
+        goal,
+        runId: taskId,
+        spaceId: input.spaceId,
+        signal: abortController.signal,
+        onProgress: ({ step, lastAction: action }) => {
+          lastAction = action;
+          return updateComputerRunProgress(taskId, step, action);
+        },
+        onAction: ({ action, ...event }) => {
+          return appendComputerRunEvent(taskId, {
+            ...event,
+            actionType: action.type,
+          });
+        },
+      });
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const result = await Promise.race([
+        computerWork,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => {
+            abortController.abort();
+            reject(
+              new Error(
+                `Computer worker timed out after ${Math.round(COMPUTER_WORKER_TIMEOUT_MS / 1000)}s with no finish`,
+              ),
+            );
+          }, COMPUTER_WORKER_TIMEOUT_MS);
+        }),
+      ]).finally(() => {
+        if (timeout) clearTimeout(timeout);
+      });
+      const deliveryText = formatComputerDeliveryText({
+        goal,
+        summary: result.summary,
+        steps: result.steps,
+        lastAction,
+      });
+      await completeComputerRun({
+        taskId,
+        resultSummary: deliveryText,
+        recordingPath: result.recordingPath,
+        step: result.steps,
+      });
+      return {
+        outbound: [{ kind: "text", text: deliveryText }],
+        historyText: `[computer ${taskId}] ${deliveryText}`,
+      };
+    },
+    onFailure: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const userMessage = formatComputerFailureText({ goal, error: message });
+      return {
+        outbound: [{ kind: "text", text: userMessage }],
+        historyText: `[computer ${taskId} failed] ${userMessage}`,
+      };
+    },
+    afterFailure: async (error) => {
+      abortController.abort();
+      await computerWork?.catch(() => undefined);
+      const message = error instanceof Error ? error.message : String(error);
+      await failComputerRun({ taskId, error: message }).catch(
+        (persistenceError: unknown) => {
+          console.error(
+            `[computer-agent] Failed to persist failure for ${taskId}`,
+            persistenceError,
+          );
+        },
+      );
+    },
+    cleanup: () => {
+      if (activeComputerTaskId === taskId) activeComputerTaskId = undefined;
+    },
+  });
+
+  return { taskId, status: "started", viewerPageUrl };
+};
+
+export const getComputerTaskStatus = (
+  spaceId: string,
+  taskId?: string,
+) => {
+  return taskId
+    ? getComputerRun(spaceId, taskId)
+    : getLatestComputerRunForSpace(spaceId);
+};
+
+/**
  * Assigns an image-generation task to a dedicated sub-agent.
  */
 export const assignImageTask = (
   input: AssignImageTaskInput,
 ): AssignImageTaskResult => {
   const prompts = input.prompts.map((prompt) => prompt.trim()).filter(Boolean);
-  if (prompts.length === 0) {
-    throw new Error("At least one image prompt is required");
-  }
+  if (prompts.length === 0) throw new Error("At least one image prompt is required");
 
   taskCounter += 1;
   const taskId = `image_${Date.now()}_${taskCounter}`;
@@ -210,7 +379,7 @@ export const assignImageTask = (
         count: prompts.length,
         promptPreview: promptSummary.slice(0, 120),
       });
-      const album = await generateGmiImages(prompts, {
+      const album = await generateOpenAiImages(prompts, {
         onProgress: createImageTaskProgressHook(task, (progress) => {
           console.log(`[image-agent] Progress ${taskId}`, {
             phase: progress.phase,

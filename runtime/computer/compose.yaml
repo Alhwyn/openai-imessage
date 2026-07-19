@@ -1,0 +1,43 @@
+services:
+  desktop:
+    build:
+      context: .
+    init: true
+    restart: unless-stopped
+    shm_size: "1gb"
+    stop_grace_period: 20s
+    ports:
+      - "127.0.0.1:6901:6901"
+    environment:
+      DISPLAY: ":1"
+      # Still required by the Kasm image to create ~/.kasmpasswd; login UI is disabled below.
+      VNC_PW: "${COMPUTER_DESKTOP_PASSWORD:?set COMPUTER_DESKTOP_PASSWORD in your local environment}"
+      VNC_RESOLUTION: "1280x800"
+      VNC_COL_DEPTH: "24"
+      MAX_FRAME_RATE: "30"
+      START_PULSEAUDIO: "1"
+      KASM_SVC_AUDIO: "0"
+      # Local-only bind (127.0.0.1). Skip the kasm_user password wall so the live
+      # viewer/app embed can open the desktop immediately. Lock desktop size so
+      # VNC clients cannot resize away from the model's coordinate space.
+      VNCOPTIONS: "-PreferBandwidth -DynamicQualityMin=4 -DynamicQualityMax=7 -DLP_ClipDelay=0 -disableBasicAuth -AcceptSetDesktopSize 0 -AcceptPointerEvents 0 -AcceptKeyEvents 0"
+    volumes:
+      - ./workspace:/workspace
+      - ./artifacts:/artifacts
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 1024
+    healthcheck:
+      # Keep this lightweight. Screenshot/maim in the healthcheck can wedge X11
+      # and block the computer worker (docker exec hangs forever).
+      test:
+        - CMD-SHELL
+        - >-
+          timeout 3 xdpyinfo -display :1 >/dev/null 2>&1
+          && pgrep -x xfce4-session >/dev/null
+      start_period: 60s
+      interval: 20s
+      timeout: 5s
+      retries: 3

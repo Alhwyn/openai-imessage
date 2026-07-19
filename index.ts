@@ -2,12 +2,18 @@ import { Spectrum, type Message, type Space, type SpectrumInstance } from "@spec
 import { imessage } from "@spectrum-ts/imessage";
 
 import {
+  COMPUTER_WATCHDOG_INTERVAL_MS,
+  COMPUTER_WORKER_TIMEOUT_MS,
+} from "./src/orchestrator/computer/constants";
+import { startComputerViewer } from "./src/orchestrator/computer/viewer";
+import {
   assertConvexEnv,
-  assertGmiApiKey,
+  assertOpenAiApiKey,
   createRecentIdTracker,
   extractInboundImages,
   extractInboundText,
   flushPendingOrchestratorTurns,
+  reconcileStaleComputerRuns,
   scheduleOrchestratorTurn,
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
@@ -19,22 +25,10 @@ const seenInboundMessages = createRecentIdTracker({
   maxSize: SEEN_MESSAGE_MAX,
 });
 
-const readEnv = (...keys: string[]) => {
-  for (const key of keys) {
-    const value = process.env[key]?.trim();
-    if (value) return value;
-  }
-  return undefined;
-};
-
 const getSpectrumEnv = () => {
-  const projectId = readEnv("SPECTRUM_PROJECT_ID", "PROJECT_ID");
-  const projectSecret = readEnv("SPECTRUM_PROJECT_SECRET", "PROJECT_SECRET");
-  const webhookSecret = readEnv(
-    "SPECTRUM_SIGNING_WEBHOOK",
-    "SPECTRUM_WEBHOOK_SECRET",
-    "SPECTRUM_SIGNING_SECRET",
-  );
+  const projectId = process.env.SPECTRUM_PROJECT_ID?.trim();
+  const projectSecret = process.env.SPECTRUM_PROJECT_SECRET?.trim();
+  const webhookSecret = process.env.SPECTRUM_SIGNING_WEBHOOK?.trim();
 
   const missing: string[] = [];
   if (!projectId) missing.push("SPECTRUM_PROJECT_ID");
@@ -45,21 +39,16 @@ const getSpectrumEnv = () => {
 
 const senderIdFrom = (message: Message): string | null => {
   const sender = message.sender;
-  if (sender && typeof sender === "object" && "id" in sender && typeof sender.id === "string") {
-    return sender.id;
-  }
+  if (sender && typeof sender === "object" && "id" in sender && typeof sender.id === "string") return sender.id;
+
   return null;
 };
 
 const handleInbound = async (space: Space, message: Message): Promise<void> => {
-  if (message.direction === "outbound") {
-    return;
-  }
+  if (message.direction === "outbound") return;
 
   const sender = message.sender;
-  if (sender && typeof sender === "object" && "kind" in sender && sender.kind === "agent") {
-    return;
-  }
+  if (sender && typeof sender === "object" && "kind" in sender && sender.kind === "agent") return;
 
   if (!seenInboundMessages.claim(message.id)) {
     console.log("[app] Skipping duplicate inbound message", {
@@ -97,8 +86,28 @@ const handleInbound = async (space: Space, message: Message): Promise<void> => {
 };
 
 const main = async () => {
-  assertGmiApiKey();
+  assertOpenAiApiKey();
   assertConvexEnv();
+  const reconciled = await reconcileStaleComputerRuns({
+    staleBefore: Date.now(),
+    error: "Computer worker stopped when the orchestrator restarted",
+  });
+  if (reconciled > 0) console.warn(`[computer-agent] Reconciled ${reconciled} orphaned run(s)`);
+
+  const watchdog = setInterval(() => {
+    void reconcileStaleComputerRuns({
+      staleBefore:
+        Date.now() -
+        COMPUTER_WORKER_TIMEOUT_MS -
+        COMPUTER_WATCHDOG_INTERVAL_MS,
+      error: "Computer worker stopped reporting progress",
+    }).catch((error: unknown) => {
+      console.error("[computer-agent] Watchdog reconciliation failed", error);
+    });
+  }, COMPUTER_WATCHDOG_INTERVAL_MS);
+  watchdog.unref();
+
+  const computerViewer = startComputerViewer();
 
   const { projectId, projectSecret, webhookSecret, missing } = getSpectrumEnv();
   if (missing.length > 0) throw new Error(`Missing env: ${missing.join(", ")}`);
@@ -115,11 +124,13 @@ const main = async () => {
   const stopApp = async (reason: string) => {
     if (stopping) return;
     stopping = true;
+    clearInterval(watchdog);
     console.log(`[app] Stopping Spectrum (${reason})`);
     try {
       await Promise.allSettled(inboundJobs);
       await flushPendingOrchestratorTurns();
       await app.stop();
+      await computerViewer.stop(true);
     } catch (error) {
       console.error("[app] Spectrum stop failed", error);
     }
@@ -142,7 +153,7 @@ const main = async () => {
   });
 
   console.log(
-    `[app] Orchestrator listening (Spectrum + GMI). Debounced inbound → assign_task → notify → reply/react`,
+    `[app] Orchestrator listening (Spectrum + OpenAI). Debounced inbound → assign_task → notify → reply/react`,
   );
 
   try {

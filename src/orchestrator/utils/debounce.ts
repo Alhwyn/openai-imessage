@@ -24,9 +24,7 @@ export const createKeyedDebounce = <T>(
   };
 
   const cancelAll = () => {
-    for (const timer of pendingTimers.values()) {
-      clearTimeout(timer);
-    }
+    for (const timer of pendingTimers.values()) clearTimeout(timer);
 
     pendingTimers.clear();
     latestValues.clear();
@@ -36,11 +34,9 @@ export const createKeyedDebounce = <T>(
     try {
       await Promise.resolve(options.onFlush(key, value));
     } catch (error) {
-      if (options.onError) {
-        await options.onError(key, value, error);
-      } else {
-        console.error(`[debounce] Flush failed for key ${key}`, error);
-      }
+      if (options.onError) await options.onError(key, value, error);
+      else console.error(`[debounce] Flush failed for key ${key}`, error);
+
     }
   };
 
@@ -50,9 +46,8 @@ export const createKeyedDebounce = <T>(
     flushQueues.set(key, current);
 
     void current.then(() => {
-      if (flushQueues.get(key) === current) {
-        flushQueues.delete(key);
-      }
+      if (flushQueues.get(key) === current) flushQueues.delete(key);
+
     });
 
     return current;

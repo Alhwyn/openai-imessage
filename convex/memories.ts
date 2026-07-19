@@ -87,16 +87,13 @@ export const applyEdit = mutation({
     const nextBody = applyMemoryEditBody(existing?.body ?? "", args.edit, limit);
     const updatedAt = Date.now();
 
-    if (existing) {
-      await ctx.db.patch("memories", existing._id, { body: nextBody, updatedAt });
-    } else {
-      await ctx.db.insert("memories", {
-        spaceId: args.spaceId,
-        kind: args.kind,
-        body: nextBody,
-        updatedAt,
-      });
-    }
+    if (existing) await ctx.db.patch("memories", existing._id, { body: nextBody, updatedAt });
+    else await ctx.db.insert("memories", {
+      spaceId: args.spaceId,
+      kind: args.kind,
+      body: nextBody,
+      updatedAt,
+    });
 
     return { kind: args.kind, body: nextBody, updatedAt };
   },

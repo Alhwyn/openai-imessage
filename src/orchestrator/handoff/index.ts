@@ -1,9 +1,14 @@
-export {
+import {
+  assignComputerTask,
   assignImageTask,
   assignTask,
+  getComputerTaskStatus,
 } from "./bus";
-export { getImageTaskStatus } from "./imageTaskTracker";
-export type {
+import { getImageTaskStatus } from "./imageTaskTracker";
+
+import type {
+  AssignComputerTaskInput,
+  AssignComputerTaskResult,
   AssignImageTaskInput,
   AssignImageTaskResult,
   AssignTaskInput,
@@ -13,3 +18,23 @@ export type {
   ImageTaskState,
   ImageTaskStatus,
 } from "./types";
+
+export {
+  assignComputerTask,
+  assignImageTask,
+  assignTask,
+  getComputerTaskStatus,
+  getImageTaskStatus,
+};
+export type {
+  AssignComputerTaskInput,
+  AssignComputerTaskResult,
+  AssignImageTaskInput,
+  AssignImageTaskResult,
+  AssignTaskInput,
+  AssignTaskResult,
+  DeliveryTarget,
+  ImageTaskRecord,
+  ImageTaskState,
+  ImageTaskStatus,
+};

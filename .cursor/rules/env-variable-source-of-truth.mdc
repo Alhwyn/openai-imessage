@@ -1,0 +1,13 @@
+---
+description: Use only environment variables declared in .env.example
+alwaysApply: true
+---
+
+# Environment variable source of truth
+
+- `.env.example` is the only authoritative list of environment variable names.
+- Before referencing an environment variable, verify its exact key exists in `.env.example`.
+- Never invent, infer, rename, alias, or silently add an environment variable.
+- If a required key is missing, stop and ask the user how to proceed.
+- Never modify `.env.example`; request a separate explicit instruction to change it.
+- Never read or modify `.env` or secret-bearing environment files.

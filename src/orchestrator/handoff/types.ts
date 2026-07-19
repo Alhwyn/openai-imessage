@@ -22,6 +22,12 @@ export type AssignImageTaskInput = {
   prompts: string[];
 };
 
+export type AssignComputerTaskInput = {
+  deliveryTarget: DeliveryTarget;
+  spaceId: string;
+  goal: string;
+};
+
 export type AssignTaskResult = {
   taskId: string;
   status: "started";
@@ -31,6 +37,11 @@ export type AssignImageTaskResult = AssignTaskResult & {
   estimatedSeconds: number;
   /** Text acknowledgment the interaction turn should deliver immediately. */
   acknowledgment: string;
+};
+
+export type AssignComputerTaskResult = AssignTaskResult & {
+  /** Custom viewer page for the iMessage card (never raw Kasm). */
+  viewerPageUrl?: string;
 };
 
 export type ImageTaskState =

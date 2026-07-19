@@ -3,10 +3,13 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 config="$root/cloudflared/config.yml"
-tunnel="${TUNNEL_NAME:-webhook-automator}"
+computer_config="$root/cloudflared/computer.yml"
+tunnel="webhook-automator"
+computer_tunnel="computer-viewer"
+viewer_host="viewer.alhwyn.com"
 
-if [[ ! -f "$config" ]]; then
-  echo "Missing $config" >&2
+if [[ ! -f "$config" || ! -f "$computer_config" ]]; then
+  echo "Missing a Cloudflare tunnel config." >&2
   echo "" >&2
   echo "Generate it from your existing Cloudflare tunnel:" >&2
   echo "  bun run tunnel:setup" >&2
@@ -16,8 +19,36 @@ if [[ ! -f "$config" ]]; then
   exit 1
 fi
 
-exec cloudflared tunnel \
+cloudflared tunnel --config "$config" ingress validate
+cloudflared tunnel --config "$computer_config" ingress validate
+echo "Phone viewer: https://$viewer_host/computer/<task-id>?token=<run-token>"
+
+cloudflared tunnel \
   --config "$config" \
   run \
   --dns-resolver-addrs 1.1.1.1:53 \
-  "$tunnel"
+  "$tunnel" &
+webhook_pid=$!
+
+cloudflared tunnel \
+  --config "$computer_config" \
+  run \
+  --dns-resolver-addrs 1.1.1.1:53 \
+  "$computer_tunnel" &
+computer_pid=$!
+
+shutdown() {
+  trap - EXIT
+  kill -TERM "$webhook_pid" "$computer_pid" 2>/dev/null || true
+  wait "$webhook_pid" "$computer_pid" 2>/dev/null || true
+}
+
+trap 'exit 0' INT TERM
+trap shutdown EXIT
+
+while kill -0 "$webhook_pid" 2>/dev/null && kill -0 "$computer_pid" 2>/dev/null; do
+  sleep 1
+done
+
+echo "A Cloudflare tunnel process stopped unexpectedly." >&2
+exit 1

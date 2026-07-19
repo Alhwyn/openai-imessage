@@ -8,9 +8,10 @@ Conversation history and Hermes-style curated memory (`USER.md` / `MEMORY.md`) p
 
 - **Bun** + Spectrum iMessage (`@spectrum-ts/core`, `@spectrum-ts/imessage`)
 - **Vercel AI SDK** (`ai`, `@ai-sdk/openai`)
-- **GMI Cloud** OpenAI-compatible inference (`GMI_CLOUD_API_KEY`)
+- **OpenAI** — text agents, image generation, and computer use (`OPENAI_API_KEY`)
 - **Convex** — durable messages + curated memory (`CONVEX_URL`)
 - **Composio** — per-person OAuth connections for Gmail, Google Calendar, and other approved apps
+- **Computer use** — a local KasmVNC/XFCE Linux desktop controlled through OpenAI's screenshot-and-action loop
 
 ## Setup
 
@@ -42,31 +43,8 @@ Keep `bun run convex:dev` running while developing so functions stay synced.
 
 ### App env
 
-```bash
-GMI_CLOUD_API_KEY=
-# optional override; default moonshotai/kimi-k2.7-code-highspeed
-# GMI_MODEL=
-
-SPECTRUM_PROJECT_ID=
-SPECTRUM_PROJECT_SECRET=
-SPECTRUM_SIGNING_WEBHOOK=
-
-CONVEX_URL=
-ORCHESTRATOR_BRIDGE_SECRET=
-
-# optional
-# ORCHESTRATOR_DEBOUNCE_MS=1500
-# AGENT_PORT=4001
-# BASE_URL=https://agent.alhwyn.com
-
-# optional Composio connected-app tools. Leave COMPOSIO_API_KEY unset to run
-# without external-app access.
-# COMPOSIO_API_KEY=
-# Use a long random secret; it hashes iMessage sender IDs before they reach Composio.
-# COMPOSIO_USER_ID_SALT=
-# Comma-separated approved toolkit slugs. Defaults to gmail,googlecalendar.
-# COMPOSIO_TOOLKITS=gmail,googlecalendar
-```
+Use only the variable names declared in `.env.example`. Convex manages its
+required `CONVEX_URL` in `.env.local` when you run `bun run convex:dev`.
 
 ## Run
 
@@ -78,13 +56,58 @@ bun run convex:dev
 bun run start
 ```
 
+### Local Linux computer
+
+Computer-use tasks operate a complete XFCE Linux desktop through its X11 mouse
+and keyboard. The model does not use DOM selectors or Playwright. Docker is a
+local development boundary; production tasks should receive separate VMs.
+
+Add `OPENAI_API_KEY` and `COMPUTER_DESKTOP_PASSWORD` to your local `.env`
+yourself, then start the desktop:
+
+```bash
+bun run computer:up
+```
+
+Open `https://127.0.0.1:6901` and accept the local certificate. Basic auth is
+disabled on the loopback-only Kasm endpoint; `COMPUTER_DESKTOP_PASSWORD` is
+still required by the base image during startup. The fixed desktop resolution
+is 1280×800 so model coordinates remain stable.
+
+Then run Convex and the orchestrator normally. When the interaction agent calls
+`assign_computer_task`, it:
+
+1. Creates a durable run in Convex.
+2. Records the desktop with FFmpeg.
+3. Sends screenshots to OpenAI only after model action batches.
+4. Executes returned mouse and keyboard actions through `xdotool`.
+5. Saves the final MP4 under `runtime/computer/artifacts/<taskId>/demo.mp4`.
+6. Serves a custom viewer on `http://127.0.0.1:6902` with a live action
+   timeline, coordinate highlights, and completed-session replay.
+
+Useful commands:
+
+```bash
+bun run computer:logs
+bun run computer:down
+```
+
+Set a public desktop tunnel for live-view cards:
+
+```bash
+COMPUTER_LIVE_VIEW_URL=https://desktop.alhwyn.com
+```
+
+That single URL is the source of truth. A `desktop.*` URL is used for the Kasm
+stream and derives the matching token-gated `viewer.*` page.
+
 ### Dev tunnel (optional, like ngrok)
 
 Expose localhost to a stable HTTPS hostname for webhook testing (same Cloudflare tunnel as bouncer):
 
 ```bash
 # Terminal 1 — app on :4001
-AGENT_PORT=4001 bun run start
+bun run start
 
 # Terminal 2 — one-off random URL
 bun run tunnel:quick
@@ -94,17 +117,21 @@ bun run tunnel:setup
 bun run tunnel
 ```
 
-Defaults: tunnel `webhook-automator` → `agent.alhwyn.com` → `127.0.0.1:4001`.
+`bun run tunnel` starts the webhook tunnel plus the computer tunnel:
 
-Set `BASE_URL=https://agent.alhwyn.com` in `.env` when testing webhooks.
+- `viewer.alhwyn.com` → token-gated viewer on `127.0.0.1:6902`
+- `desktop.alhwyn.com` → Kasm stream on `127.0.0.1:6901`
+- `agent.alhwyn.com` → webhook server on `127.0.0.1:4001`
+
+Set `COMPUTER_LIVE_VIEW_URL=https://desktop.alhwyn.com` for computer cards.
 
 ## How orchestration works
 
 Layout lives under `src/orchestrator/` (types / utils / agents / bounce / handoff / **db** / **memory** / prompts):
 
 1. Person texts → keyed debounce (`src/orchestrator/bounce/inbound.ts`)
-2. Interaction Agent loads curated memory, recent conversation history, and optional connected-app tools, then runs with first-party tools such as `assign_task`, `assign_image_task`, `react_to_message`, and `memory`
-3. Worker runs stubs (`echo`, `search_mock`) in `src/orchestrator/agents/execution.ts`
+2. Interaction Agent loads curated memory, recent conversation history, and optional connected-app tools, then runs with first-party tools such as `assign_task`, `assign_image_task`, `assign_computer_task`, `react_to_message`, and `memory`
+3. Workers run generic tasks or operate the local Linux desktop for computer-use tasks
 4. Handoff delivers worker output to the captured conversation target
 5. Turn transcripts append atomically in Convex; memory edits use their own mutation
 
@@ -116,8 +143,7 @@ The agent caches one Composio Tool Router tool set per sender and toolkit config
 Connections are isolated by sender: the raw Spectrum sender ID is salted and hashed
 before it becomes the Composio user ID. If Spectrum does not provide a sender ID,
 connected-app tools stay disabled for that message. By default, only Gmail and Google Calendar
-are enabled. Add explicitly approved toolkit slugs to `COMPOSIO_TOOLKITS` to enable
-other apps.
+are enabled.
 
 When someone asks to use an unconnected service, the agent uses Composio's
 connection manager and texts back the OAuth URL. The person completes OAuth in

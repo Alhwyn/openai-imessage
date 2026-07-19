@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+output="${1:-/tmp/computer-screen.png}"
+display=":1"
+width="1280"
+height="800"
+
+mkdir -p "$(dirname "$output")"
+
+# Keep the desktop in the model's fixed coordinate space. Kasm often boots at
+# 1024x768 even when VNC_RESOLUTION is set, and VNC clients can resize it.
+# Bound xdpyinfo so a wedged X server cannot hang the worker forever.
+current="$(timeout 3 xdpyinfo -display "$display" 2>/dev/null | awk '/dimensions:/ {print $2; found=1} END { if (!found) exit 0 }' || true)"
+if [[ -n "$current" && "$current" != "${width}x${height}" ]]; then
+  timeout 5 env DISPLAY="$display" xrandr --output VNC-0 --mode "${width}x${height}" 2>/dev/null \
+    || timeout 5 env DISPLAY="$display" xrandr -s "${width}x${height}" 2>/dev/null \
+    || true
+fi
+
+# maim can block forever if X is wedged or another grab is held.
+timeout 10 env DISPLAY="$display" maim -u "$output"
+printf '%s\n' "$output"

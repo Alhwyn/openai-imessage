@@ -19,10 +19,10 @@ export const applyMemoryEdit = async (
       ? { action: "add" as const, text: input.text }
       : input.action === "replace"
         ? {
-            action: "replace" as const,
-            oldText: input.oldText,
-            text: input.text,
-          }
+          action: "replace" as const,
+          oldText: input.oldText,
+          text: input.text,
+        }
         : { action: "remove" as const, oldText: input.oldText };
 
   return await getConvexClient().mutation(api.memories.applyEdit, {

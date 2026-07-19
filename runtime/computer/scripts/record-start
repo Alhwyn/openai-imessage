@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+run_id="${1:?run id is required}"
+display=":1"
+fps="15"
+artifact_dir="/artifacts/${run_id}"
+pid_file="${artifact_dir}/recording.pid"
+log_file="${artifact_dir}/recording.log"
+recording="${artifact_dir}/session.mkv"
+
+mkdir -p "$artifact_dir"
+
+if [[ -f "$pid_file" ]] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+  printf '%s\n' "$recording"
+  exit 0
+fi
+
+# Prefer the live X11 size so recording still works if the desktop was resized.
+# Avoid early awk exit under pipefail (SIGPIPE/141).
+dims="$(timeout 3 xdpyinfo -display "$display" 2>/dev/null | awk '/dimensions:/ {print $2; found=1} END { if (!found) exit 0 }' || true)"
+width="${dims%x*}"
+height="${dims#*x}"
+if [[ -z "${width}" || -z "${height}" || "${width}" = "${dims}" ]]; then
+  width="1280"
+  height="800"
+fi
+
+nohup ffmpeg \
+  -nostdin \
+  -f x11grab \
+  -framerate "$fps" \
+  -video_size "${width}x${height}" \
+  -draw_mouse 1 \
+  -i "${display}.0" \
+  -an \
+  -c:v libx264 \
+  -preset veryfast \
+  -crf 24 \
+  -pix_fmt yuv420p \
+  -y "$recording" >"$log_file" 2>&1 &
+
+printf '%s\n' "$!" >"$pid_file"
+printf '%s\n' "$recording"

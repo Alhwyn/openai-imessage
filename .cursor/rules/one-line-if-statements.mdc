@@ -1,0 +1,15 @@
+---
+description: Keep single-statement conditionals on one line
+globs: "**/*.{ts,tsx,js,jsx}"
+alwaysApply: true
+---
+
+# One-line conditionals
+
+- Omit braces when an `if`, `else`, `for`, or `while` body is a single statement.
+- Keep the condition and its single statement on the same line.
+- Use braces when the body contains multiple statements.
+
+```typescript
+if (!value) throw new Error("Value is required");
+```

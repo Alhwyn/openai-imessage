@@ -1,10 +1,19 @@
-export {
+import {
   composioUserIdFor,
   getComposioTools,
   isComposioAuthUrl,
 } from "./composio";
+import {
+  cleanupImageAlbum,
+  clampImageCount,
+  generateOpenAiImages,
+} from "./openaiImages";
+
 export {
   cleanupImageAlbum,
   clampImageCount,
-  generateGmiImages,
-} from "./gmiImages";
+  composioUserIdFor,
+  generateOpenAiImages,
+  getComposioTools,
+  isComposioAuthUrl,
+};
