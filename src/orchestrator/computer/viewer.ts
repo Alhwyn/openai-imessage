@@ -54,28 +54,28 @@ const viewerHtml = `<!doctype html>
     }
     .poster.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
     .watch {
-      display: grid;
-      width: 52px;
-      height: 52px;
+      display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 0;
+      gap: 9px;
+      padding: 10px 15px;
       border: 1px solid rgba(255,255,255,.55);
-      border-radius: 50%;
+      border-radius: 999px;
       color: white;
       background: rgba(25,25,25,.78);
       box-shadow: 0 2px 12px rgba(0,0,0,.18);
       cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
       transition: background .15s ease;
     }
     .watch:hover { background: #191919; }
     .play-icon {
       width: 0;
       height: 0;
-      margin-left: 3px;
-      border-top: 7px solid transparent;
-      border-bottom: 7px solid transparent;
-      border-left: 11px solid currentColor;
+      margin-left: 1px;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 8px solid currentColor;
     }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
     .cursor {
@@ -102,90 +102,6 @@ const viewerHtml = `<!doctype html>
       animation: click .55s ease-out;
     }
     @keyframes click { to { transform: scale(1.7); opacity: 0; } }
-    .timeline-card {
-      margin-top: 10px;
-      overflow: hidden;
-      border: 1px solid #dededb;
-      border-radius: 7px;
-      background: #fff;
-    }
-    .events {
-      display: flex;
-      max-height: 250px;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 0;
-      overflow-y: auto;
-      padding: 7px;
-      scrollbar-width: thin;
-    }
-    .empty { padding: 7px 9px; color: #999; font-size: 11px; }
-    .event {
-      position: relative;
-      display: grid;
-      min-width: 0;
-      grid-template-columns: 18px minmax(0, 1fr);
-      align-items: start;
-      gap: 8px;
-      padding: 6px 8px;
-      border-radius: 5px;
-      cursor: pointer;
-      transition: background .12s ease;
-    }
-    .event::after {
-      position: absolute;
-      top: 24px;
-      bottom: -7px;
-      left: 16.5px;
-      width: 1px;
-      background: #dededb;
-      content: "";
-    }
-    .event:last-child::after { display: none; }
-    .event:hover { background: #f3f3f1; }
-    .event.selected { background: #e9e9e7; }
-    .event:hover .event-label, .event.selected .event-label { color: #191919; }
-    .event-icon {
-      display: grid;
-      position: relative;
-      z-index: 1;
-      width: 18px;
-      height: 18px;
-      place-items: center;
-      border: 1px solid #d8d8d4;
-      border-radius: 50%;
-      color: #666;
-      background: #fff;
-      font-size: 9px;
-    }
-    .event.selected .event-icon {
-      border-color: #bdbdb8;
-      color: #333;
-      background: #f7f7f5;
-    }
-    .event-copy {
-      min-width: 0;
-      padding-top: 1px;
-    }
-    .event-label {
-      overflow: hidden;
-      margin: 0;
-      color: #4f4f4c;
-      font-size: 12px;
-      font-weight: 500;
-      line-height: 16px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .event-meta {
-      overflow: hidden;
-      margin-top: 1px;
-      color: #999;
-      font-size: 10px;
-      line-height: 14px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
     .error {
       display: none;
       margin: 0 0 8px;
@@ -200,7 +116,6 @@ const viewerHtml = `<!doctype html>
     @media (max-width: 640px) {
       .shell { padding: 10px 10px 24px; }
       .stage { border-radius: 5px; }
-      .events { max-height: 200px; }
     }
   </style>
 </head>
@@ -214,12 +129,9 @@ const viewerHtml = `<!doctype html>
           <video id="recording" controls playsinline hidden></video>
           <div class="cursor" id="cursor"></div>
           <div class="poster" id="poster">
-            <button class="watch" id="watch"><span class="play-icon"></span><span class="sr-only">Watch agent live</span></button>
+            <button class="watch" id="watch"><span class="play-icon"></span><span id="watch-label">Play live</span></button>
           </div>
         </div>
-      </section>
-      <section class="timeline-card" aria-label="Agent activity">
-        <div class="events" id="events"><div class="empty">Actions will appear here as the agent clicks, types, and moves through the task.</div></div>
       </section>
     </div>
   </main>
@@ -232,24 +144,13 @@ const viewerHtml = `<!doctype html>
       cursor: document.querySelector("#cursor"),
       desktop: document.querySelector("#desktop"),
       error: document.querySelector("#error"),
-      events: document.querySelector("#events"),
       poster: document.querySelector("#poster"),
       recording: document.querySelector("#recording"),
       watch: document.querySelector("#watch"),
+      watchLabel: document.querySelector("#watch-label"),
     };
     let snapshot;
     let viewing = false;
-    let selectedSequence = 0;
-    let knownEventCount = 0;
-
-    const iconFor = (type) => ({
-      click: "↗", double_click: "↗", move: "•", scroll: "↕",
-      type: "T", keypress: "⌘", drag: "↝", wait: "◷", screenshot: "◎"
-    })[type] || "•";
-
-    const timeLabel = (timestamp) => new Intl.DateTimeFormat([], {
-      minute: "2-digit", second: "2-digit"
-    }).format(new Date(timestamp));
 
     function showPointer(event) {
       if (!event || event.x == null || event.y == null || !snapshot) {
@@ -262,54 +163,6 @@ const viewerHtml = `<!doctype html>
       void els.cursor.offsetWidth;
       els.cursor.classList.add("visible");
       if (event.actionType.includes("click")) els.cursor.classList.add("pulse");
-    }
-
-    function selectEvent(sequence) {
-      if (!snapshot?.events.length) return;
-      selectedSequence = Math.max(1, Math.min(sequence, snapshot.events.length));
-      const event = snapshot.events.find((item) => item.sequence === selectedSequence);
-      showPointer(event);
-      for (const row of els.events.querySelectorAll(".event")) {
-        row.classList.toggle("selected", Number(row.dataset.sequence) === selectedSequence);
-      }
-    }
-
-    function renderEvents(events) {
-      const shouldFollow = selectedSequence === 0 || selectedSequence >= knownEventCount;
-      knownEventCount = events.length;
-      if (!events.length) {
-        els.events.innerHTML = '<div class="empty">Actions will appear here as the agent clicks, types, and moves through the task.</div>';
-        return;
-      }
-      const fragment = document.createDocumentFragment();
-      for (const event of events) {
-        const row = document.createElement("div");
-        row.className = "event";
-        row.dataset.sequence = String(event.sequence);
-        const icon = document.createElement("div");
-        icon.className = "event-icon";
-        icon.textContent = iconFor(event.actionType);
-        const copy = document.createElement("div");
-        copy.className = "event-copy";
-        const label = document.createElement("div");
-        label.className = "event-label";
-        label.textContent = event.label;
-        const meta = document.createElement("div");
-        meta.className = "event-meta";
-        const position = event.x == null ? "" : " · " + Math.round(event.x) + ", " + Math.round(event.y);
-        meta.textContent = "Step " + event.step + position + (event.detail ? " · " + event.detail : "") + " · " + timeLabel(event.createdAt);
-        copy.append(label, meta);
-        row.append(icon, copy);
-        row.addEventListener("click", () => selectEvent(event.sequence));
-        fragment.append(row);
-      }
-      els.events.replaceChildren(fragment);
-      if (shouldFollow) {
-        selectEvent(events.at(-1).sequence);
-        els.events.scrollTop = els.events.scrollHeight;
-      } else {
-        selectEvent(selectedSequence);
-      }
     }
 
     function startViewing() {
@@ -332,7 +185,8 @@ const viewerHtml = `<!doctype html>
     function render(next) {
       snapshot = next;
       const state = next.run.state;
-      renderEvents(next.events);
+      els.watchLabel.textContent = state === "completed" ? "Play recording" : "Play live";
+      showPointer(next.events.at(-1));
       if (viewing && state === "completed" && next.recordingUrl && els.recording.hidden) {
         els.desktop.hidden = true;
         els.recording.hidden = false;

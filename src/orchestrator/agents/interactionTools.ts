@@ -67,7 +67,7 @@ export const buildInteractionTools = ({
         });
         effects.push({
           kind: "text",
-          text: `starting the computer now — watch it live:\n${result.liveViewUrl}`,
+          text: `starting the computer agent...`,
         });
         if (/^https?:\/\//.test(result.liveViewUrl)) {
           effects.push({ kind: "app", url: result.liveViewUrl });
