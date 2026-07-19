@@ -73,14 +73,7 @@ export const formatComputerDeliveryText = (input: {
 export const formatComputerFailureText = (input: {
   goal: string;
   error: string;
-  awaitingApproval?: boolean;
 }): string => {
-  if (input.awaitingApproval) {
-    return (
-      `computer paused on "${input.goal}" before a restricted action — ` +
-      `use the live viewer to take over, then ask me to continue`
-    );
-  }
   const error = input.error.trim().slice(0, 280);
   return `couldnt finish the computer task ("${input.goal}"): ${error}`;
 };

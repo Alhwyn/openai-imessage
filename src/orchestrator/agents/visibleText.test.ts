@@ -1,22 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  extractVisibleAssistantText,
-  looksLikeInternalPlanning,
-} from "./visibleText";
-
-describe("looksLikeInternalPlanning", () => {
-  test("flags tool names and commentary leaks", () => {
-    expect(
-      looksLikeInternalPlanning(
-        "We need answer latest image request needs call assign_image_task. But developer says immediately queues ack and don't text. Use commentary tool.",
-      ),
-    ).toBe(true);
-    expect(looksLikeInternalPlanning("still cooking ur burrito pic")).toBe(
-      false,
-    );
-  });
-});
+import { extractVisibleAssistantText } from "./visibleText";
 
 describe("extractVisibleAssistantText", () => {
   test("keeps only final_answer when phase metadata is present", () => {
@@ -54,15 +38,6 @@ describe("extractVisibleAssistantText", () => {
     ).toBe("");
   });
 
-  test("rejects unphased fallback that still looks like planning", () => {
-    expect(
-      extractVisibleAssistantText(
-        [],
-        "We need answer latest image request needs call assign_image_task. But developer says immediately queues ack and don't text. Use commentary tool.",
-      ),
-    ).toBe("");
-  });
-
   test("keeps normal unphased chat text", () => {
     expect(
       extractVisibleAssistantText(
@@ -70,5 +45,9 @@ describe("extractVisibleAssistantText", () => {
         "bet, on it",
       ),
     ).toBe("bet, on it");
+  });
+
+  test("falls back to raw text when content has no text parts", () => {
+    expect(extractVisibleAssistantText([], "bet, on it")).toBe("bet, on it");
   });
 });

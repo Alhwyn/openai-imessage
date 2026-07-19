@@ -52,7 +52,7 @@ describe("finalizeTurnOutbound", () => {
     ]);
   });
 
-  test("suppresses all text while preserving an app card", () => {
+  test("non_text_only keeps app card and drops all text", () => {
     expect(
       finalizeTurnOutbound(
         [
@@ -60,20 +60,19 @@ describe("finalizeTurnOutbound", () => {
           { kind: "app", url: "https://viewer.example.com/computer/task" },
         ],
         "i started it",
-        true,
+        "non_text_only",
       ),
     ).toEqual([
       { kind: "app", url: "https://viewer.example.com/computer/task" },
     ]);
   });
 
-  test("suppresses model text while keeping tool acknowledgment", () => {
+  test("tools_only keeps tool ack and drops model text", () => {
     expect(
       finalizeTurnOutbound(
         [{ kind: "text", text: "bet cooking that, ~20 sec" }],
         "call assign_image_task and don't text",
-        false,
-        true,
+        "tools_only",
       ),
     ).toEqual([{ kind: "text", text: "bet cooking that, ~20 sec" }]);
   });

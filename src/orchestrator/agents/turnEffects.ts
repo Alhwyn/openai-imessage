@@ -1,60 +1,56 @@
 import type { OutboundItem } from "../contracts";
 
 /**
+ * How model/tool text is merged into the turn's outbound payload.
+ * - include_model: model text wins; else latest tool text
+ * - tools_only: keep tool text, drop model text (image ack)
+ * - non_text_only: drop all text (computer app card only)
+ */
+export type TextPolicy = "include_model" | "tools_only" | "non_text_only";
+
+/**
  * Collects outbound side effects for one interaction turn.
- * Tools push items; finalize merges model text and enforces at most one text item.
+ * Tools push items; finalize merges model text per TextPolicy.
  */
 export type TurnEffectCollector = {
   push: (item: OutboundItem) => void;
-  suppressText: () => void;
-  /** Keep tool-queued text (e.g. image ack) but ignore model text for this turn. */
-  suppressModelText: () => void;
+  setTextPolicy: (policy: TextPolicy) => void;
   finalize: (modelText: string) => OutboundItem[];
 };
 
 export const createTurnEffectCollector = (): TurnEffectCollector => {
   const effects: OutboundItem[] = [];
-  let textSuppressed = false;
-  let modelTextSuppressed = false;
+  let textPolicy: TextPolicy = "include_model";
 
   return {
     push: (item) => {
       effects.push(item);
     },
-    suppressText: () => {
-      textSuppressed = true;
-    },
-    suppressModelText: () => {
-      modelTextSuppressed = true;
+    setTextPolicy: (policy) => {
+      textPolicy = policy;
     },
     finalize: (modelText) =>
-      finalizeTurnOutbound(
-        effects,
-        modelText,
-        textSuppressed,
-        modelTextSuppressed,
-      ),
+      finalizeTurnOutbound(effects, modelText, textPolicy),
   };
 };
 
 /**
  * Merges tool-queued outbound with optional model text.
- * Non-text items are preserved in order; at most one text item is kept
- * (model text wins when present, otherwise the latest tool text).
+ * Non-text items are preserved in order; at most one text item is kept.
  */
 export const finalizeTurnOutbound = (
   toolOutbound: OutboundItem[],
   modelText: string,
-  suppressText = false,
-  suppressModelText = false,
+  textPolicy: TextPolicy = "include_model",
 ): OutboundItem[] => {
-  const trimmedModelText = suppressModelText ? "" : modelText.trim();
   const nonText = toolOutbound.filter((item) => item.kind !== "text");
-  if (suppressText) return nonText;
+  if (textPolicy === "non_text_only") return nonText;
 
   const toolTexts = toolOutbound.filter(
     (item): item is Extract<OutboundItem, { kind: "text" }> => item.kind === "text",
   );
+  const trimmedModelText =
+    textPolicy === "tools_only" ? "" : modelText.trim();
 
   if (trimmedModelText) {
     return [...nonText, { kind: "text", text: trimmedModelText }];

@@ -1,8 +1,7 @@
 import {
-  ComputerApprovalRequiredError,
   formatComputerDeliveryText,
-  getComputerLiveViewUrl,
-  getComputerViewerUrl,
+  formatComputerFailureText,
+  resolveComputerPublicUrls,
   runComputerAgent,
 } from "../computer/index";
 import {
@@ -66,7 +65,10 @@ type RunHandoffTaskInput = {
   execute: () => Promise<HandoffWorkResult>;
   onFailure?: (error: unknown, kind: HandoffFailureKind) => HandoffWorkResult;
   afterSuccess?: () => void;
-  afterFailure?: (error: unknown, kind: HandoffFailureKind) => void;
+  afterFailure?: (
+    error: unknown,
+    kind: HandoffFailureKind,
+  ) => void | Promise<void>;
   cleanup?: () => Promise<void>;
 };
 
@@ -137,7 +139,7 @@ const runHandoffTask = (input: RunHandoffTaskInput): void => {
         `[handoff] ${input.label} failed (${kind}) for ${input.taskId}`,
         error,
       );
-      input.afterFailure?.(error, kind);
+      await input.afterFailure?.(error, kind);
       const failure = input.onFailure?.(error, kind) ?? defaultApology(message);
       const deliveryTaskId =
         kind === "delivery" ? `${input.taskId}:delivery` : input.taskId;
@@ -193,8 +195,7 @@ export const assignTask = (input: AssignTaskInput): AssignTaskResult => {
 
 /**
  * Assigns a task to the local Linux computer-use worker.
- * @param input - The computer task and delivery target.
- * @returns Durable task metadata and the live desktop URL.
+ * Card URL is the custom viewer page only (never raw Kasm).
  */
 export const assignComputerTask = async (
   input: AssignComputerTaskInput,
@@ -211,32 +212,50 @@ export const assignComputerTask = async (
   }
   activeComputerTaskId = taskId;
 
-  const streamUrl = getComputerLiveViewUrl();
   const viewerToken = crypto.randomUUID();
-  const liveViewUrl = streamUrl
-    ? getComputerViewerUrl(taskId, viewerToken)
-    : undefined;
+  const { kasmStreamUrl, viewerPageUrl } = resolveComputerPublicUrls(
+    taskId,
+    viewerToken,
+  );
+  if (!kasmStreamUrl) {
+    console.warn(
+      "[handoff] No public COMPUTER_LIVE_VIEW_URL; computer task has no desktop stream.",
+    );
+  } else if (!viewerPageUrl) {
+    console.warn(
+      "[handoff] No public viewer host; skipping iMessage card so iPhone does not show KasmVNC. Tunnel viewer.* → port 6902.",
+    );
+  }
 
   try {
     await createComputerRun({
       taskId,
       spaceId: input.spaceId,
       goal,
-      liveViewUrl,
-      streamUrl,
-      viewerToken: liveViewUrl ? viewerToken : undefined,
+      // Convex fields: liveViewUrl = card, streamUrl = Kasm iframe
+      liveViewUrl: viewerPageUrl,
+      streamUrl: kasmStreamUrl,
+      viewerToken: viewerPageUrl ? viewerToken : undefined,
     });
   } catch (error) {
     activeComputerTaskId = undefined;
     throw error;
   }
 
-  console.log(`[handoff] Assigned ${taskId} for space ${input.spaceId}:`, goal.slice(0, 120));
+  console.log(
+    `[handoff] Assigned ${taskId} for space ${input.spaceId}:`,
+    goal.slice(0, 120),
+  );
 
-  void (async () => {
-    const abortController = new AbortController();
-    let computerWork: ReturnType<typeof runComputerAgent> | undefined;
-    try {
+  const abortController = new AbortController();
+  let computerWork: ReturnType<typeof runComputerAgent> | undefined;
+
+  runHandoffTask({
+    spaceId: input.spaceId,
+    deliveryTarget: input.deliveryTarget,
+    taskId,
+    label: "Computer agent",
+    execute: async () => {
       await markComputerRunRunning(taskId);
       let lastAction: string | undefined;
       const workerTimeoutMs = Math.max(
@@ -287,28 +306,38 @@ export const assignComputerTask = async (
         recordingPath: result.recordingPath,
         step: result.steps,
       });
-    } catch (error) {
+      return {
+        outbound: [{ kind: "text", text: deliveryText }],
+        historyText: `[computer ${taskId}] ${deliveryText}`,
+      };
+    },
+    onFailure: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const userMessage = formatComputerFailureText({ goal, error: message });
+      return {
+        outbound: [{ kind: "text", text: userMessage }],
+        historyText: `[computer ${taskId} failed] ${userMessage}`,
+      };
+    },
+    afterFailure: async (error) => {
       abortController.abort();
       await computerWork?.catch(() => undefined);
-      const needsApproval = error instanceof ComputerApprovalRequiredError;
       const message = error instanceof Error ? error.message : String(error);
-      await failComputerRun({
-        taskId,
-        error: message,
-        awaitingApproval: needsApproval,
-      }).catch((persistenceError: unknown) => {
-        console.error(`[computer-agent] Failed to persist failure for ${taskId}`, persistenceError);
-      });
-    } finally {
+      await failComputerRun({ taskId, error: message }).catch(
+        (persistenceError: unknown) => {
+          console.error(
+            `[computer-agent] Failed to persist failure for ${taskId}`,
+            persistenceError,
+          );
+        },
+      );
+    },
+    cleanup: async () => {
       if (activeComputerTaskId === taskId) activeComputerTaskId = undefined;
-    }
-  })().catch((error: unknown) => {
-    console.error(`[computer-agent] Unhandled task failure for ${taskId}`, {
-      ...getOpenAiErrorDetails(error),
-    });
+    },
   });
 
-  return { taskId, status: "started", liveViewUrl };
+  return { taskId, status: "started", viewerPageUrl };
 };
 
 export const getComputerTaskStatus = async (

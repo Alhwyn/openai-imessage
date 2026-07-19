@@ -9,32 +9,8 @@ type TextLikePart = {
 };
 
 /**
- * True when text looks like leaked planning / tool narration rather than chat.
- */
-export const looksLikeInternalPlanning = (text: string): boolean => {
-  const trimmed = text.trim();
-  if (!trimmed) return false;
-
-  const lower = trimmed.toLowerCase();
-  return (
-    /\bassign_\w+_task\b/i.test(trimmed) ||
-    /\bget_\w+_task_status\b/i.test(trimmed) ||
-    /\breact_to_message\b/i.test(trimmed) ||
-    /\bsend_auth_link\b/i.test(trimmed) ||
-    /\bcomposio_search_tools\b/i.test(trimmed) ||
-    /\bcommentary tool\b/.test(lower) ||
-    /\buse commentary\b/.test(lower) ||
-    /\bdeveloper says\b/.test(lower) ||
-    /\btool call\b/.test(lower) ||
-    /\bdon't text\b/.test(lower) ||
-    /\bdo not text\b/.test(lower) ||
-    /\bqueues? ack\b/.test(lower)
-  );
-};
-
-/**
  * Prefer Responses `final_answer` text; drop `commentary` planning leaks.
- * Falls back to unphased text, then rejects obvious internal narration.
+ * Without phase metadata, keep unphased text (tools own suppress via TextPolicy).
  */
 export const extractVisibleAssistantText = (
   content: ReadonlyArray<TextLikePart>,
@@ -50,22 +26,17 @@ export const extractVisibleAssistantText = (
     return phase === "commentary" || phase === "final_answer";
   });
 
-  const candidates = hasPhase
-    ? textParts.filter(
-        (part) => part.providerMetadata?.openai?.phase === "final_answer",
-      )
-    : textParts;
-
-  const joined = candidates
-    .map((part) => part.text)
-    .join("")
-    .trim();
-
-  if (joined) {
-    return looksLikeInternalPlanning(joined) ? "" : joined;
+  if (hasPhase) {
+    return textParts
+      .filter((part) => part.providerMetadata?.openai?.phase === "final_answer")
+      .map((part) => part.text)
+      .join("")
+      .trim();
   }
 
-  const fallback = fallbackText.trim();
-  if (!fallback || looksLikeInternalPlanning(fallback)) return "";
-  return fallback;
+  if (textParts.length > 0) {
+    return textParts.map((part) => part.text).join("").trim();
+  }
+
+  return fallbackText.trim();
 };

@@ -220,7 +220,6 @@ export const fail = mutation({
     secret: v.string(),
     taskId: v.string(),
     error: v.string(),
-    awaitingApproval: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -233,22 +232,16 @@ export const fail = mutation({
     ) {
       return null;
     }
-    if (args.awaitingApproval && run.state !== "running") {
-      throw new Error(
-        `Cannot request approval for computer run from state ${run.state}`,
-      );
-    }
-    const state = args.awaitingApproval ? "awaiting_approval" : "failed";
     await ctx.db.patch("computerRuns", run._id, {
-      state,
+      state: "failed",
       error: args.error,
-      finishedAt: args.awaitingApproval ? undefined : Date.now(),
+      finishedAt: Date.now(),
     });
     const status = await getStatus(ctx, run._id);
     await upsertStatus(
       ctx,
       run._id,
-      args.awaitingApproval ? "awaiting approval" : "failed",
+      "failed",
       status?.step ?? 0,
       status?.lastAction,
     );
@@ -321,7 +314,8 @@ export const reconcileStaleActive = mutation({
   returns: v.number(),
   handler: async (ctx, args) => {
     assertBridgeSecret(args.secret);
-    const states = ["queued", "running"] as const;
+    // awaiting_approval is legacy (no longer written); still reconcile orphans.
+    const states = ["queued", "running", "awaiting_approval"] as const;
     let reconciled = 0;
 
     for (const state of states) {

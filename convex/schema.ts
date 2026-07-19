@@ -24,12 +24,15 @@ export default defineSchema({
     state: v.union(
       v.literal("queued"),
       v.literal("running"),
+      // Legacy — no longer written; kept so old rows still validate.
       v.literal("awaiting_approval"),
       v.literal("completed"),
       v.literal("failed"),
       v.literal("cancelled"),
     ),
+    /** iMessage card / custom viewer page (not raw Kasm). */
     liveViewUrl: v.optional(v.string()),
+    /** Kasm stream URL embedded by the viewer iframe. */
     streamUrl: v.optional(v.string()),
     viewerToken: v.optional(v.string()),
     resultSummary: v.optional(v.string()),

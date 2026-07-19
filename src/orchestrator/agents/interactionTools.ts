@@ -65,9 +65,9 @@ export const buildInteractionTools = ({
           spaceId,
           goal,
         });
-        if (result.liveViewUrl && /^https?:\/\//.test(result.liveViewUrl)) {
-          effects.suppressText();
-          effects.push({ kind: "app", url: result.liveViewUrl });
+        if (result.viewerPageUrl && /^https?:\/\//.test(result.viewerPageUrl)) {
+          effects.setTextPolicy("non_text_only");
+          effects.push({ kind: "app", url: result.viewerPageUrl });
         }
         return result;
       },
@@ -114,7 +114,7 @@ export const buildInteractionTools = ({
             prompts,
           });
         // Tool ack is the only user-facing text; drop model commentary/planning.
-        effects.suppressModelText();
+        effects.setTextPolicy("tools_only");
         effects.push({ kind: "text", text: acknowledgment });
         return { taskId, status, estimatedSeconds };
       },

@@ -1,6 +1,5 @@
 import {
   assertDesktopReady,
-  getComputerLiveViewUrl,
   resetDesktopBrowserSession,
   resetDesktopWorkspace,
   startDesktopRecording,
@@ -67,13 +66,14 @@ export const runComputerAgent = async ({
   }
 };
 
-export { getComputerLiveViewUrl };
 export {
   getComputerViewerBaseUrl,
+  resolveComputerPublicUrls,
+} from "./urls";
+export {
   getComputerViewerUrl,
   startComputerViewer,
 } from "./viewer";
-export { ComputerApprovalRequiredError } from "./openai";
 export {
   formatComputerDeliveryText,
   formatComputerFailureText,

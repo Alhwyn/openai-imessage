@@ -40,7 +40,8 @@ export type AssignImageTaskResult = AssignTaskResult & {
 };
 
 export type AssignComputerTaskResult = AssignTaskResult & {
-  liveViewUrl?: string;
+  /** Custom viewer page for the iMessage card (never raw Kasm). */
+  viewerPageUrl?: string;
 };
 
 export type ImageTaskState =

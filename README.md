@@ -74,9 +74,9 @@ ORCHESTRATOR_BRIDGE_SECRET=
 
 # Set a long local-only password before running the desktop container.
 # COMPUTER_DESKTOP_PASSWORD=
-# Externally reachable Kasm stream used inside the custom viewer.
-# COMPUTER_LIVE_VIEW_URL=
-# Externally reachable base URL for the custom viewer and action timeline.
+# Public desktop tunnel for iMessage live-view cards (required for the card).
+# COMPUTER_LIVE_VIEW_URL=https://desktop.alhwyn.com
+# Optional token-gated wrapper page; defaults from BASE_URL when unset.
 # COMPUTER_VIEWER_URL=
 ```
 
@@ -141,15 +141,16 @@ COMPUTER_LIVE_VIEW_PORT=6901
 COMPUTER_VIEWER_PORT=6902
 ```
 
-The named tunnel exposes the token-gated viewer, but deliberately does not
-publish the raw Kasm desktop. With `BASE_URL=https://agent.alhwyn.com`, the
-viewer base resolves to:
+Set a public desktop tunnel for live-view cards:
 
-- Viewer: `https://viewer.alhwyn.com/computer/...`
+```bash
+COMPUTER_LIVE_VIEW_URL=https://desktop.alhwyn.com
+```
 
-To enable live desktop cards, configure `COMPUTER_LIVE_VIEW_URL` with a separate
-externally reachable stream that has its own access controls. Without one,
-computer tasks still run and report status, but no live-view app card is sent.
+That single URL is enough — iMessage gets it as the live-view card. Localhost
+values are ignored. Optionally, with `BASE_URL=https://agent.alhwyn.com` (or
+`COMPUTER_VIEWER_URL`), the card uses the token-gated `viewer.*` page that
+embeds the desktop stream instead.
 
 ### Dev tunnel (optional, like ngrok)
 
@@ -167,15 +168,14 @@ bun run tunnel:setup
 bun run tunnel
 ```
 
-`bun run tunnel` starts the existing webhook tunnel and a separate locally
-managed computer tunnel. The computer tunnel routes only:
+`bun run tunnel` starts the webhook tunnel plus the computer tunnel:
 
-- `viewer.alhwyn.com` → custom viewer on `127.0.0.1:6902`
+- `viewer.alhwyn.com` → token-gated viewer on `127.0.0.1:6902`
+- `desktop.alhwyn.com` → Kasm stream on `127.0.0.1:6901`
+- `agent.alhwyn.com` → webhook server on `127.0.0.1:4001`
 
-The existing `agent.alhwyn.com` hostname continues to route to the webhook
-server on `127.0.0.1:4001`.
-
-Set `BASE_URL=https://agent.alhwyn.com` in `.env` when testing webhooks.
+Set `COMPUTER_LIVE_VIEW_URL=https://desktop.alhwyn.com` for computer cards.
+`BASE_URL=https://agent.alhwyn.com` is still used for webhooks / optional viewer.
 
 ## How orchestration works
 

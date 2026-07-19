@@ -68,7 +68,6 @@ export const completeComputerRun = async (input: {
 export const failComputerRun = async (input: {
   taskId: string;
   error: string;
-  awaitingApproval?: boolean;
 }): Promise<void> => {
   await getConvexClient().mutation(api.computerRuns.fail, {
     secret: getBridgeSecret(),

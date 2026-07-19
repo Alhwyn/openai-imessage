@@ -1,9 +1,9 @@
 import { dirname, resolve } from "node:path";
 
+import { getComputerDisplaySize } from "./display";
+
 import type { ComputerAction } from "./types";
 
-const DEFAULT_WIDTH = 1280;
-const DEFAULT_HEIGHT = 800;
 const DEFAULT_SETTLE_MS = 300;
 
 const keyAliases: Record<string, string> = {
@@ -67,20 +67,6 @@ const getComposeProject = (): string => {
     dirname(getComposeFile()).split("/").pop() ||
     "computer"
   );
-};
-
-const getDisplaySize = (): { width: number; height: number } => {
-  const width = Number(process.env.COMPUTER_DISPLAY_WIDTH ?? DEFAULT_WIDTH);
-  const height = Number(process.env.COMPUTER_DISPLAY_HEIGHT ?? DEFAULT_HEIGHT);
-
-  if (!Number.isInteger(width) || width < 640) {
-    throw new Error("COMPUTER_DISPLAY_WIDTH must be an integer of at least 640");
-  }
-  if (!Number.isInteger(height) || height < 480) {
-    throw new Error("COMPUTER_DISPLAY_HEIGHT must be an integer of at least 480");
-  }
-
-  return { width, height };
 };
 
 const getDesktopCommandTimeoutMs = (): number => {
@@ -188,63 +174,13 @@ const withModifiers = async (
 };
 
 const movePointer = async (x: number, y: number): Promise<void> => {
-  const { width, height } = getDisplaySize();
+  const { width, height } = getComputerDisplaySize();
   await runXdotool(
     "mousemove",
     "--sync",
     String(clampCoordinate(x, width)),
     String(clampCoordinate(y, height)),
   );
-};
-
-const withScaleToFit = (value: string): string => {
-  try {
-    const url = new URL(value);
-    url.searchParams.set("resize", "scale");
-    return url.href;
-  } catch {
-    return value;
-  }
-};
-
-export const isExternallyReachableHttpUrl = (value: string): boolean => {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
-    const hostname = url.hostname.toLowerCase();
-    if (
-      hostname === "localhost" ||
-      hostname === "0.0.0.0" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname === "[::1]" ||
-      hostname.endsWith(".local")
-    ) {
-      return false;
-    }
-    if (
-      /^10\./u.test(hostname) ||
-      /^192\.168\./u.test(hostname) ||
-      /^172\.(1[6-9]|2\d|3[01])\./u.test(hostname)
-    ) {
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-export const getComputerLiveViewUrl = (): string | undefined => {
-  const configured = process.env.COMPUTER_LIVE_VIEW_URL?.trim();
-  if (configured) {
-    if (isExternallyReachableHttpUrl(configured)) return withScaleToFit(configured);
-    console.warn(
-      "[computer-agent] Ignoring non-public COMPUTER_LIVE_VIEW_URL",
-    );
-  }
-
-  return undefined;
 };
 
 /**
@@ -257,7 +193,7 @@ export const ensureFixedDisplaySize = async (): Promise<{
   before?: string;
   after?: string;
 }> => {
-  const { width, height } = getDisplaySize();
+  const { width, height } = getComputerDisplaySize();
   const readDims =
     "timeout 3 xdpyinfo -display :1 2>/dev/null | awk '/dimensions:/ {print $2; found=1} END { if (!found) exit 0 }' || true";
   const before = await runDocker(["bash", "-lc", readDims], {
@@ -349,18 +285,6 @@ export const resetDesktopWorkspace = async (): Promise<void> => {
     ],
     { timeoutMs: 15_000 },
   );
-};
-
-export const getActiveDesktopWindowClass = async (): Promise<string | undefined> => {
-  const windowClass = await runDocker(
-    [
-      "bash",
-      "-lc",
-      "env DISPLAY=:1 xdotool getactivewindow getwindowclassname 2>/dev/null || true",
-    ],
-    { allowFailure: true },
-  );
-  return windowClass || undefined;
 };
 
 export const captureDesktopScreenshot = async (): Promise<Uint8Array> => {
