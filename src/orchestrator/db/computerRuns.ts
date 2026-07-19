@@ -2,13 +2,19 @@ import { api } from "../../../convex/_generated/api";
 
 import { getBridgeSecret, getConvexClient } from "./client";
 
-import type { ComputerRunStatus } from "../computer/types";
+import type {
+  ComputerRunEvent,
+  ComputerRunStatus,
+  ComputerViewerSnapshot,
+} from "../computer/types";
 
 export const createComputerRun = async (input: {
   taskId: string;
   spaceId: string;
   goal: string;
   liveViewUrl?: string;
+  streamUrl?: string;
+  viewerToken?: string;
 }): Promise<ComputerRunStatus> => {
   return await getConvexClient().mutation(api.computerRuns.create, {
     secret: getBridgeSecret(),
@@ -36,6 +42,17 @@ export const updateComputerRunProgress = async (
   });
 };
 
+export const appendComputerRunEvent = async (
+  taskId: string,
+  event: Omit<ComputerRunEvent, "createdAt">,
+): Promise<void> => {
+  await getConvexClient().mutation(api.computerRuns.appendEvent, {
+    secret: getBridgeSecret(),
+    taskId,
+    ...event,
+  });
+};
+
 export const completeComputerRun = async (input: {
   taskId: string;
   resultSummary: string;
@@ -59,6 +76,17 @@ export const failComputerRun = async (input: {
   });
 };
 
+export const cancelActiveComputerRunsForSpace = async (input: {
+  spaceId: string;
+  error: string;
+  exceptTaskId?: string;
+}): Promise<number> => {
+  return await getConvexClient().mutation(api.computerRuns.cancelActiveForSpace, {
+    secret: getBridgeSecret(),
+    ...input,
+  });
+};
+
 export const getComputerRun = async (
   taskId: string,
 ): Promise<ComputerRunStatus | null> => {
@@ -74,5 +102,16 @@ export const getLatestComputerRunForSpace = async (
   return await getConvexClient().query(api.computerRuns.latestForSpace, {
     secret: getBridgeSecret(),
     spaceId,
+  });
+};
+
+export const getComputerViewerSnapshot = async (
+  taskId: string,
+  viewerToken: string,
+): Promise<ComputerViewerSnapshot | null> => {
+  return await getConvexClient().query(api.computerRuns.getViewerSnapshot, {
+    secret: getBridgeSecret(),
+    taskId,
+    viewerToken,
   });
 };

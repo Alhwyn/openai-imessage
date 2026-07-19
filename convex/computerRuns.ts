@@ -2,7 +2,11 @@ import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
 import { assertBridgeSecret } from "./lib/bridge";
-import { computerRunStatusResult } from "./lib/computer";
+import {
+  computerActionType,
+  computerRunStatusResult,
+  computerViewerSnapshotResult,
+} from "./lib/computer";
 
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -80,6 +84,8 @@ export const create = mutation({
     spaceId: v.string(),
     goal: v.string(),
     liveViewUrl: v.optional(v.string()),
+    streamUrl: v.optional(v.string()),
+    viewerToken: v.optional(v.string()),
   },
   returns: computerRunStatusResult,
   handler: async (ctx, args) => {
@@ -98,6 +104,8 @@ export const create = mutation({
       goal: args.goal,
       state: "queued",
       liveViewUrl: args.liveViewUrl,
+      streamUrl: args.streamUrl,
+      viewerToken: args.viewerToken,
       createdAt,
     });
     await upsertStatus(ctx, runId, "queued", 0);
@@ -142,6 +150,38 @@ export const updateProgress = mutation({
     const run = await getRunByTaskId(ctx, args.taskId);
     if (run.state !== "running") return null;
     await upsertStatus(ctx, run._id, "operating desktop", args.step, args.lastAction);
+    return null;
+  },
+});
+
+export const appendEvent = mutation({
+  args: {
+    secret: v.string(),
+    taskId: v.string(),
+    sequence: v.number(),
+    step: v.number(),
+    actionType: computerActionType,
+    label: v.string(),
+    x: v.optional(v.number()),
+    y: v.optional(v.number()),
+    detail: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    assertBridgeSecret(args.secret);
+    const run = await getRunByTaskId(ctx, args.taskId);
+    if (run.state !== "running") return null;
+    await ctx.db.insert("computerRunEvents", {
+      runId: run._id,
+      sequence: args.sequence,
+      step: args.step,
+      actionType: args.actionType,
+      label: args.label,
+      x: args.x,
+      y: args.y,
+      detail: args.detail,
+      createdAt: Date.now(),
+    });
     return null;
   },
 });
@@ -199,6 +239,57 @@ export const fail = mutation({
   },
 });
 
+/**
+ * Cancels queued/running tasks for a space so a new assign can take the desktop.
+ * Orphaned workers (process restart, wedged docker exec) otherwise leave forever-running rows.
+ */
+export const cancelActiveForSpace = mutation({
+  args: {
+    secret: v.string(),
+    spaceId: v.string(),
+    error: v.string(),
+    exceptTaskId: v.optional(v.string()),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    assertBridgeSecret(args.secret);
+    const runs = await ctx.db
+      .query("computerRuns")
+      .withIndex("by_spaceId_and_createdAt", (q) =>
+        q.eq("spaceId", args.spaceId),
+      )
+      .order("desc")
+      .take(25);
+
+    let cancelled = 0;
+    for (const run of runs) {
+      if (args.exceptTaskId && run.taskId === args.exceptTaskId) continue;
+      if (
+        run.state !== "queued" &&
+        run.state !== "running" &&
+        run.state !== "awaiting_approval"
+      ) {
+        continue;
+      }
+      await ctx.db.patch("computerRuns", run._id, {
+        state: "cancelled",
+        error: args.error,
+        finishedAt: Date.now(),
+      });
+      const status = await getStatus(ctx, run._id);
+      await upsertStatus(
+        ctx,
+        run._id,
+        "cancelled",
+        status?.step ?? 0,
+        status?.lastAction,
+      );
+      cancelled += 1;
+    }
+    return cancelled;
+  },
+});
+
 export const getByTaskId = query({
   args: {
     secret: v.string(),
@@ -231,5 +322,45 @@ export const latestForSpace = query({
       .order("desc")
       .take(1);
     return run ? await formatStatus(ctx, run) : null;
+  },
+});
+
+export const getViewerSnapshot = query({
+  args: {
+    secret: v.string(),
+    taskId: v.string(),
+    viewerToken: v.string(),
+  },
+  returns: v.union(computerViewerSnapshotResult, v.null()),
+  handler: async (ctx, args) => {
+    assertBridgeSecret(args.secret);
+    const run = await ctx.db
+      .query("computerRuns")
+      .withIndex("by_taskId", (q) => q.eq("taskId", args.taskId))
+      .unique();
+    if (!run || !run.viewerToken || run.viewerToken !== args.viewerToken) {
+      return null;
+    }
+
+    const events = await ctx.db
+      .query("computerRunEvents")
+      .withIndex("by_runId_and_sequence", (q) => q.eq("runId", run._id))
+      .order("asc")
+      .take(250);
+
+    return {
+      run: await formatStatus(ctx, run),
+      streamUrl: run.streamUrl ?? "https://127.0.0.1:6901",
+      events: events.map((event) => ({
+        sequence: event.sequence,
+        step: event.step,
+        actionType: event.actionType,
+        label: event.label,
+        x: event.x,
+        y: event.y,
+        detail: event.detail,
+        createdAt: event.createdAt,
+      })),
+    };
   },
 });

@@ -52,13 +52,22 @@ describe("interaction prompt conversation history", () => {
 describe("interaction prompt computer use", () => {
   test("routes full desktop work through durable computer tools", () => {
     expect(interactionSystemPrompt).toContain(
-      "Use assign_computer_task when the request specifically requires visually operating a full Linux desktop",
+      "Use assign_computer_task whenever the person wants something done in a real browser or desktop GUI",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "use Google Chrome or other desktop apps",
     );
     expect(interactionSystemPrompt).toContain(
       "always call get_computer_task_status",
     );
     expect(interactionSystemPrompt).toContain(
-      "Do not use it for ordinary questions, research, connected-app API actions, or image generation.",
+      "do not pretend Wordle/browser work succeeded",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Never use Composio for opening websites, browser games, Wordle/Worldle",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "open worlds and solve the world of the day",
     );
   });
 });

@@ -74,8 +74,10 @@ ORCHESTRATOR_BRIDGE_SECRET=
 # OPENAI_COMPUTER_MODEL=
 # Set a long local-only password before running the desktop container.
 # COMPUTER_DESKTOP_PASSWORD=
-# Set this to an externally reachable HTTPS viewer URL before sending links over iMessage.
+# Externally reachable Kasm stream used inside the custom viewer.
 # COMPUTER_LIVE_VIEW_URL=
+# Externally reachable base URL for the custom viewer and action timeline.
+# COMPUTER_VIEWER_URL=
 ```
 
 ## Run
@@ -101,9 +103,10 @@ yourself, then start the desktop:
 bun run computer:up
 ```
 
-Open `https://127.0.0.1:6901`, accept the local certificate, and sign in as
-`kasm_user` with `COMPUTER_DESKTOP_PASSWORD`. The fixed desktop resolution is
-1280×800 so model coordinates remain stable.
+Open `https://127.0.0.1:6901` and accept the local certificate. Basic auth is
+disabled on the loopback-only Kasm endpoint; `COMPUTER_DESKTOP_PASSWORD` is
+still required by the base image during startup. The fixed desktop resolution
+is 1280×800 so model coordinates remain stable.
 
 Then run Convex and the orchestrator normally. When the interaction agent calls
 `assign_computer_task`, it:
@@ -113,6 +116,8 @@ Then run Convex and the orchestrator normally. When the interaction agent calls
 3. Sends screenshots to OpenAI only after model action batches.
 4. Executes returned mouse and keyboard actions through `xdotool`.
 5. Saves the final MP4 under `runtime/computer/artifacts/<taskId>/demo.mp4`.
+6. Serves a custom viewer on `http://127.0.0.1:6902` with a live action
+   timeline, coordinate highlights, and completed-session replay.
 
 Useful commands:
 
@@ -133,11 +138,19 @@ COMPUTER_STABILITY_ATTEMPTS=3
 COMPUTER_STABILITY_DELAY_MS=150
 COMPUTER_COMPACT_THRESHOLD=60000
 COMPUTER_LIVE_VIEW_PORT=6901
+COMPUTER_VIEWER_PORT=6902
 ```
 
-For viewing from a phone, put the KasmVNC endpoint behind an authenticated HTTPS
-gateway and set `COMPUTER_LIVE_VIEW_URL` to its short-lived session URL. Do not
-expose port 6901 directly to the public Internet.
+For viewing from a phone, expose both local services through HTTPS. The named
+tunnel setup below handles this automatically. With
+`BASE_URL=https://agent.alhwyn.com`, computer links resolve to:
+
+- Viewer: `https://viewer.alhwyn.com/computer/...`
+- Read-only desktop stream: `https://desktop.alhwyn.com`
+
+The iMessage app card points to the custom viewer and uses a per-run access
+token. The direct desktop stream is unauthenticated while the development tunnel
+is running, so stop the tunnel when testing is finished.
 
 ### Dev tunnel (optional, like ngrok)
 
@@ -155,7 +168,14 @@ bun run tunnel:setup
 bun run tunnel
 ```
 
-Defaults: tunnel `webhook-automator` → `agent.alhwyn.com` → `127.0.0.1:4001`.
+`bun run tunnel` starts the existing webhook tunnel and a separate locally
+managed computer tunnel. The computer tunnel routes:
+
+- `viewer.alhwyn.com` → custom viewer on `127.0.0.1:6902`
+- `desktop.alhwyn.com` → read-only Kasm stream on `127.0.0.1:6901`
+
+The existing `agent.alhwyn.com` hostname continues to route to the webhook
+server on `127.0.0.1:4001`.
 
 Set `BASE_URL=https://agent.alhwyn.com` in `.env` when testing webhooks.
 

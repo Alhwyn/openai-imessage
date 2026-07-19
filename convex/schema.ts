@@ -30,6 +30,8 @@ export default defineSchema({
       v.literal("cancelled"),
     ),
     liveViewUrl: v.optional(v.string()),
+    streamUrl: v.optional(v.string()),
+    viewerToken: v.optional(v.string()),
     resultSummary: v.optional(v.string()),
     recordingPath: v.optional(v.string()),
     error: v.optional(v.string()),
@@ -48,5 +50,27 @@ export default defineSchema({
     lastAction: v.optional(v.string()),
     heartbeatAt: v.number(),
   }).index("by_runId", ["runId"]),
+
+  computerRunEvents: defineTable({
+    runId: v.id("computerRuns"),
+    sequence: v.number(),
+    step: v.number(),
+    actionType: v.union(
+      v.literal("click"),
+      v.literal("double_click"),
+      v.literal("move"),
+      v.literal("scroll"),
+      v.literal("type"),
+      v.literal("keypress"),
+      v.literal("drag"),
+      v.literal("wait"),
+      v.literal("screenshot"),
+    ),
+    label: v.string(),
+    x: v.optional(v.number()),
+    y: v.optional(v.number()),
+    detail: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_runId_and_sequence", ["runId", "sequence"]),
 });
 

@@ -12,12 +12,17 @@ services:
       DISPLAY: ":1"
       COMPUTER_DISPLAY_HEIGHT: "${COMPUTER_DISPLAY_HEIGHT:-800}"
       COMPUTER_DISPLAY_WIDTH: "${COMPUTER_DISPLAY_WIDTH:-1280}"
+      # Still required by the Kasm image to create ~/.kasmpasswd; login UI is disabled below.
       VNC_PW: "${COMPUTER_DESKTOP_PASSWORD:?set COMPUTER_DESKTOP_PASSWORD in your local environment}"
       VNC_RESOLUTION: "${COMPUTER_DISPLAY_WIDTH:-1280}x${COMPUTER_DISPLAY_HEIGHT:-800}"
       VNC_COL_DEPTH: "24"
       MAX_FRAME_RATE: "30"
       START_PULSEAUDIO: "1"
       KASM_SVC_AUDIO: "0"
+      # Local-only bind (127.0.0.1). Skip the kasm_user password wall so the live
+      # viewer/app embed can open the desktop immediately. Lock desktop size so
+      # VNC clients cannot resize away from the model's coordinate space.
+      VNCOPTIONS: "-PreferBandwidth -DynamicQualityMin=4 -DynamicQualityMax=7 -DLP_ClipDelay=0 -disableBasicAuth -AcceptSetDesktopSize 0 -AcceptPointerEvents 0 -AcceptKeyEvents 0"
     volumes:
       - ./workspace:/workspace
       - ./artifacts:/artifacts
@@ -27,13 +32,14 @@ services:
       - no-new-privileges:true
     pids_limit: 1024
     healthcheck:
+      # Keep this lightweight. Screenshot/maim in the healthcheck can wedge X11
+      # and block the computer worker (docker exec hangs forever).
       test:
         - CMD-SHELL
         - >-
-          xdpyinfo -display :1 >/dev/null 2>&1
+          timeout 3 xdpyinfo -display :1 >/dev/null 2>&1
           && pgrep -x xfce4-session >/dev/null
-          && /opt/computer-agent/bin/screenshot /tmp/health.png
-      start_period: 45s
-      interval: 15s
+      start_period: 60s
+      interval: 20s
       timeout: 5s
       retries: 3

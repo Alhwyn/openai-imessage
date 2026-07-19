@@ -1,9 +1,14 @@
 import {
   ComputerApprovalRequiredError,
+  formatComputerDeliveryText,
+  formatComputerFailureText,
   getComputerLiveViewUrl,
+  getComputerViewerUrl,
   runComputerAgent,
 } from "../computer/index";
 import {
+  appendComputerRunEvent,
+  cancelActiveComputerRunsForSpace,
   completeComputerRun,
   createComputerRun,
   failComputerRun,
@@ -199,13 +204,26 @@ export const assignComputerTask = async (
 
   taskCounter += 1;
   const taskId = `computer_${Date.now()}_${taskCounter}`;
-  const liveViewUrl = getComputerLiveViewUrl();
+  const streamUrl = getComputerLiveViewUrl();
+  const viewerToken = crypto.randomUUID();
+  const liveViewUrl = getComputerViewerUrl(taskId, viewerToken);
+
+  // Clear orphaned queued/running rows so "still running" zombies cannot block status.
+  await cancelActiveComputerRunsForSpace({
+    spaceId: input.spaceId,
+    error: `Superseded by ${taskId}`,
+    exceptTaskId: taskId,
+  }).catch((error: unknown) => {
+    console.warn("[computer-agent] Failed to cancel prior active runs", error);
+  });
 
   await createComputerRun({
     taskId,
     spaceId: input.spaceId,
     goal,
     liveViewUrl,
+    streamUrl,
+    viewerToken,
   });
 
   console.log(`[handoff] Assigned ${taskId} for space ${input.spaceId}:`, goal.slice(0, 120));
@@ -213,15 +231,45 @@ export const assignComputerTask = async (
   void (async () => {
     try {
       await markComputerRunRunning(taskId);
-      const result = await runComputerAgent({
+      let lastAction: string | undefined;
+      const workerTimeoutMs = Math.max(
+        60_000,
+        Number(process.env.COMPUTER_WORKER_TIMEOUT_MS ?? 8 * 60_000),
+      );
+      const result = await Promise.race([
+        runComputerAgent({
+          goal,
+          runId: taskId,
+          onProgress: ({ step, lastAction: action }) => {
+            lastAction = action;
+            return updateComputerRunProgress(taskId, step, action);
+          },
+          onAction: ({ action, ...event }) => {
+            return appendComputerRunEvent(taskId, {
+              ...event,
+              actionType: action.type,
+            });
+          },
+        }),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(
+              new Error(
+                `Computer worker timed out after ${Math.round(workerTimeoutMs / 1000)}s with no finish`,
+              ),
+            );
+          }, workerTimeoutMs);
+        }),
+      ]);
+      const deliveryText = formatComputerDeliveryText({
         goal,
-        runId: taskId,
-        onProgress: ({ step, lastAction }) =>
-          updateComputerRunProgress(taskId, step, lastAction),
+        summary: result.summary,
+        steps: result.steps,
+        lastAction,
       });
       await completeComputerRun({
         taskId,
-        resultSummary: result.summary,
+        resultSummary: deliveryText,
         recordingPath: result.recordingPath,
         step: result.steps,
       });
@@ -229,8 +277,8 @@ export const assignComputerTask = async (
         input.deliveryTarget,
         input.spaceId,
         taskId,
-        [{ kind: "text", text: result.summary }],
-        result.summary,
+        [{ kind: "text", text: deliveryText }],
+        `[computer ${taskId}] ${deliveryText}`,
       );
     } catch (error) {
       const needsApproval = error instanceof ComputerApprovalRequiredError;
@@ -242,15 +290,17 @@ export const assignComputerTask = async (
       }).catch((persistenceError: unknown) => {
         console.error(`[computer-agent] Failed to persist failure for ${taskId}`, persistenceError);
       });
-      const userMessage = needsApproval
-        ? "computer task paused before a restricted action, use the live viewer to take over"
-        : `couldnt finish that computer task: ${message}`;
+      const userMessage = formatComputerFailureText({
+        goal,
+        error: message,
+        awaitingApproval: needsApproval,
+      });
       await deliverTaskOutput(
         input.deliveryTarget,
         input.spaceId,
         taskId,
         [{ kind: "text", text: userMessage }],
-        userMessage,
+        `[computer ${taskId} failed] ${userMessage}`,
       );
     }
   })().catch((error: unknown) => {

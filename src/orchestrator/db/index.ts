@@ -1,9 +1,12 @@
 export { assertConvexEnv, getBridgeSecret, getConvexClient, getConvexUrl } from "./client";
 export {
+  appendComputerRunEvent,
+  cancelActiveComputerRunsForSpace,
   completeComputerRun,
   createComputerRun,
   failComputerRun,
   getComputerRun,
+  getComputerViewerSnapshot,
   getLatestComputerRunForSpace,
   markComputerRunRunning,
   updateComputerRunProgress,

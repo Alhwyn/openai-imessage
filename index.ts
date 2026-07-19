@@ -1,6 +1,7 @@
 import { Spectrum, type Message, type Space, type SpectrumInstance } from "@spectrum-ts/core";
 import { imessage } from "@spectrum-ts/imessage";
 
+import { startComputerViewer } from "./src/orchestrator/computer/viewer";
 import {
   assertConvexEnv,
   assertGmiApiKey,
@@ -99,6 +100,7 @@ const handleInbound = async (space: Space, message: Message): Promise<void> => {
 const main = async () => {
   assertGmiApiKey();
   assertConvexEnv();
+  const computerViewer = startComputerViewer();
 
   const { projectId, projectSecret, webhookSecret, missing } = getSpectrumEnv();
   if (missing.length > 0) throw new Error(`Missing env: ${missing.join(", ")}`);
@@ -120,6 +122,7 @@ const main = async () => {
       await Promise.allSettled(inboundJobs);
       await flushPendingOrchestratorTurns();
       await app.stop();
+      await computerViewer.stop(true);
     } catch (error) {
       console.error("[app] Spectrum stop failed", error);
     }

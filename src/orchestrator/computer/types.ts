@@ -63,3 +63,20 @@ export type ComputerRunStatus = {
   heartbeatAt?: number;
   lastAction?: string;
 };
+
+export type ComputerRunEvent = {
+  sequence: number;
+  step: number;
+  actionType: ComputerAction["type"];
+  label: string;
+  x?: number;
+  y?: number;
+  detail?: string;
+  createdAt: number;
+};
+
+export type ComputerViewerSnapshot = {
+  run: ComputerRunStatus;
+  streamUrl: string;
+  events: ComputerRunEvent[];
+};

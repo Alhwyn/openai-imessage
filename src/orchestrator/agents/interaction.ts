@@ -4,6 +4,8 @@ import {
   type ModelMessage,
 } from "ai";
 
+import { formatComputerRunContext } from "../computer/index";
+import { getLatestComputerRunForSpace } from "../db/index";
 import { getComposioTools } from "../integrations/index";
 import {
   appendHistory,
@@ -69,18 +71,27 @@ export const runInteractionAgent = async (
     const effects = createTurnEffectCollector();
     const contextStartedAt = Date.now();
     console.log("[agent] Loading interaction context", { spaceId });
-    const [memories, composioTools, history] = await Promise.all([
-      getCuratedMemories(spaceId),
-      getComposioTools(event.senderId),
-      getHistory(spaceId),
-    ]);
+    const [memories, composioTools, history, latestComputerRun] =
+      await Promise.all([
+        getCuratedMemories(spaceId),
+        getComposioTools(event.senderId),
+        getHistory(spaceId),
+        getLatestComputerRunForSpace(spaceId).catch(() => null),
+      ]);
     console.log("[agent] Interaction context loaded", {
       spaceId,
       historyCount: history.length,
+      computerState: latestComputerRun?.state ?? "none",
       elapsedMs: Date.now() - contextStartedAt,
     });
     const userContent = buildUserContent(event.text, event.images);
-    const system = buildSystemPrompt(interactionSystemPrompt, memories);
+    const computerContext = formatComputerRunContext(latestComputerRun);
+    const system = [
+      buildSystemPrompt(interactionSystemPrompt, memories),
+      computerContext,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
     const messages: ModelMessage[] = [
       ...history,
       { role: "user", content: userContent },

@@ -3,8 +3,6 @@ set -euo pipefail
 
 run_id="${1:?run id is required}"
 display="${DISPLAY:-:1}"
-width="${COMPUTER_DISPLAY_WIDTH:-1280}"
-height="${COMPUTER_DISPLAY_HEIGHT:-800}"
 fps="${COMPUTER_RECORDING_FPS:-15}"
 artifact_dir="/artifacts/${run_id}"
 pid_file="${artifact_dir}/recording.pid"
@@ -16,6 +14,16 @@ mkdir -p "$artifact_dir"
 if [[ -f "$pid_file" ]] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
   printf '%s\n' "$recording"
   exit 0
+fi
+
+# Prefer the live X11 size so recording still works if the desktop was resized.
+# Avoid early awk exit under pipefail (SIGPIPE/141).
+dims="$(timeout 3 xdpyinfo -display "$display" 2>/dev/null | awk '/dimensions:/ {print $2; found=1} END { if (!found) exit 0 }' || true)"
+width="${dims%x*}"
+height="${dims#*x}"
+if [[ -z "${width}" || -z "${height}" || "${width}" = "${dims}" ]]; then
+  width="${COMPUTER_DISPLAY_WIDTH:-1280}"
+  height="${COMPUTER_DISPLAY_HEIGHT:-800}"
 fi
 
 nohup ffmpeg \

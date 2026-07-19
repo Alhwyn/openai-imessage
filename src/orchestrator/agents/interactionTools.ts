@@ -55,7 +55,7 @@ export const buildInteractionTools = ({
     }),
     assign_computer_task: tool({
       description:
-        "Assign work that requires visually operating a full Linux desktop with mouse and keyboard, such as opening GUI applications, navigating websites visually, or verifying a UI. Returns immediately while the computer worker continues in the background. Do not use for ordinary research or image generation.",
+        "Assign work on the local Linux desktop with mouse and keyboard: open Google Chrome/websites, play or solve browser games (Wordle, Worldle/worlds, etc.), click through pages, use GUI apps, or verify on-screen UI. Use this instead of Composio for any browser/desktop work. Returns immediately while the computer worker continues in the background. Do not use for Gmail/Calendar APIs, ordinary research, or image generation.",
       inputSchema: z.object({
         goal: z.string().min(1).describe("Clear, bounded goal for the Linux computer worker"),
       }),
@@ -67,9 +67,9 @@ export const buildInteractionTools = ({
         });
         effects.push({
           kind: "text",
-          text: "starting the computer now, u can watch it live",
+          text: `starting the computer now — watch it live:\n${result.liveViewUrl}`,
         });
-        if (result.liveViewUrl.startsWith("https://")) {
+        if (/^https?:\/\//.test(result.liveViewUrl)) {
           effects.push({ kind: "app", url: result.liveViewUrl });
         }
         return result;

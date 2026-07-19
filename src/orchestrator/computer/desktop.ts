@@ -5,6 +5,7 @@ import type { ComputerAction } from "./types";
 const DEFAULT_WIDTH = 1280;
 const DEFAULT_HEIGHT = 800;
 const DEFAULT_SETTLE_MS = 300;
+const DEFAULT_PUBLIC_DESKTOP_URL = "https://desktop.alhwyn.com";
 
 const keyAliases: Record<string, string> = {
   ALT: "alt",
@@ -61,6 +62,14 @@ const getDesktopService = (): string => {
   return process.env.COMPUTER_DESKTOP_SERVICE?.trim() || "desktop";
 };
 
+const getComposeProject = (): string => {
+  return (
+    process.env.COMPUTER_COMPOSE_PROJECT?.trim() ||
+    dirname(getComposeFile()).split("/").pop() ||
+    "computer"
+  );
+};
+
 const getDisplaySize = (): { width: number; height: number } => {
   const width = Number(process.env.COMPUTER_DISPLAY_WIDTH ?? DEFAULT_WIDTH);
   const height = Number(process.env.COMPUTER_DISPLAY_HEIGHT ?? DEFAULT_HEIGHT);
@@ -75,41 +84,89 @@ const getDisplaySize = (): { width: number; height: number } => {
   return { width, height };
 };
 
-const runDocker = async (
-  command: string[],
-  options: { allowFailure?: boolean } = {},
+const getDesktopCommandTimeoutMs = (): number => {
+  const parsed = Number(process.env.COMPUTER_DOCKER_TIMEOUT_MS ?? 20_000);
+  return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : 20_000;
+};
+
+const runProcess = async (
+  argv: string[],
+  options: { allowFailure?: boolean; timeoutMs?: number } = {},
 ): Promise<string> => {
-  const child = Bun.spawn(
+  const timeoutMs = options.timeoutMs ?? getDesktopCommandTimeoutMs();
+  const child = Bun.spawn(argv, {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: process.env,
+  });
+
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    child.kill();
+  }, timeoutMs);
+
+  try {
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+
+    if (timedOut) {
+      throw new Error(
+        `Desktop command timed out after ${timeoutMs}ms: ${argv.join(" ")}`,
+      );
+    }
+
+    if (exitCode !== 0 && !options.allowFailure) {
+      throw new Error(
+        `Desktop command failed (${exitCode}): ${stderr.trim() || argv.join(" ")}`,
+      );
+    }
+
+    return stdout.trim();
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
+ * Resolves the running desktop container without re-parsing compose env
+ * interpolation (which requires COMPUTER_DESKTOP_PASSWORD on every call).
+ */
+const getDesktopContainerId = async (): Promise<string> => {
+  const byLabel = await runProcess(
     [
       "docker",
-      "compose",
-      "-f",
-      getComposeFile(),
-      "exec",
-      "-T",
-      getDesktopService(),
-      ...command,
+      "ps",
+      "-q",
+      "--filter",
+      `label=com.docker.compose.project=${getComposeProject()}`,
+      "--filter",
+      `label=com.docker.compose.service=${getDesktopService()}`,
     ],
-    {
-      stdout: "pipe",
-      stderr: "pipe",
-      env: process.env,
-    },
+    { allowFailure: true },
   );
+  const containerId = byLabel.split("\n").map((line) => line.trim()).find(Boolean);
+  if (containerId) return containerId;
 
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
+  const hasPassword = Boolean(process.env.COMPUTER_DESKTOP_PASSWORD?.trim());
+  throw new Error(
+    "Desktop container is not running. " +
+      (hasPassword
+        ? "Run `bun run computer:up` and wait until https://127.0.0.1:6901 is reachable."
+        : "Add COMPUTER_DESKTOP_PASSWORD to your local .env, then run `bun run computer:up`."),
+  );
+};
 
-  if (exitCode !== 0 && !options.allowFailure) {
-    throw new Error(
-      `Desktop command failed (${exitCode}): ${stderr.trim() || command.join(" ")}`,
-    );
-  }
-
-  return stdout.trim();
+const runDocker = async (
+  command: string[],
+  options: { allowFailure?: boolean; timeoutMs?: number } = {},
+): Promise<string> => {
+  const containerId = await getDesktopContainerId();
+  // Note: `docker exec` has no `-T` flag (that is compose-only). Omit TTY allocation.
+  return await runProcess(["docker", "exec", containerId, ...command], options);
 };
 
 const runXdotool = async (...args: string[]): Promise<void> => {
@@ -142,14 +199,72 @@ const movePointer = async (x: number, y: number): Promise<void> => {
 };
 
 export const getComputerLiveViewUrl = (): string => {
-  return (
-    process.env.COMPUTER_LIVE_VIEW_URL?.trim() ||
-    `https://127.0.0.1:${process.env.COMPUTER_LIVE_VIEW_PORT?.trim() || "6901"}`
+  const configured = process.env.COMPUTER_LIVE_VIEW_URL?.trim();
+  if (configured) {
+    try {
+      const hostname = new URL(configured).hostname;
+      if (hostname !== "127.0.0.1" && hostname !== "localhost") return configured;
+    } catch {
+      return configured;
+    }
+  }
+
+  const baseUrl = process.env.BASE_URL?.trim();
+  if (baseUrl) {
+    try {
+      const url = new URL(baseUrl);
+      const zoneHostname = url.hostname.startsWith("agent.")
+        ? url.hostname.slice("agent.".length)
+        : url.hostname;
+      return `${url.protocol}//desktop.${zoneHostname}`;
+    } catch {
+      console.warn("[computer-agent] Ignoring invalid BASE_URL for desktop viewer");
+    }
+  }
+
+  return DEFAULT_PUBLIC_DESKTOP_URL;
+};
+
+/**
+ * Forces the X11 desktop back to the configured size so model coordinates stay valid.
+ * VNC clients otherwise resize the session (seen as 2632x1662 vs expected 1280x800).
+ */
+export const ensureFixedDisplaySize = async (): Promise<{
+  width: number;
+  height: number;
+  before?: string;
+  after?: string;
+}> => {
+  const { width, height } = getDisplaySize();
+  const readDims =
+    "timeout 3 xdpyinfo -display :1 2>/dev/null | awk '/dimensions:/ {print $2; found=1} END { if (!found) exit 0 }' || true";
+  const before = await runDocker(["bash", "-lc", readDims], {
+    allowFailure: true,
+    timeoutMs: 8_000,
+  });
+  if (before === `${width}x${height}`) {
+    return { width, height, before, after: before };
+  }
+  await runDocker(
+    [
+      "bash",
+      "-lc",
+      `timeout 5 env DISPLAY=:1 xrandr --output VNC-0 --mode ${width}x${height} 2>/dev/null || timeout 5 env DISPLAY=:1 xrandr -s ${width}x${height} || true`,
+    ],
+    { allowFailure: true, timeoutMs: 10_000 },
   );
+  const after = await runDocker(["bash", "-lc", readDims], {
+    allowFailure: true,
+    timeoutMs: 8_000,
+  });
+  return { width, height, before: before || undefined, after: after || undefined };
 };
 
 export const assertDesktopReady = async (): Promise<void> => {
-  await runDocker(["/opt/computer-agent/bin/screenshot", "/tmp/ready.png"]);
+  await ensureFixedDisplaySize();
+  await runDocker(["/opt/computer-agent/bin/screenshot", "/tmp/ready.png"], {
+    timeoutMs: 15_000,
+  });
 };
 
 export const captureDesktopScreenshot = async (): Promise<Uint8Array> => {
