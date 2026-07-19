@@ -5,9 +5,9 @@ import {
   formatComputerFailureText,
   formatComputerRunContext,
   stripMarkdownEmphasis,
-} from "./statusText";
+} from "../statusText";
 
-import type { ComputerRunStatus } from "./types";
+import type { ComputerRunStatus } from "../types";
 
 const baseRun = (overrides: Partial<ComputerRunStatus> = {}): ComputerRunStatus => ({
   taskId: "computer_1",

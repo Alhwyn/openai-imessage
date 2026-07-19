@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { summarizeOutbound } from "../outbound";
+import { summarizeOutbound } from "../../outbound";
 
 describe("summarizeOutbound", () => {
   test("summarizes app items by url instead of as reactions", () => {

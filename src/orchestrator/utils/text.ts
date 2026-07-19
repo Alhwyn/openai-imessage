@@ -22,12 +22,11 @@ export const extractInboundText = (message: Message): string => {
   const { content } = message;
   if (content.type === "text") return content.text.trim();
   if (content.type === "markdown") return content.markdown.trim();
-  if (content.type === "group") {
-    return content.items
-      .map(extractInboundText)
-      .filter(Boolean)
-      .join("\n");
-  }
+  if (content.type === "group") return content.items
+    .map(extractInboundText)
+    .filter(Boolean)
+    .join("\n");
+
   return "";
 };
 
@@ -46,7 +45,7 @@ export const extractInboundImages = async (
   if (content.type !== "attachment") return [];
 
   const mediaType = normalizeMediaType(content.mimeType);
-  
+
   if (!SUPPORTED_IMAGE_MEDIA_TYPES.has(mediaType)) return [];
 
   return [

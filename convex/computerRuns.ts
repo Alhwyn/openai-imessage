@@ -70,11 +70,9 @@ const upsertStatus = async (
     lastAction,
     heartbeatAt: Date.now(),
   };
-  if (existing) {
-    await ctx.db.patch("computerRunStatus", existing._id, fields);
-  } else {
-    await ctx.db.insert("computerRunStatus", { runId, ...fields });
-  }
+  if (existing) await ctx.db.patch("computerRunStatus", existing._id, fields);
+  else await ctx.db.insert("computerRunStatus", { runId, ...fields });
+
 };
 
 export const create = mutation({
@@ -124,9 +122,8 @@ export const markRunning = mutation({
   handler: async (ctx, args) => {
     assertBridgeSecret(args.secret);
     const run = await getRunByTaskId(ctx, args.taskId);
-    if (run.state !== "queued") {
-      throw new Error(`Cannot start computer run from state ${run.state}`);
-    }
+    if (run.state !== "queued") throw new Error(`Cannot start computer run from state ${run.state}`);
+
     await ctx.db.patch("computerRuns", run._id, {
       state: "running",
       startedAt: Date.now(),
@@ -200,9 +197,8 @@ export const complete = mutation({
   handler: async (ctx, args) => {
     assertBridgeSecret(args.secret);
     const run = await getRunByTaskId(ctx, args.taskId);
-    if (run.state !== "running") {
-      throw new Error(`Cannot complete computer run from state ${run.state}`);
-    }
+    if (run.state !== "running") throw new Error(`Cannot complete computer run from state ${run.state}`);
+
     await ctx.db.patch("computerRuns", run._id, {
       state: "completed",
       resultSummary: args.resultSummary,
@@ -229,9 +225,8 @@ export const fail = mutation({
       run.state === "completed" ||
       run.state === "failed" ||
       run.state === "cancelled"
-    ) {
-      return null;
-    }
+    ) return null;
+
     await ctx.db.patch("computerRuns", run._id, {
       state: "failed",
       error: args.error,
@@ -246,57 +241,6 @@ export const fail = mutation({
       status?.lastAction,
     );
     return null;
-  },
-});
-
-/**
- * Cancels queued/running tasks for a space so a new assign can take the desktop.
- * Orphaned workers (process restart, wedged docker exec) otherwise leave forever-running rows.
- */
-export const cancelActiveForSpace = mutation({
-  args: {
-    secret: v.string(),
-    spaceId: v.string(),
-    error: v.string(),
-    exceptTaskId: v.optional(v.string()),
-  },
-  returns: v.number(),
-  handler: async (ctx, args) => {
-    assertBridgeSecret(args.secret);
-    const runs = await ctx.db
-      .query("computerRuns")
-      .withIndex("by_spaceId_and_createdAt", (q) =>
-        q.eq("spaceId", args.spaceId),
-      )
-      .order("desc")
-      .take(25);
-
-    let cancelled = 0;
-    for (const run of runs) {
-      if (args.exceptTaskId && run.taskId === args.exceptTaskId) continue;
-      if (
-        run.state !== "queued" &&
-        run.state !== "running" &&
-        run.state !== "awaiting_approval"
-      ) {
-        continue;
-      }
-      await ctx.db.patch("computerRuns", run._id, {
-        state: "cancelled",
-        error: args.error,
-        finishedAt: Date.now(),
-      });
-      const status = await getStatus(ctx, run._id);
-      await upsertStatus(
-        ctx,
-        run._id,
-        "cancelled",
-        status?.step ?? 0,
-        status?.lastAction,
-      );
-      cancelled += 1;
-    }
-    return cancelled;
   },
 });
 
@@ -332,9 +276,8 @@ export const reconcileStaleActive = mutation({
           state === "running" &&
           status &&
           status.heartbeatAt >= args.staleBefore
-        ) {
-          continue;
-        }
+        ) continue;
+
         await ctx.db.patch("computerRuns", run._id, {
           state: "failed",
           error: args.error,
@@ -404,9 +347,7 @@ export const getViewerSnapshot = query({
       .query("computerRuns")
       .withIndex("by_taskId", (q) => q.eq("taskId", args.taskId))
       .unique();
-    if (!run || !run.viewerToken || run.viewerToken !== args.viewerToken) {
-      return null;
-    }
+    if (!run || !run.viewerToken || run.viewerToken !== args.viewerToken) return null;
 
     const events = await ctx.db
       .query("computerRunEvents")

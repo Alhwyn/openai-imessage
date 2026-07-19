@@ -30,9 +30,8 @@ const withoutTransientMedia = (message: ModelMessage): ModelMessage => {
 };
 
 const assertStoredRole = (role: ModelMessage["role"]): MessageRole => {
-  if (role !== "user" && role !== "assistant") {
-    throw new Error(`Only user/assistant messages can be stored, got ${role}`);
-  }
+  if (role !== "user" && role !== "assistant") throw new Error(`Only user/assistant messages can be stored, got ${role}`);
+
   return role;
 };
 
@@ -45,18 +44,15 @@ const searchTextFromMessage = (message: ModelMessage): string => {
   if (!Array.isArray(content)) return JSON.stringify(content);
 
   const parts: string[] = [];
-  for (const part of content) {
-    if (
-      typeof part === "object" &&
+  for (const part of content) if (
+    typeof part === "object" &&
       part !== null &&
       "type" in part &&
       part.type === "text" &&
       "text" in part &&
       typeof part.text === "string"
-    ) {
-      parts.push(part.text);
-    }
-  }
+  ) parts.push(part.text);
+
   return parts.join(" ").trim() || JSON.stringify(content);
 };
 

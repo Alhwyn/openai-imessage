@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { isStoredHistoryMessage } from "./history";
+import { isStoredHistoryMessage } from "../history";
 
 describe("isStoredHistoryMessage", () => {
   test("accepts string and text-part messages", () => {

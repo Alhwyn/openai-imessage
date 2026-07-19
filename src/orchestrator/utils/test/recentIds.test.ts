@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createRecentIdTracker } from "./recentIds";
+import { createRecentIdTracker } from "../recentIds";
 
 describe("createRecentIdTracker", () => {
   test("accepts the first claim and rejects duplicates", () => {

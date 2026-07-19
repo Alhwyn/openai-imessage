@@ -21,8 +21,7 @@ export const TAPBACK_KEYS = TAPBACKS.map((tapback) => tapback.key) as [
 /** Resolves a tapback key to its Spectrum emoji value. */
 export const tapbackEmoji = (key: TapbackKey): string => {
   const tapback = TAPBACKS.find((entry) => entry.key === key);
-  if (!tapback) {
-    throw new Error(`Unknown tapback: ${key}`);
-  }
+  if (!tapback) throw new Error(`Unknown tapback: ${key}`);
+
   return tapback.emoji;
 };

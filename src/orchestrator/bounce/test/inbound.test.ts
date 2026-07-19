@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { buildDebouncedTurn } from "./inbound";
+import { buildDebouncedTurn } from "../inbound";
 
 describe("buildDebouncedTurn", () => {
   test("stacks texts", () => {

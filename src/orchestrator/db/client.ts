@@ -6,7 +6,7 @@ export const getConvexUrl = (): string => {
   const url = process.env.CONVEX_URL?.trim();
 
   if (!url) throw new Error("Missing CONVEX_URL. Run `bun run convex:dev` and add it to your .env.");
-  
+
   return url;
 };
 

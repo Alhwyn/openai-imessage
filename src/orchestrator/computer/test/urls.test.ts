@@ -6,7 +6,7 @@ import {
   getKasmStreamUrl,
   isExternallyReachableHttpUrl,
   resolveComputerPublicUrls,
-} from "./urls";
+} from "../urls";
 
 const originalEnv = {
   BASE_URL: process.env.BASE_URL,
@@ -15,10 +15,9 @@ const originalEnv = {
 };
 
 afterEach(() => {
-  for (const [key, value] of Object.entries(originalEnv)) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+  for (const [key, value] of Object.entries(originalEnv)) if (value === undefined) delete process.env[key];
+  else process.env[key] = value;
+
 });
 
 describe("public computer URLs", () => {

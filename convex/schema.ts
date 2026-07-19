@@ -1,6 +1,8 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+import { computerActionType } from "./lib/computer";
+
 export default defineSchema({
   memories: defineTable({
     spaceId: v.string(),
@@ -58,17 +60,7 @@ export default defineSchema({
     runId: v.id("computerRuns"),
     sequence: v.number(),
     step: v.number(),
-    actionType: v.union(
-      v.literal("click"),
-      v.literal("double_click"),
-      v.literal("move"),
-      v.literal("scroll"),
-      v.literal("type"),
-      v.literal("keypress"),
-      v.literal("drag"),
-      v.literal("wait"),
-      v.literal("screenshot"),
-    ),
+    actionType: computerActionType,
     label: v.string(),
     x: v.optional(v.number()),
     y: v.optional(v.number()),

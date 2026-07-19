@@ -65,7 +65,7 @@ export const buildInteractionTools = ({
           spaceId,
           goal,
         });
-        if (result.viewerPageUrl && /^https?:\/\//.test(result.viewerPageUrl)) {
+        if (result.viewerPageUrl) {
           effects.setTextPolicy("non_text_only");
           effects.push({
             kind: "app",
@@ -153,13 +153,12 @@ export const buildInteractionTools = ({
       }),
       execute: ({ url }) => {
         const trimmed = url.trim();
-        if (!isComposioAuthUrl(trimmed)) {
-          return {
-            ok: false,
-            error:
+        if (!isComposioAuthUrl(trimmed)) return {
+          ok: false,
+          error:
               "url must be an https Composio authorization link (connect.composio.dev)",
-          };
-        }
+        };
+
         effects.push({ kind: "app", url: trimmed });
         return { ok: true };
       },
@@ -189,25 +188,25 @@ export const buildInteractionTools = ({
         const updated =
           input.action === "add"
             ? await editMemory({
-                spaceId,
-                kind: input.kind,
-                action: "add",
-                text: input.text,
-              })
+              spaceId,
+              kind: input.kind,
+              action: "add",
+              text: input.text,
+            })
             : input.action === "replace"
               ? await editMemory({
-                  spaceId,
-                  kind: input.kind,
-                  action: "replace",
-                  text: input.text,
-                  oldText: input.old_text,
-                })
+                spaceId,
+                kind: input.kind,
+                action: "replace",
+                text: input.text,
+                oldText: input.old_text,
+              })
               : await editMemory({
-                  spaceId,
-                  kind: input.kind,
-                  action: "remove",
-                  oldText: input.old_text,
-                });
+                spaceId,
+                kind: input.kind,
+                action: "remove",
+                oldText: input.old_text,
+              });
         return {
           ok: true,
           kind: updated.kind,

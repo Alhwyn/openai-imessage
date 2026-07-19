@@ -81,9 +81,7 @@ export const runExecutionAgent = async (
     .map((toolResult) => JSON.stringify(toolResult.output))
     .filter(Boolean);
 
-  if (toolNotes.length > 0) {
-    return `Task completed. Tool outputs: ${toolNotes.join(" | ")}`;
-  }
+  if (toolNotes.length > 0) return `Task completed. Tool outputs: ${toolNotes.join(" | ")}`;
 
   return "Task finished with no textual result.";
 };

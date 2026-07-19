@@ -12,9 +12,7 @@ export const applyAdd = (body: string, text: string, limit: number): string => {
   if (body.includes(entry)) return body;
 
   const next = body ? `${body}\n${entry}` : entry;
-  if (next.length > limit) {
-    throw new Error(`Memory exceeds ${limit} character limit`);
-  }
+  if (next.length > limit) throw new Error(`Memory exceeds ${limit} character limit`);
 
   return next;
 };
@@ -28,14 +26,10 @@ export const applyReplace = (
   newText: string,
   limit: number,
 ): string => {
-  if (!oldText || !body.includes(oldText)) {
-    throw new Error("old_text not found in memory");
-  }
+  if (!oldText || !body.includes(oldText)) throw new Error("old_text not found in memory");
 
   const next = body.replace(oldText, newText);
-  if (next.length > limit) {
-    throw new Error(`Memory exceeds ${limit} character limit`);
-  }
+  if (next.length > limit) throw new Error(`Memory exceeds ${limit} character limit`);
 
   return next;
 };
@@ -44,9 +38,7 @@ export const applyReplace = (
  * Removes all occurrences of oldText and collapses excess blank lines.
  */
 export const applyRemove = (body: string, oldText: string): string => {
-  if (!oldText || !body.includes(oldText)) {
-    throw new Error("old_text not found in memory");
-  }
+  if (!oldText || !body.includes(oldText)) throw new Error("old_text not found in memory");
 
   return body.replaceAll(oldText, "").replace(/\n{3,}/g, "\n\n").trim();
 };

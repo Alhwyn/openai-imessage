@@ -7,7 +7,7 @@ import {
   getImageTaskStatus,
   markImageTaskDelivering,
   startImageTask,
-} from "./imageTaskTracker";
+} from "../imageTaskTracker";
 
 describe("imageTaskTracker", () => {
   test("tracks worker progress through the progress hook", () => {

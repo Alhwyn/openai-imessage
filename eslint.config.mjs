@@ -21,6 +21,8 @@ export default tseslint.config(
     },
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
+      curly: ["error", "multi"],
+      indent: ["error", 2, { SwitchCase: 1 }],
       "import/first": "error",
       "import/no-duplicates": "error",
       "import/order": [
@@ -31,6 +33,9 @@ export default tseslint.config(
           "newlines-between": "always",
         },
       ],
+      "nonblock-statement-body-position": ["error", "beside"],
+      "no-multiple-empty-lines": ["error", { max: 1 }],
+      "no-trailing-spaces": "error",
     },
   },
 );

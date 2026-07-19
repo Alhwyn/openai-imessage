@@ -52,14 +52,10 @@ export const finalizeTurnOutbound = (
   const trimmedModelText =
     textPolicy === "tools_only" ? "" : modelText.trim();
 
-  if (trimmedModelText) {
-    return [...nonText, { kind: "text", text: trimmedModelText }];
-  }
+  if (trimmedModelText) return [...nonText, { kind: "text", text: trimmedModelText }];
 
   const latestToolText = toolTexts.at(-1);
-  if (latestToolText) {
-    return [...nonText, latestToolText];
-  }
+  if (latestToolText) return [...nonText, latestToolText];
 
   return nonText;
 };

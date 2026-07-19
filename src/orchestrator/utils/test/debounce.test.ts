@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { createKeyedDebounce } from "./debounce";
-import { extractInboundImages, extractInboundText } from "./text";
+import { createKeyedDebounce } from "../debounce";
+import { extractInboundImages, extractInboundText } from "../text";
 
 describe("createKeyedDebounce", () => {
   test("coalesces rapid schedules into one flush", async () => {
@@ -45,9 +45,8 @@ describe("createKeyedDebounce", () => {
         events.push(`end:${value}`);
         activeFlushes -= 1;
 
-        if (value === "second") {
-          secondFinished.resolve();
-        }
+        if (value === "second") secondFinished.resolve();
+
       },
     });
 

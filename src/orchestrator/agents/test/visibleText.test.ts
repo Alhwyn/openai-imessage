@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { extractVisibleAssistantText } from "./visibleText";
+import { extractVisibleAssistantText } from "../visibleText";
 
 describe("extractVisibleAssistantText", () => {
   test("keeps only final_answer when phase metadata is present", () => {

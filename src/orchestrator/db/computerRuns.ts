@@ -8,7 +8,7 @@ import type {
   ComputerViewerSnapshot,
 } from "../computer/types";
 
-export const createComputerRun = async (input: {
+export const createComputerRun = (input: {
   taskId: string;
   spaceId: string;
   goal: string;
@@ -16,7 +16,7 @@ export const createComputerRun = async (input: {
   streamUrl?: string;
   viewerToken?: string;
 }): Promise<ComputerRunStatus> => {
-  return await getConvexClient().mutation(api.computerRuns.create, {
+  return getConvexClient().mutation(api.computerRuns.create, {
     secret: getBridgeSecret(),
     ...input,
   });
@@ -75,52 +75,41 @@ export const failComputerRun = async (input: {
   });
 };
 
-export const cancelActiveComputerRunsForSpace = async (input: {
-  spaceId: string;
-  error: string;
-  exceptTaskId?: string;
-}): Promise<number> => {
-  return await getConvexClient().mutation(api.computerRuns.cancelActiveForSpace, {
-    secret: getBridgeSecret(),
-    ...input,
-  });
-};
-
-export const getComputerRun = async (
+export const getComputerRun = (
   spaceId: string,
   taskId: string,
 ): Promise<ComputerRunStatus | null> => {
-  return await getConvexClient().query(api.computerRuns.getByTaskId, {
+  return getConvexClient().query(api.computerRuns.getByTaskId, {
     secret: getBridgeSecret(),
     spaceId,
     taskId,
   });
 };
 
-export const reconcileStaleComputerRuns = async (input: {
+export const reconcileStaleComputerRuns = (input: {
   staleBefore: number;
   error: string;
 }): Promise<number> => {
-  return await getConvexClient().mutation(api.computerRuns.reconcileStaleActive, {
+  return getConvexClient().mutation(api.computerRuns.reconcileStaleActive, {
     secret: getBridgeSecret(),
     ...input,
   });
 };
 
-export const getLatestComputerRunForSpace = async (
+export const getLatestComputerRunForSpace = (
   spaceId: string,
 ): Promise<ComputerRunStatus | null> => {
-  return await getConvexClient().query(api.computerRuns.latestForSpace, {
+  return getConvexClient().query(api.computerRuns.latestForSpace, {
     secret: getBridgeSecret(),
     spaceId,
   });
 };
 
-export const getComputerViewerSnapshot = async (
+export const getComputerViewerSnapshot = (
   taskId: string,
   viewerToken: string,
 ): Promise<ComputerViewerSnapshot | null> => {
-  return await getConvexClient().query(api.computerRuns.getViewerSnapshot, {
+  return getConvexClient().query(api.computerRuns.getViewerSnapshot, {
     secret: getBridgeSecret(),
     taskId,
     viewerToken,

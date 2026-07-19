@@ -5,7 +5,7 @@ import {
   applyMemoryEditBody,
   applyRemove,
   applyReplace,
-} from "../convex/lib/memoryEdits";
+} from "../lib/memoryEdits";
 
 describe("applyAdd", () => {
   test("appends a new entry", () => {

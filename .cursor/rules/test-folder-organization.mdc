@@ -1,0 +1,12 @@
+---
+description: Keep tests in a dedicated folder for each code section
+globs: "**/*.test.ts"
+alwaysApply: false
+---
+
+# Test organization
+
+- Put tests in the nearest section's `test/` folder.
+- Keep test filenames aligned with the source module: `feature.ts` uses `test/feature.test.ts`.
+- Do not place `*.test.ts` files beside production source files.
+- Use `convex/test/` for Convex tests.

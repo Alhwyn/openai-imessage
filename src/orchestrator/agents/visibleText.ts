@@ -26,17 +26,13 @@ export const extractVisibleAssistantText = (
     return phase === "commentary" || phase === "final_answer";
   });
 
-  if (hasPhase) {
-    return textParts
-      .filter((part) => part.providerMetadata?.openai?.phase === "final_answer")
-      .map((part) => part.text)
-      .join("")
-      .trim();
-  }
+  if (hasPhase) return textParts
+    .filter((part) => part.providerMetadata?.openai?.phase === "final_answer")
+    .map((part) => part.text)
+    .join("")
+    .trim();
 
-  if (textParts.length > 0) {
-    return textParts.map((part) => part.text).join("").trim();
-  }
+  if (textParts.length > 0) return textParts.map((part) => part.text).join("").trim();
 
   return fallbackText.trim();
 };

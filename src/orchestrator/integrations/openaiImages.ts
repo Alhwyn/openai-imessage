@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import sharp from "sharp";
+import { z } from "zod";
 
 import {
   IMAGE_MAX_COUNT,
@@ -23,6 +24,32 @@ import type {
   ImageGenerationProgress,
   OpenAiImagesResponse,
 } from "../utils/types";
+
+const openAiImagesResponseSchema = z
+  .object({
+    created: z.number().optional(),
+    data: z
+      .array(
+        z
+          .object({
+            b64_json: z.string().optional(),
+            revised_prompt: z.string().optional(),
+            url: z.string().optional(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+    error: z
+      .object({
+        message: z.string().optional(),
+        type: z.string().optional(),
+        code: z.string().optional(),
+        param: z.string().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
 
 /**
  * Clamps a requested image count into the supported range.
@@ -53,19 +80,25 @@ const parseResponse = async (
   response: Response,
 ): Promise<OpenAiImagesResponse> => {
   const text = await response.text();
-  if (!text.trim()) {
-    throw new Error(
-      `OpenAI image API returned empty body (HTTP ${response.status})`,
-    );
-  }
+  if (!text.trim()) throw new Error(
+    `OpenAI image API returned empty body (HTTP ${response.status})`,
+  );
 
+  let parsed: unknown;
   try {
-    return JSON.parse(text) as OpenAiImagesResponse;
+    parsed = JSON.parse(text);
   } catch {
     throw new Error(
       `OpenAI image API returned non-JSON body (HTTP ${response.status})`,
     );
   }
+
+  const result = openAiImagesResponseSchema.safeParse(parsed);
+  if (!result.success) throw new Error(
+    `OpenAI image API returned invalid JSON (HTTP ${response.status})`,
+  );
+
+  return result.data;
 };
 
 const generateOneImageB64 = async (
@@ -101,20 +134,15 @@ const generateOneImageB64 = async (
     );
 
     const payload = await parseResponse(response);
-    if (!response.ok) {
-      throw new Error(`${errorMessage(payload)} (HTTP ${response.status})`);
-    }
+    if (!response.ok) throw new Error(`${errorMessage(payload)} (HTTP ${response.status})`);
 
     const encoded = payload.data?.[0]?.b64_json?.trim();
-    if (!encoded) {
-      throw new Error("OpenAI image API returned no image data");
-    }
+    if (!encoded) throw new Error("OpenAI image API returned no image data");
 
     return new Uint8Array(Buffer.from(encoded, "base64"));
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Image generation timed out");
-    }
+    if (error instanceof Error && error.name === "AbortError") throw new Error("Image generation timed out");
+
     throw error;
   } finally {
     clearTimeout(timer);
@@ -133,14 +161,11 @@ const stageAlbum = async (images: Uint8Array[]): Promise<GeneratedImageAlbum> =>
           .jpeg({ quality: 80 })
           .toBuffer(),
       );
-      if (staged.byteLength === 0) {
-        throw new Error("Generated image was empty after staging");
-      }
-      if (staged.byteLength > IMAGE_MAX_FILE_BYTES) {
-        throw new Error(
-          `Staged image too large (${(staged.byteLength / 1_048_576).toFixed(2)} MiB)`,
-        );
-      }
+      if (staged.byteLength === 0) throw new Error("Generated image was empty after staging");
+
+      if (staged.byteLength > IMAGE_MAX_FILE_BYTES) throw new Error(
+        `Staged image too large (${(staged.byteLength / 1_048_576).toFixed(2)} MiB)`,
+      );
 
       const path = join(tempDir, `image-${index + 1}.jpeg`);
       await Bun.write(path, staged);

@@ -6,11 +6,8 @@ import { OPENAI_API_KEY, OPENAI_BASE_URL } from "./constants/openai";
 export const getOpenAiApiKey = (
   purpose = "OpenAI requests",
 ): string => {
-  if (!OPENAI_API_KEY) {
-    throw new Error(
-      `Missing OPENAI_API_KEY. Add it to your local .env before ${purpose}.`,
-    );
-  }
+  if (!OPENAI_API_KEY) throw new Error(`Missing OPENAI_API_KEY. Add it to your local .env before ${purpose}.`);
+
   return OPENAI_API_KEY;
 };
 

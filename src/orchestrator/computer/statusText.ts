@@ -35,11 +35,10 @@ export const formatComputerRunContext = (
     (run.state === "running" || run.state === "queued") &&
     run.step === 0 &&
     ageMs > 90_000
-  ) {
-    lines.push(
-      `note: this run looks stuck (no desktop actions after ${Math.round(ageMs / 1000)}s). If the person asks again to do the task, call assign_computer_task to start a fresh run.`,
-    );
-  }
+  ) lines.push(
+    `note: this run looks stuck (no desktop actions after ${Math.round(ageMs / 1000)}s). If the person asks again to do the task, call assign_computer_task to start a fresh run.`,
+  );
+
   lines.push(
     "Use this as ground truth for computer/browser/desktop outcomes. If state is failed/cancelled, or resultSummary is empty/vague, do not claim the task succeeded. Call get_computer_task_status when the person asks what happened.",
   );

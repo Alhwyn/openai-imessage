@@ -10,9 +10,8 @@ const ARTIFACTS_ROOT = resolve("runtime/computer/artifacts");
 
 const htmlResponse = (request: Request): Response => {
   const previewImage = new URL("/computer-favicon", request.url);
-  if (request.headers.get("x-forwarded-proto") === "https") {
-    previewImage.protocol = "https:";
-  }
+  if (request.headers.get("x-forwarded-proto") === "https") previewImage.protocol = "https:";
+
   const previewImageUrl = previewImage.href;
   return new Response(computerViewerHtml.replaceAll("__PREVIEW_IMAGE__", previewImageUrl), {
     headers: {
@@ -57,9 +56,7 @@ const recordingResponse = async (request: Request): Promise<Response> => {
     !artifactRelativePath ||
     artifactRelativePath.startsWith("..") ||
     isAbsolute(artifactRelativePath)
-  ) {
-    return jsonResponse({ error: "Invalid recording path" }, 403);
-  }
+  ) return jsonResponse({ error: "Invalid recording path" }, 403);
 
   const file = Bun.file(absolutePath);
   if (!(await file.exists())) return jsonResponse({ error: "Recording not found" }, 404);
@@ -127,16 +124,13 @@ export const startComputerViewer = (): ReturnType<typeof Bun.serve> => {
       const url = new URL(request.url);
       if (request.method !== "GET") return new Response(null, { status: 405 });
       if (/^\/computer\/[^/]+$/.test(url.pathname)) return htmlResponse(request);
-      if (url.pathname === "/computer-wallpaper") return await wallpaperResponse();
-      if (url.pathname === "/computer-favicon" || url.pathname === "/favicon.ico") {
-        return await faviconResponse();
-      }
-      if (/^\/api\/computer\/[^/]+\/recording$/.test(url.pathname)) {
-        return await recordingResponse(request);
-      }
-      if (/^\/api\/computer\/[^/]+$/.test(url.pathname)) {
-        return await snapshotResponse(request);
-      }
+      if (url.pathname === "/computer-wallpaper") return wallpaperResponse();
+      if (url.pathname === "/computer-favicon" || url.pathname === "/favicon.ico") return faviconResponse();
+
+      if (/^\/api\/computer\/[^/]+\/recording$/.test(url.pathname)) return recordingResponse(request);
+
+      if (/^\/api\/computer\/[^/]+$/.test(url.pathname)) return snapshotResponse(request);
+
       return new Response(null, { status: 404 });
     },
   });

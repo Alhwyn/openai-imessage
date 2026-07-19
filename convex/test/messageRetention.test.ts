@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   getMessagePruneBatch,
   MESSAGE_PRUNE_BATCH_SIZE,
-} from "../convex/lib/messageRetention";
+} from "../lib/messageRetention";
 
 describe("getMessagePruneBatch", () => {
   test("prunes every message older than the retention window in bounded batches", () => {

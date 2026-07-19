@@ -47,21 +47,16 @@ const getSpectrumEnv = () => {
 
 const senderIdFrom = (message: Message): string | null => {
   const sender = message.sender;
-  if (sender && typeof sender === "object" && "id" in sender && typeof sender.id === "string") {
-    return sender.id;
-  }
+  if (sender && typeof sender === "object" && "id" in sender && typeof sender.id === "string") return sender.id;
+
   return null;
 };
 
 const handleInbound = async (space: Space, message: Message): Promise<void> => {
-  if (message.direction === "outbound") {
-    return;
-  }
+  if (message.direction === "outbound") return;
 
   const sender = message.sender;
-  if (sender && typeof sender === "object" && "kind" in sender && sender.kind === "agent") {
-    return;
-  }
+  if (sender && typeof sender === "object" && "kind" in sender && sender.kind === "agent") return;
 
   if (!seenInboundMessages.claim(message.id)) {
     console.log("[app] Skipping duplicate inbound message", {
@@ -105,9 +100,7 @@ const main = async () => {
     staleBefore: Date.now(),
     error: "Computer worker stopped when the orchestrator restarted",
   });
-  if (reconciled > 0) {
-    console.warn(`[computer-agent] Reconciled ${reconciled} orphaned run(s)`);
-  }
+  if (reconciled > 0) console.warn(`[computer-agent] Reconciled ${reconciled} orphaned run(s)`);
 
   const workerTimeoutMs = Math.max(
     60_000,

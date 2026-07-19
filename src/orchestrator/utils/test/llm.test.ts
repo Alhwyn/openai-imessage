@@ -5,8 +5,8 @@ import {
   OPENAI_MAX_RETRIES,
   OPENAI_PROVIDER_OPTIONS,
   OPENAI_REASONING,
-} from "./constants";
-import { getOpenAiErrorDetails, OPENAI_TEXT_MODEL } from "./llm";
+} from "../constants";
+import { getOpenAiErrorDetails, OPENAI_TEXT_MODEL } from "../llm";
 
 describe("OpenAI configuration", () => {
   test("uses Terra as the default with bounded retries", () => {

@@ -98,17 +98,13 @@ const runProcess = async (
       child.exited,
     ]);
 
-    if (timedOut) {
-      throw new Error(
-        `Desktop command timed out after ${timeoutMs}ms: ${argv.join(" ")}`,
-      );
-    }
+    if (timedOut) throw new Error(
+      `Desktop command timed out after ${timeoutMs}ms: ${argv.join(" ")}`,
+    );
 
-    if (exitCode !== 0 && !options.allowFailure) {
-      throw new Error(
-        `Desktop command failed (${exitCode}): ${stderr.trim() || argv.join(" ")}`,
-      );
-    }
+    if (exitCode !== 0 && !options.allowFailure) throw new Error(
+      `Desktop command failed (${exitCode}): ${stderr.trim() || argv.join(" ")}`,
+    );
 
     return stdout.trim();
   } finally {
@@ -151,7 +147,7 @@ const runDocker = async (
 ): Promise<string> => {
   const containerId = await getDesktopContainerId();
   // Note: `docker exec` has no `-T` flag (that is compose-only). Omit TTY allocation.
-  return await runProcess(["docker", "exec", containerId, ...command], options);
+  return runProcess(["docker", "exec", containerId, ...command], options);
 };
 
 const runXdotool = async (...args: string[]): Promise<void> => {
@@ -167,9 +163,8 @@ const withModifiers = async (
   try {
     await execute();
   } finally {
-    for (const key of modifiers.reverse()) {
-      await runXdotool("keyup", key).catch(() => undefined);
-    }
+    for (const key of modifiers.reverse()) await runXdotool("keyup", key).catch(() => undefined);
+
   }
 };
 
@@ -200,9 +195,8 @@ export const ensureFixedDisplaySize = async (): Promise<{
     allowFailure: true,
     timeoutMs: 8_000,
   });
-  if (before === `${width}x${height}`) {
-    return { width, height, before, after: before };
-  }
+  if (before === `${width}x${height}`) return { width, height, before, after: before };
+
   await runDocker(
     [
       "bash",
@@ -437,11 +431,10 @@ export const executeComputerAction = async (
     }
   }
 
-  if (action.type !== "wait" && action.type !== "screenshot") {
-    await Bun.sleep(
-      Number(process.env.COMPUTER_ACTION_SETTLE_MS ?? DEFAULT_SETTLE_MS),
-    );
-  }
+  if (action.type !== "wait" && action.type !== "screenshot") await Bun.sleep(
+    Number(process.env.COMPUTER_ACTION_SETTLE_MS ?? DEFAULT_SETTLE_MS),
+  );
+
 };
 
 export const startDesktopRecording = async (runId: string): Promise<void> => {

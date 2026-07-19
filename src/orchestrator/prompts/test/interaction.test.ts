@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { interactionSystemPrompt } from "./index";
+import { interactionSystemPrompt } from "../index";
 
 describe("interaction prompt rewrite formatting", () => {
   test("forbids emoji and Markdown in rewritten copy", () => {

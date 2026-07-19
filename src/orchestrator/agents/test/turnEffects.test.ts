@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { finalizeTurnOutbound } from "./turnEffects";
+import { finalizeTurnOutbound } from "../turnEffects";
 
 describe("finalizeTurnOutbound", () => {
   test("keeps only the latest tool text when model text is empty", () => {

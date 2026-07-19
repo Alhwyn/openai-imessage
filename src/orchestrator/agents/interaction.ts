@@ -158,12 +158,10 @@ export const runInteractionAgent = async (
     });
 
     const visibleText = extractVisibleAssistantText(result.content, result.text);
-    if (result.text.trim() && !visibleText) {
-      console.warn("[agent] Dropped non-user-facing model text", {
-        spaceId,
-        preview: result.text.trim().slice(0, 160),
-      });
-    }
+    if (result.text.trim() && !visibleText) console.warn("[agent] Dropped non-user-facing model text", {
+      spaceId,
+      preview: result.text.trim().slice(0, 160),
+    });
 
     const finalOutbound = effects.finalize(visibleText);
     const toolCalls = result.steps.flatMap((step) =>
@@ -184,12 +182,10 @@ export const runInteractionAgent = async (
       queuedCount: finalOutbound.length,
     });
 
-    if (!visibleText && toolCalls.length === 0) {
-      console.warn("[agent] Model returned no tools or text", {
-        spaceId,
-        finishReason: result.finishReason,
-      });
-    }
+    if (!visibleText && toolCalls.length === 0) console.warn("[agent] Model returned no tools or text", {
+      spaceId,
+      finishReason: result.finishReason,
+    });
 
     await appendHistory(
       spaceId,

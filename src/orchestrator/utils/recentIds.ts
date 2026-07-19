@@ -12,11 +12,8 @@ export const createRecentIdTracker = (
   const now = options.now ?? Date.now;
 
   const pruneExpired = (currentTime: number) => {
-    for (const [id, claimedAt] of seenAt) {
-      if (currentTime - claimedAt >= options.ttlMs) {
-        seenAt.delete(id);
-      }
-    }
+    for (const [id, claimedAt] of seenAt) if (currentTime - claimedAt >= options.ttlMs) seenAt.delete(id);
+
   };
 
   const evictOldest = () => {
@@ -35,9 +32,7 @@ export const createRecentIdTracker = (
     pruneExpired(currentTime);
 
     const previous = seenAt.get(trimmed);
-    if (previous !== undefined && currentTime - previous < options.ttlMs) {
-      return false;
-    }
+    if (previous !== undefined && currentTime - previous < options.ttlMs) return false;
 
     if (previous !== undefined) seenAt.delete(trimmed);
 

@@ -69,7 +69,7 @@ type RunHandoffTaskInput = {
     error: unknown,
     kind: HandoffFailureKind,
   ) => void | Promise<void>;
-  cleanup?: () => Promise<void>;
+  cleanup?: () => void | Promise<void>;
 };
 
 const defaultApology = (message: string): HandoffWorkResult => {
@@ -205,11 +205,10 @@ export const assignComputerTask = async (
 
   taskCounter += 1;
   const taskId = `computer_${Date.now()}_${taskCounter}`;
-  if (activeComputerTaskId) {
-    throw new Error(
-      `The shared desktop is already running task ${activeComputerTaskId}. Wait for it to finish before starting another task.`,
-    );
-  }
+  if (activeComputerTaskId) throw new Error(
+    `The shared desktop is already running task ${activeComputerTaskId}. Wait for it to finish before starting another task.`,
+  );
+
   activeComputerTaskId = taskId;
 
   const viewerToken = crypto.randomUUID();
@@ -217,15 +216,12 @@ export const assignComputerTask = async (
     taskId,
     viewerToken,
   );
-  if (!kasmStreamUrl) {
-    console.warn(
-      "[handoff] No public COMPUTER_LIVE_VIEW_URL; computer task has no desktop stream.",
-    );
-  } else if (!viewerPageUrl) {
-    console.warn(
-      "[handoff] No public viewer host; skipping iMessage card so iPhone does not show KasmVNC. Tunnel viewer.* → port 6902.",
-    );
-  }
+  if (!kasmStreamUrl) console.warn(
+    "[handoff] No public COMPUTER_LIVE_VIEW_URL; computer task has no desktop stream.",
+  );
+  else if (!viewerPageUrl) console.warn(
+    "[handoff] No public viewer host; skipping iMessage card so iPhone does not show KasmVNC. Tunnel viewer.* → port 6902.",
+  );
 
   try {
     await createComputerRun({
@@ -332,7 +328,7 @@ export const assignComputerTask = async (
         },
       );
     },
-    cleanup: async () => {
+    cleanup: () => {
       if (activeComputerTaskId === taskId) activeComputerTaskId = undefined;
     },
   });
@@ -340,13 +336,13 @@ export const assignComputerTask = async (
   return { taskId, status: "started", viewerPageUrl };
 };
 
-export const getComputerTaskStatus = async (
+export const getComputerTaskStatus = (
   spaceId: string,
   taskId?: string,
 ) => {
   return taskId
-    ? await getComputerRun(spaceId, taskId)
-    : await getLatestComputerRunForSpace(spaceId);
+    ? getComputerRun(spaceId, taskId)
+    : getLatestComputerRunForSpace(spaceId);
 };
 
 /**
@@ -356,9 +352,7 @@ export const assignImageTask = (
   input: AssignImageTaskInput,
 ): AssignImageTaskResult => {
   const prompts = input.prompts.map((prompt) => prompt.trim()).filter(Boolean);
-  if (prompts.length === 0) {
-    throw new Error("At least one image prompt is required");
-  }
+  if (prompts.length === 0) throw new Error("At least one image prompt is required");
 
   taskCounter += 1;
   const taskId = `image_${Date.now()}_${taskCounter}`;

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { Emoji } from "@spectrum-ts/core";
 import { describe, expect, mock, test } from "bun:test";
 
-import { deliverOutbound } from "./deliver";
+import { deliverOutbound } from "../deliver";
 
 import type { ContentBuilder, Message, Space } from "@spectrum-ts/core";
 
@@ -113,9 +113,8 @@ describe("deliverOutbound", () => {
       expect(send).toHaveBeenCalledTimes(1);
       const content = await buildContent(firstArg(send));
       expect(content.type).toBe("group");
-      if (content.type !== "group") {
-        throw new Error("expected group content");
-      }
+      if (content.type !== "group") throw new Error("expected group content");
+
       expect(content.items.map((item) => item.content.type)).toEqual([
         "attachment",
         "attachment",
@@ -160,9 +159,8 @@ describe("deliverOutbound", () => {
     expect(send).toHaveBeenCalledTimes(1);
     const content = await buildContent(firstArg(send));
     expect(content.type).toBe("app");
-    if (content.type !== "app") {
-      throw new Error("expected app content");
-    }
+    if (content.type !== "app") throw new Error("expected app content");
+
     expect(await content.url()).toBe(url);
   });
 
@@ -211,9 +209,8 @@ describe("deliverOutbound", () => {
       type: "text",
       text: "tap that to finish connecting gmail",
     });
-    if (first.type !== "app") {
-      throw new Error("expected app content");
-    }
+    if (first.type !== "app") throw new Error("expected app content");
+
     expect(await first.url()).toBe(url);
   });
 });

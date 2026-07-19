@@ -4,7 +4,7 @@ import {
   composioUserIdFor,
   getComposioTools,
   isComposioAuthUrl,
-} from "./composio";
+} from "../composio";
 
 const originalApiKey = process.env.COMPOSIO_API_KEY;
 const originalSalt = process.env.COMPOSIO_USER_ID_SALT;

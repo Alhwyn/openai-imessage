@@ -43,9 +43,7 @@ const pruneMessageBatch = async (
     .take(keep + MESSAGE_PRUNE_BATCH_SIZE + 1);
   const batch = getMessagePruneBatch(newestFirst, keep);
 
-  for (const row of batch.rows) {
-    await ctx.db.delete("messages", row._id);
-  }
+  for (const row of batch.rows) await ctx.db.delete("messages", row._id);
 
   return batch.hasMore;
 };
@@ -100,24 +98,20 @@ export const appendMany = mutation({
   handler: async (ctx, args) => {
     assertBridgeSecret(args.secret);
 
-    if (args.messages.length > MESSAGE_APPEND_MAX_BATCH) {
-      throw new Error(
-        `messages batch exceeds ${MESSAGE_APPEND_MAX_BATCH} item limit`,
-      );
-    }
+    if (args.messages.length > MESSAGE_APPEND_MAX_BATCH) throw new Error(
+      `messages batch exceeds ${MESSAGE_APPEND_MAX_BATCH} item limit`,
+    );
 
     const keep = Math.max(1, Math.min(args.keep, 100));
     const baseTime = Date.now();
 
-    for (const [i, msg] of args.messages.entries()) {
-      await ctx.db.insert("messages", {
-        spaceId: args.spaceId,
-        role: msg.role,
-        searchText: msg.searchText,
-        payloadJson: msg.payloadJson,
-        createdAt: msg.createdAt ?? baseTime + i,
-      });
-    }
+    for (const [i, msg] of args.messages.entries()) await ctx.db.insert("messages", {
+      spaceId: args.spaceId,
+      role: msg.role,
+      searchText: msg.searchText,
+      payloadJson: msg.payloadJson,
+      createdAt: msg.createdAt ?? baseTime + i,
+    });
 
     const hasMore = await pruneMessageBatch(ctx, args.spaceId, keep);
 
@@ -136,9 +130,7 @@ export const pruneOverflow = internalMutation({
   handler: async (ctx, args): Promise<null> => {
     const keep = Math.max(1, Math.min(args.keep, 100));
     const hasMore = await pruneMessageBatch(ctx, args.spaceId, keep);
-    if (hasMore) {
-      await schedulePruneContinuation(ctx, args.spaceId, keep);
-    }
+    if (hasMore) await schedulePruneContinuation(ctx, args.spaceId, keep);
 
     return null;
   },

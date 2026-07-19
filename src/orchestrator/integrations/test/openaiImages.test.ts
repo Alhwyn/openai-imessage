@@ -11,15 +11,14 @@ import {
   IMAGE_MIN_COUNT,
   OPENAI_BASE_URL,
   OPENAI_IMAGE_MODEL_ID,
-} from "../utils/constants";
-
+} from "../../utils/constants";
 import {
   cleanupImageAlbum,
   clampImageCount,
   generateOpenAiImages,
-} from "./openaiImages";
+} from "../openaiImages";
 
-import type { ImageGenerationProgress } from "../utils/types";
+import type { ImageGenerationProgress } from "../../utils/types";
 
 const SOURCE_PNG = await sharp({
   create: {

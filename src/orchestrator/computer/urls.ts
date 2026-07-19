@@ -27,16 +27,14 @@ export const isExternallyReachableHttpUrl = (value: string): boolean => {
       hostname === "::1" ||
       hostname === "[::1]" ||
       hostname.endsWith(".local")
-    ) {
-      return false;
-    }
+    ) return false;
+
     if (
       /^10\./u.test(hostname) ||
       /^192\.168\./u.test(hostname) ||
       /^172\.(1[6-9]|2\d|3[01])\./u.test(hostname)
-    ) {
-      return false;
-    }
+    ) return false;
+
     return true;
   } catch {
     return false;
@@ -67,9 +65,8 @@ export const deriveComputerPublicHostUrl = (
 export const getKasmStreamUrl = (): string | undefined => {
   const configured = process.env.COMPUTER_LIVE_VIEW_URL?.trim();
   if (configured) {
-    if (isExternallyReachableHttpUrl(configured)) {
-      return withScaleToFit(configured);
-    }
+    if (isExternallyReachableHttpUrl(configured)) return withScaleToFit(configured);
+
     console.warn("[computer] Ignoring non-public COMPUTER_LIVE_VIEW_URL");
   }
 
@@ -92,19 +89,17 @@ export const getComputerViewerBaseUrl = (): string | undefined => {
   if (fromBase) return fromBase;
 
   const liveView = process.env.COMPUTER_LIVE_VIEW_URL?.trim();
-  if (liveView && isExternallyReachableHttpUrl(liveView)) {
-    try {
-      const url = new URL(liveView);
-      if (url.hostname.startsWith("desktop.")) {
-        url.hostname = `viewer.${url.hostname.slice("desktop.".length)}`;
-        url.pathname = "/";
-        url.search = "";
-        url.hash = "";
-        return url.origin;
-      }
-    } catch {
-      // ignore invalid live-view URL
+  if (liveView && isExternallyReachableHttpUrl(liveView)) try {
+    const url = new URL(liveView);
+    if (url.hostname.startsWith("desktop.")) {
+      url.hostname = `viewer.${url.hostname.slice("desktop.".length)}`;
+      url.pathname = "/";
+      url.search = "";
+      url.hash = "";
+      return url.origin;
     }
+  } catch {
+    // ignore invalid live-view URL
   }
 
   return undefined;
