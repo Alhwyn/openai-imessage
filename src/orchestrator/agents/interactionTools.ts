@@ -65,8 +65,8 @@ export const buildInteractionTools = ({
           spaceId,
           goal,
         });
-        effects.suppressText();
-        if (/^https?:\/\//.test(result.liveViewUrl)) {
+        if (result.liveViewUrl && /^https?:\/\//.test(result.liveViewUrl)) {
+          effects.suppressText();
           effects.push({ kind: "app", url: result.liveViewUrl });
         }
         return result;
@@ -74,11 +74,16 @@ export const buildInteractionTools = ({
     }),
     get_computer_task_status: tool({
       description:
-        "Get durable status for the latest Linux computer-use task in this conversation, including its current phase, step, last action, live viewer URL, completion result, or error.",
-      inputSchema: z.object({}),
-      execute: async () => {
+        "Get durable status for a Linux computer-use task in this conversation, including its current phase, step, last action, live viewer URL, completion result, or error. Pass taskId when asking about a specific assignment; omit it for the latest task.",
+      inputSchema: z.object({
+        taskId: z
+          .string()
+          .optional()
+          .describe("Task ID returned by assign_computer_task"),
+      }),
+      execute: async ({ taskId }) => {
         return (
-          (await getComputerTaskStatus(spaceId)) ?? {
+          (await getComputerTaskStatus(spaceId, taskId)) ?? {
             state: "not_found" as const,
           }
         );

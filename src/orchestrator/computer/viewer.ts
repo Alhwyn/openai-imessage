@@ -2,8 +2,9 @@ import { isAbsolute, relative, resolve } from "node:path";
 
 import { getComputerViewerSnapshot } from "../db/computerRuns";
 
+import { isExternallyReachableHttpUrl } from "./desktop";
+
 const DEFAULT_VIEWER_PORT = 6902;
-const DEFAULT_PUBLIC_VIEWER_URL = "https://viewer.alhwyn.com";
 const ARTIFACTS_ROOT = resolve("runtime/computer/artifacts");
 
 const viewerHtml = `<!doctype html>
@@ -318,19 +319,15 @@ const faviconResponse = async (): Promise<Response> => {
   });
 };
 
-export const getComputerViewerBaseUrl = (): string => {
+export const getComputerViewerBaseUrl = (): string | undefined => {
   const configured = process.env.COMPUTER_VIEWER_URL?.trim().replace(/\/+$/, "");
   if (configured) {
-    try {
-      const hostname = new URL(configured).hostname;
-      if (hostname !== "127.0.0.1" && hostname !== "localhost") return configured;
-    } catch {
-      return configured;
-    }
+    if (isExternallyReachableHttpUrl(configured)) return configured;
+    console.warn("[computer-viewer] Ignoring non-public COMPUTER_VIEWER_URL");
   }
 
   const baseUrl = process.env.BASE_URL?.trim();
-  if (baseUrl) {
+  if (baseUrl && isExternallyReachableHttpUrl(baseUrl)) {
     try {
       const url = new URL(baseUrl);
       const zoneHostname = url.hostname.startsWith("agent.")
@@ -342,11 +339,16 @@ export const getComputerViewerBaseUrl = (): string => {
     }
   }
 
-  return DEFAULT_PUBLIC_VIEWER_URL;
+  return undefined;
 };
 
-export const getComputerViewerUrl = (taskId: string, viewerToken: string): string => {
-  return `${getComputerViewerBaseUrl()}/computer/${encodeURIComponent(taskId)}?token=${encodeURIComponent(viewerToken)}`;
+export const getComputerViewerUrl = (
+  taskId: string,
+  viewerToken: string,
+): string | undefined => {
+  const baseUrl = getComputerViewerBaseUrl();
+  if (!baseUrl) return undefined;
+  return `${baseUrl}/computer/${encodeURIComponent(taskId)}?token=${encodeURIComponent(viewerToken)}`;
 };
 
 let viewerServer: ReturnType<typeof Bun.serve> | undefined;

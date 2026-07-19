@@ -88,11 +88,23 @@ export const cancelActiveComputerRunsForSpace = async (input: {
 };
 
 export const getComputerRun = async (
+  spaceId: string,
   taskId: string,
 ): Promise<ComputerRunStatus | null> => {
   return await getConvexClient().query(api.computerRuns.getByTaskId, {
     secret: getBridgeSecret(),
+    spaceId,
     taskId,
+  });
+};
+
+export const reconcileStaleComputerRuns = async (input: {
+  staleBefore: number;
+  error: string;
+}): Promise<number> => {
+  return await getConvexClient().mutation(api.computerRuns.reconcileStaleActive, {
+    secret: getBridgeSecret(),
+    ...input,
   });
 };
 

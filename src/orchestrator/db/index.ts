@@ -9,6 +9,7 @@ export {
   getComputerViewerSnapshot,
   getLatestComputerRunForSpace,
   markComputerRunRunning,
+  reconcileStaleComputerRuns,
   updateComputerRunProgress,
 } from "./computerRuns";
 export { appendMessages, listRecentMessages } from "./messages";

@@ -9,7 +9,6 @@ computer_tunnel="${COMPUTER_TUNNEL_NAME:-computer-viewer}"
 host="${TUNNEL_HOSTNAME:-agent.alhwyn.com}"
 zone_host="${TUNNEL_ZONE_HOSTNAME:-${host#*.}}"
 viewer_host="${COMPUTER_VIEWER_TUNNEL_HOSTNAME:-viewer.$zone_host}"
-desktop_host="${COMPUTER_TUNNEL_HOSTNAME:-desktop.$zone_host}"
 
 if [[ ! -f "$config" || ! -f "$computer_config" ]]; then
   echo "Missing a Cloudflare tunnel config." >&2
@@ -25,7 +24,6 @@ fi
 cloudflared tunnel --config "$config" ingress validate
 cloudflared tunnel --config "$computer_config" ingress validate
 echo "Phone viewer: https://$viewer_host/computer/<task-id>?token=<run-token>"
-echo "Desktop stream: https://$desktop_host"
 
 cloudflared tunnel \
   --config "$config" \

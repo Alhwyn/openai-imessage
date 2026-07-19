@@ -40,7 +40,7 @@ export type AssignImageTaskResult = AssignTaskResult & {
 };
 
 export type AssignComputerTaskResult = AssignTaskResult & {
-  liveViewUrl: string;
+  liveViewUrl?: string;
 };
 
 export type ImageTaskState =

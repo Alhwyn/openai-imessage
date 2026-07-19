@@ -13,7 +13,7 @@ export {
   scheduleOrchestratorTurn,
 } from "./bounce/index";
 export type { OrchestratorTurn } from "./bounce/index";
-export { assertConvexEnv } from "./db/index";
+export { assertConvexEnv, reconcileStaleComputerRuns } from "./db/index";
 export {
   assignImageTask,
   assignTask,

@@ -9,6 +9,7 @@ import {
   extractInboundImages,
   extractInboundText,
   flushPendingOrchestratorTurns,
+  reconcileStaleComputerRuns,
   scheduleOrchestratorTurn,
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
@@ -100,6 +101,32 @@ const handleInbound = async (space: Space, message: Message): Promise<void> => {
 const main = async () => {
   assertGmiApiKey();
   assertConvexEnv();
+  const reconciled = await reconcileStaleComputerRuns({
+    staleBefore: Date.now(),
+    error: "Computer worker stopped when the orchestrator restarted",
+  });
+  if (reconciled > 0) {
+    console.warn(`[computer-agent] Reconciled ${reconciled} orphaned run(s)`);
+  }
+
+  const workerTimeoutMs = Math.max(
+    60_000,
+    Number(process.env.COMPUTER_WORKER_TIMEOUT_MS ?? 8 * 60_000),
+  );
+  const watchdogIntervalMs = Math.max(
+    15_000,
+    Number(process.env.COMPUTER_WATCHDOG_INTERVAL_MS ?? 60_000),
+  );
+  const watchdog = setInterval(() => {
+    void reconcileStaleComputerRuns({
+      staleBefore: Date.now() - workerTimeoutMs - watchdogIntervalMs,
+      error: "Computer worker stopped reporting progress",
+    }).catch((error: unknown) => {
+      console.error("[computer-agent] Watchdog reconciliation failed", error);
+    });
+  }, watchdogIntervalMs);
+  watchdog.unref();
+
   const computerViewer = startComputerViewer();
 
   const { projectId, projectSecret, webhookSecret, missing } = getSpectrumEnv();
@@ -117,6 +144,7 @@ const main = async () => {
   const stopApp = async (reason: string) => {
     if (stopping) return;
     stopping = true;
+    clearInterval(watchdog);
     console.log(`[app] Stopping Spectrum (${reason})`);
     try {
       await Promise.allSettled(inboundJobs);

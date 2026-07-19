@@ -141,16 +141,15 @@ COMPUTER_LIVE_VIEW_PORT=6901
 COMPUTER_VIEWER_PORT=6902
 ```
 
-For viewing from a phone, expose both local services through HTTPS. The named
-tunnel setup below handles this automatically. With
-`BASE_URL=https://agent.alhwyn.com`, computer links resolve to:
+The named tunnel exposes the token-gated viewer, but deliberately does not
+publish the raw Kasm desktop. With `BASE_URL=https://agent.alhwyn.com`, the
+viewer base resolves to:
 
 - Viewer: `https://viewer.alhwyn.com/computer/...`
-- Read-only desktop stream: `https://desktop.alhwyn.com`
 
-The iMessage app card points to the custom viewer and uses a per-run access
-token. The direct desktop stream is unauthenticated while the development tunnel
-is running, so stop the tunnel when testing is finished.
+To enable live desktop cards, configure `COMPUTER_LIVE_VIEW_URL` with a separate
+externally reachable stream that has its own access controls. Without one,
+computer tasks still run and report status, but no live-view app card is sent.
 
 ### Dev tunnel (optional, like ngrok)
 
@@ -169,10 +168,9 @@ bun run tunnel
 ```
 
 `bun run tunnel` starts the existing webhook tunnel and a separate locally
-managed computer tunnel. The computer tunnel routes:
+managed computer tunnel. The computer tunnel routes only:
 
 - `viewer.alhwyn.com` → custom viewer on `127.0.0.1:6902`
-- `desktop.alhwyn.com` → read-only Kasm stream on `127.0.0.1:6901`
 
 The existing `agent.alhwyn.com` hostname continues to route to the webhook
 server on `127.0.0.1:4001`.

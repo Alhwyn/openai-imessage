@@ -3,7 +3,9 @@ import { z } from "zod";
 import {
   captureStableDesktopScreenshot,
   executeComputerAction,
+  getActiveDesktopWindowClass,
 } from "./desktop";
+import { getComputerHostSafetyChecks } from "./safety";
 
 import type { ComputerAction } from "./types";
 
@@ -97,6 +99,7 @@ export class ComputerApprovalRequiredError extends Error {
 type RunComputerUseInput = {
   goal: string;
   sessionId: string;
+  signal?: AbortSignal;
   onProgress?: (progress: {
     step: number;
     lastAction: string;
@@ -164,7 +167,10 @@ const responseText = (output: unknown[], directText?: string): string => {
   return parts.join("\n");
 };
 
-const callOpenAi = async (body: Record<string, unknown>) => {
+const callOpenAi = async (
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+) => {
   const response = await fetch(`${getOpenAiBaseUrl()}/responses`, {
     method: "POST",
     headers: {
@@ -172,6 +178,7 @@ const callOpenAi = async (body: Record<string, unknown>) => {
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!response.ok) {
@@ -224,7 +231,7 @@ const describeAction = (
     case "type":
       return {
         label: "Typed text",
-        detail: action.text.length > 80 ? `${action.text.slice(0, 77)}…` : action.text,
+        detail: `[typed ${action.text.length} character${action.text.length === 1 ? "" : "s"}]`,
       };
     case "keypress":
       return { label: "Pressed keys", detail: action.keys.join(" + ") };
@@ -265,6 +272,7 @@ const screenshotOutput = async (callId: string) => {
 export const runComputerUse = async ({
   goal,
   sessionId,
+  signal,
   onProgress,
   onAction,
 }: RunComputerUseInput): Promise<RunComputerUseResult> => {
@@ -309,6 +317,7 @@ export const runComputerUse = async ({
   let actionSequence = 0;
 
   for (let step = 1; step <= maximumSteps; step += 1) {
+    signal?.throwIfAborted();
     const body: Record<string, unknown> = {
       model: getComputerModel(),
       tools: [{ type: "computer" }],
@@ -331,7 +340,7 @@ export const runComputerUse = async ({
       body.previous_response_id = previousResponseId;
     }
 
-    const response = await callOpenAi(body);
+    const response = await callOpenAi(body, signal);
     const outputTypes = response.output.map((item) =>
       item && typeof item === "object" && "type" in item
         ? String(item.type)
@@ -416,6 +425,19 @@ export const runComputerUse = async ({
       });
 
       for (const action of call.actions) {
+        signal?.throwIfAborted();
+        const activeWindowClass =
+          action.type === "type" || action.type === "keypress"
+            ? await getActiveDesktopWindowClass()
+            : undefined;
+        const hostSafetyChecks = getComputerHostSafetyChecks(
+          action,
+          activeWindowClass,
+        );
+        if (hostSafetyChecks.length > 0) {
+          throw new ComputerApprovalRequiredError(hostSafetyChecks);
+        }
+
         actionSequence += 1;
         await onAction?.({
           sequence: actionSequence,

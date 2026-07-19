@@ -5,7 +5,6 @@ import type { ComputerAction } from "./types";
 const DEFAULT_WIDTH = 1280;
 const DEFAULT_HEIGHT = 800;
 const DEFAULT_SETTLE_MS = 300;
-const DEFAULT_PUBLIC_DESKTOP_URL = "https://desktop.alhwyn.com";
 
 const keyAliases: Record<string, string> = {
   ALT: "alt",
@@ -208,33 +207,44 @@ const withScaleToFit = (value: string): string => {
   }
 };
 
-export const getComputerLiveViewUrl = (): string => {
+export const isExternallyReachableHttpUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+    const hostname = url.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname === "0.0.0.0" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "[::1]" ||
+      hostname.endsWith(".local")
+    ) {
+      return false;
+    }
+    if (
+      /^10\./u.test(hostname) ||
+      /^192\.168\./u.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./u.test(hostname)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const getComputerLiveViewUrl = (): string | undefined => {
   const configured = process.env.COMPUTER_LIVE_VIEW_URL?.trim();
   if (configured) {
-    try {
-      const hostname = new URL(configured).hostname;
-      if (hostname !== "127.0.0.1" && hostname !== "localhost") {
-        return withScaleToFit(configured);
-      }
-    } catch {
-      return withScaleToFit(configured);
-    }
+    if (isExternallyReachableHttpUrl(configured)) return withScaleToFit(configured);
+    console.warn(
+      "[computer-agent] Ignoring non-public COMPUTER_LIVE_VIEW_URL",
+    );
   }
 
-  const baseUrl = process.env.BASE_URL?.trim();
-  if (baseUrl) {
-    try {
-      const url = new URL(baseUrl);
-      const zoneHostname = url.hostname.startsWith("agent.")
-        ? url.hostname.slice("agent.".length)
-        : url.hostname;
-      return withScaleToFit(`${url.protocol}//desktop.${zoneHostname}`);
-    } catch {
-      console.warn("[computer-agent] Ignoring invalid BASE_URL for desktop viewer");
-    }
-  }
-
-  return withScaleToFit(DEFAULT_PUBLIC_DESKTOP_URL);
+  return undefined;
 };
 
 /**
@@ -320,6 +330,39 @@ export const resetDesktopBrowserSession = async (): Promise<void> => {
   );
 };
 
+/**
+ * Removes user-created files shared by the long-lived desktop container.
+ * Browser profile preferences remain, while cookies and site storage are reset
+ * separately by resetDesktopBrowserSession.
+ */
+export const resetDesktopWorkspace = async (): Promise<void> => {
+  await runDocker(
+    [
+      "bash",
+      "-lc",
+      `
+        for directory in /workspace "$HOME/Downloads" "$HOME/Desktop" "$HOME/Documents"; do
+          mkdir -p "$directory"
+          find "$directory" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+        done
+      `,
+    ],
+    { timeoutMs: 15_000 },
+  );
+};
+
+export const getActiveDesktopWindowClass = async (): Promise<string | undefined> => {
+  const windowClass = await runDocker(
+    [
+      "bash",
+      "-lc",
+      "env DISPLAY=:1 xdotool getactivewindow getwindowclassname 2>/dev/null || true",
+    ],
+    { allowFailure: true },
+  );
+  return windowClass || undefined;
+};
+
 export const captureDesktopScreenshot = async (): Promise<Uint8Array> => {
   const path = `/tmp/computer-screen-${crypto.randomUUID()}.png`;
   try {
@@ -376,7 +419,14 @@ export const executeComputerAction = async (
       break;
     }
     case "type": {
-      await runXdotool("type", "--clearmodifiers", "--delay", "1", action.text);
+      await runXdotool(
+        "type",
+        "--clearmodifiers",
+        "--delay",
+        "1",
+        "--",
+        action.text,
+      );
       break;
     }
     case "keypress": {

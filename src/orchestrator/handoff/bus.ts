@@ -7,10 +7,10 @@ import {
 } from "../computer/index";
 import {
   appendComputerRunEvent,
-  cancelActiveComputerRunsForSpace,
   completeComputerRun,
   createComputerRun,
   failComputerRun,
+  getComputerRun,
   getLatestComputerRunForSpace,
   markComputerRunRunning,
   updateComputerRunProgress,
@@ -47,6 +47,7 @@ import type { OutboundItem } from "../contracts";
 export const IMAGE_TASK_ACK_TEXT = "got u, making those now, gimme a sec";
 
 const inFlight = new Set<string>();
+let activeComputerTaskId: string | undefined;
 
 let taskCounter = 0;
 
@@ -203,31 +204,38 @@ export const assignComputerTask = async (
 
   taskCounter += 1;
   const taskId = `computer_${Date.now()}_${taskCounter}`;
+  if (activeComputerTaskId) {
+    throw new Error(
+      `The shared desktop is already running task ${activeComputerTaskId}. Wait for it to finish before starting another task.`,
+    );
+  }
+  activeComputerTaskId = taskId;
+
   const streamUrl = getComputerLiveViewUrl();
   const viewerToken = crypto.randomUUID();
-  const liveViewUrl = getComputerViewerUrl(taskId, viewerToken);
+  const liveViewUrl = streamUrl
+    ? getComputerViewerUrl(taskId, viewerToken)
+    : undefined;
 
-  // Clear orphaned queued/running rows so "still running" zombies cannot block status.
-  await cancelActiveComputerRunsForSpace({
-    spaceId: input.spaceId,
-    error: `Superseded by ${taskId}`,
-    exceptTaskId: taskId,
-  }).catch((error: unknown) => {
-    console.warn("[computer-agent] Failed to cancel prior active runs", error);
-  });
-
-  await createComputerRun({
-    taskId,
-    spaceId: input.spaceId,
-    goal,
-    liveViewUrl,
-    streamUrl,
-    viewerToken,
-  });
+  try {
+    await createComputerRun({
+      taskId,
+      spaceId: input.spaceId,
+      goal,
+      liveViewUrl,
+      streamUrl,
+      viewerToken: liveViewUrl ? viewerToken : undefined,
+    });
+  } catch (error) {
+    activeComputerTaskId = undefined;
+    throw error;
+  }
 
   console.log(`[handoff] Assigned ${taskId} for space ${input.spaceId}:`, goal.slice(0, 120));
 
   void (async () => {
+    const abortController = new AbortController();
+    let computerWork: ReturnType<typeof runComputerAgent> | undefined;
     try {
       await markComputerRunRunning(taskId);
       let lastAction: string | undefined;
@@ -235,23 +243,28 @@ export const assignComputerTask = async (
         60_000,
         Number(process.env.COMPUTER_WORKER_TIMEOUT_MS ?? 8 * 60_000),
       );
+      computerWork = runComputerAgent({
+        goal,
+        runId: taskId,
+        spaceId: input.spaceId,
+        signal: abortController.signal,
+        onProgress: ({ step, lastAction: action }) => {
+          lastAction = action;
+          return updateComputerRunProgress(taskId, step, action);
+        },
+        onAction: ({ action, ...event }) => {
+          return appendComputerRunEvent(taskId, {
+            ...event,
+            actionType: action.type,
+          });
+        },
+      });
+      let timeout: ReturnType<typeof setTimeout> | undefined;
       const result = await Promise.race([
-        runComputerAgent({
-          goal,
-          runId: taskId,
-          onProgress: ({ step, lastAction: action }) => {
-            lastAction = action;
-            return updateComputerRunProgress(taskId, step, action);
-          },
-          onAction: ({ action, ...event }) => {
-            return appendComputerRunEvent(taskId, {
-              ...event,
-              actionType: action.type,
-            });
-          },
-        }),
+        computerWork,
         new Promise<never>((_, reject) => {
-          setTimeout(() => {
+          timeout = setTimeout(() => {
+            abortController.abort();
             reject(
               new Error(
                 `Computer worker timed out after ${Math.round(workerTimeoutMs / 1000)}s with no finish`,
@@ -259,7 +272,9 @@ export const assignComputerTask = async (
             );
           }, workerTimeoutMs);
         }),
-      ]);
+      ]).finally(() => {
+        if (timeout) clearTimeout(timeout);
+      });
       const deliveryText = formatComputerDeliveryText({
         goal,
         summary: result.summary,
@@ -273,6 +288,8 @@ export const assignComputerTask = async (
         step: result.steps,
       });
     } catch (error) {
+      abortController.abort();
+      await computerWork?.catch(() => undefined);
       const needsApproval = error instanceof ComputerApprovalRequiredError;
       const message = error instanceof Error ? error.message : String(error);
       await failComputerRun({
@@ -282,6 +299,8 @@ export const assignComputerTask = async (
       }).catch((persistenceError: unknown) => {
         console.error(`[computer-agent] Failed to persist failure for ${taskId}`, persistenceError);
       });
+    } finally {
+      if (activeComputerTaskId === taskId) activeComputerTaskId = undefined;
     }
   })().catch((error: unknown) => {
     console.error(`[computer-agent] Unhandled task failure for ${taskId}`, {
@@ -292,7 +311,14 @@ export const assignComputerTask = async (
   return { taskId, status: "started", liveViewUrl };
 };
 
-export const getComputerTaskStatus = getLatestComputerRunForSpace;
+export const getComputerTaskStatus = async (
+  spaceId: string,
+  taskId?: string,
+) => {
+  return taskId
+    ? await getComputerRun(spaceId, taskId)
+    : await getLatestComputerRunForSpace(spaceId);
+};
 
 /**
  * Assigns an image-generation task to a dedicated sub-agent.

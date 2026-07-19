@@ -2,6 +2,7 @@ import {
   assertDesktopReady,
   getComputerLiveViewUrl,
   resetDesktopBrowserSession,
+  resetDesktopWorkspace,
   startDesktopRecording,
   stopDesktopRecording,
 } from "./desktop";
@@ -12,6 +13,8 @@ import type { ComputerAction } from "./types";
 type RunComputerAgentInput = {
   goal: string;
   runId: string;
+  spaceId: string;
+  signal?: AbortSignal;
   onProgress?: (progress: {
     step: number;
     lastAction: string;
@@ -36,10 +39,14 @@ export type RunComputerAgentResult = {
 export const runComputerAgent = async ({
   goal,
   runId,
+  spaceId,
+  signal,
   onProgress,
   onAction,
 }: RunComputerAgentInput): Promise<RunComputerAgentResult> => {
+  console.log(`[computer-agent] Resetting desktop for space ${spaceId}`);
   await resetDesktopBrowserSession();
+  await resetDesktopWorkspace();
   await assertDesktopReady();
   await startDesktopRecording(runId);
 
@@ -48,6 +55,7 @@ export const runComputerAgent = async ({
     const result = await runComputerUse({
       goal,
       sessionId: runId,
+      signal,
       onProgress,
       onAction,
     });

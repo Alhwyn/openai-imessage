@@ -149,6 +149,8 @@ export const updateProgress = mutation({
     assertBridgeSecret(args.secret);
     const run = await getRunByTaskId(ctx, args.taskId);
     if (run.state !== "running") return null;
+    const status = await getStatus(ctx, run._id);
+    if (status && args.step < status.step) return null;
     await upsertStatus(ctx, run._id, "operating desktop", args.step, args.lastAction);
     return null;
   },
@@ -198,6 +200,9 @@ export const complete = mutation({
   handler: async (ctx, args) => {
     assertBridgeSecret(args.secret);
     const run = await getRunByTaskId(ctx, args.taskId);
+    if (run.state !== "running") {
+      throw new Error(`Cannot complete computer run from state ${run.state}`);
+    }
     await ctx.db.patch("computerRuns", run._id, {
       state: "completed",
       resultSummary: args.resultSummary,
@@ -221,6 +226,18 @@ export const fail = mutation({
   handler: async (ctx, args) => {
     assertBridgeSecret(args.secret);
     const run = await getRunByTaskId(ctx, args.taskId);
+    if (
+      run.state === "completed" ||
+      run.state === "failed" ||
+      run.state === "cancelled"
+    ) {
+      return null;
+    }
+    if (args.awaitingApproval && run.state !== "running") {
+      throw new Error(
+        `Cannot request approval for computer run from state ${run.state}`,
+      );
+    }
     const state = args.awaitingApproval ? "awaiting_approval" : "failed";
     await ctx.db.patch("computerRuns", run._id, {
       state,
@@ -290,9 +307,64 @@ export const cancelActiveForSpace = mutation({
   },
 });
 
+/**
+ * Reconciles workers that can no longer be making progress. Passing the current
+ * time during startup clears every queued/running row left by the prior process.
+ * The periodic watchdog passes an older cutoff and preserves fresh heartbeats.
+ */
+export const reconcileStaleActive = mutation({
+  args: {
+    secret: v.string(),
+    staleBefore: v.number(),
+    error: v.string(),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    assertBridgeSecret(args.secret);
+    const states = ["queued", "running"] as const;
+    let reconciled = 0;
+
+    for (const state of states) {
+      const runs = await ctx.db
+        .query("computerRuns")
+        .withIndex("by_state_and_createdAt", (q) =>
+          q.eq("state", state).lt("createdAt", args.staleBefore),
+        )
+        .take(100);
+
+      for (const run of runs) {
+        const status = await getStatus(ctx, run._id);
+        if (
+          state === "running" &&
+          status &&
+          status.heartbeatAt >= args.staleBefore
+        ) {
+          continue;
+        }
+        await ctx.db.patch("computerRuns", run._id, {
+          state: "failed",
+          error: args.error,
+          finishedAt: Date.now(),
+        });
+        await upsertStatus(
+          ctx,
+          run._id,
+          "failed",
+          status?.step ?? 0,
+          status?.lastAction,
+        );
+        reconciled += 1;
+      }
+    }
+
+    return reconciled;
+  },
+});
+
 export const getByTaskId = query({
   args: {
     secret: v.string(),
+    spaceId: v.string(),
     taskId: v.string(),
   },
   returns: v.union(computerRunStatusResult, v.null()),
@@ -302,7 +374,7 @@ export const getByTaskId = query({
       .query("computerRuns")
       .withIndex("by_taskId", (q) => q.eq("taskId", args.taskId))
       .unique();
-    return run ? await formatStatus(ctx, run) : null;
+    return run?.spaceId === args.spaceId ? await formatStatus(ctx, run) : null;
   },
 });
 
