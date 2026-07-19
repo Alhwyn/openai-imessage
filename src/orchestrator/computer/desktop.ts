@@ -297,6 +297,10 @@ export const resetDesktopWorkspace = async (): Promise<void> => {
   );
 };
 
+/**
+ * Capture a screenshot of the desktop.
+ * @returns The screenshot.
+ */
 export const captureDesktopScreenshot = async (): Promise<Uint8Array> => {
   const path = `/tmp/computer-screen-${crypto.randomUUID()}.png`;
   try {
@@ -308,6 +312,10 @@ export const captureDesktopScreenshot = async (): Promise<Uint8Array> => {
   }
 };
 
+/**
+ * Capture a stable screenshot of the desktop.
+ * @returns The screenshot.
+ */
 export const captureStableDesktopScreenshot = async (): Promise<Uint8Array> => {
   let previous = await captureDesktopScreenshot();
 
@@ -419,10 +427,19 @@ export const executeComputerAction = async (
 
 };
 
+/**
+ * Start the desktop recording.
+ * @param runId - The ID of the computer task.
+ */
 export const startDesktopRecording = async (runId: string): Promise<void> => {
   await runDocker(["/opt/computer-agent/bin/record-start", runId]);
 };
 
+/**
+ * Stop the desktop recording.
+ * @param runId - The ID of the computer task.
+ * @returns The path to the recording.
+ */
 export const stopDesktopRecording = async (
   runId: string,
 ): Promise<string | undefined> => {

@@ -105,6 +105,7 @@ const generateOneImageB64 = async (
   prompt: string,
   fetchFn: typeof fetch,
   timeoutMs: number,
+  apiKey: string,
 ): Promise<Uint8Array> => {
   const controller = new AbortController();
   const timer = setTimeout(() => {
@@ -117,7 +118,7 @@ const generateOneImageB64 = async (
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${getOpenAiApiKey("generating images")}`,
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         signal: controller.signal,
@@ -197,6 +198,7 @@ export const generateOpenAiImages = async (
 
   const imagePrompts = cleaned.slice(0, clampImageCount(cleaned.length));
   const imageCount = imagePrompts.length;
+  const apiKey = options.apiKey ?? getOpenAiApiKey("generating images");
   const fetchFn = options.fetchFn ?? fetch;
   const timeoutMs = options.timeoutMs ?? OPENAI_IMAGE_TIMEOUT_MS;
   const now = options.now ?? Date.now;
@@ -219,7 +221,7 @@ export const generateOpenAiImages = async (
   reportProgress("queued");
   const images: Uint8Array[] = [];
   for (const prompt of imagePrompts) {
-    const bytes = await generateOneImageB64(prompt, fetchFn, timeoutMs);
+    const bytes = await generateOneImageB64(prompt, fetchFn, timeoutMs, apiKey);
     images.push(bytes);
     completedImages += 1;
     reportProgress("processing");

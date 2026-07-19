@@ -60,6 +60,7 @@ export type ImageGenerationProgress = {
 
 /** Test/injection hooks for OpenAI image generation. */
 export type GenerateImagesOptions = {
+  apiKey?: string;
   fetchFn?: typeof fetch;
   now?: () => number;
   onProgress?: (progress: ImageGenerationProgress) => void;

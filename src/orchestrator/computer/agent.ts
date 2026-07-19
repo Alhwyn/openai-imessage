@@ -13,6 +13,11 @@ import type {
   RunComputerAgentResult,
 } from "./types";
 
+/**
+ * Run the computer agent.
+ * @param input - The input for the computer agent.
+ * @returns The result of the computer agent.
+ */
 export const runComputerAgent = async ({
   goal,
   runId,

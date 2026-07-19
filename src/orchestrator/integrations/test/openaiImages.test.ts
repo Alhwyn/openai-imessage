@@ -82,6 +82,8 @@ describe("cleanupImageAlbum", () => {
   });
 });
 
+const TEST_API_KEY = "test-openai-key";
+
 describe("generateOpenAiImages", () => {
   test("runs one OpenAI image request per prompt sequentially and stages JPEGs", async () => {
     let postCount = 0;
@@ -91,6 +93,9 @@ describe("generateOpenAiImages", () => {
         const url = requestUrl(input);
         expect(url).toBe(`${OPENAI_BASE_URL}/images/generations`);
         expect(init?.method).toBe("POST");
+        expect(init?.headers).toMatchObject({
+          Authorization: `Bearer ${TEST_API_KEY}`,
+        });
 
         const body = JSON.parse(requestBodyText(init?.body)) as {
           model: string;
@@ -120,6 +125,7 @@ describe("generateOpenAiImages", () => {
     );
 
     const album = await generateOpenAiImages(["a fluffy cat", "a fluffy cat"], {
+      apiKey: TEST_API_KEY,
       fetchFn: fetchFn as unknown as typeof fetch,
       onProgress: (update) => {
         progress.push(update);
@@ -162,6 +168,7 @@ describe("generateOpenAiImages", () => {
 
     try {
       await generateOpenAiImages(["bad prompt"], {
+        apiKey: TEST_API_KEY,
         fetchFn: fetchFn as unknown as typeof fetch,
       });
       throw new Error("expected generateOpenAiImages to fail");
@@ -187,11 +194,13 @@ describe("generateOpenAiImages", () => {
 
     try {
       await generateOpenAiImages(["bad bytes"], {
+        apiKey: TEST_API_KEY,
         fetchFn: fetchFn as unknown as typeof fetch,
       });
       throw new Error("expected generateOpenAiImages to reject bad image bytes");
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).not.toContain("OPENAI_API_KEY");
     }
   });
 
@@ -213,6 +222,7 @@ describe("generateOpenAiImages", () => {
 
     try {
       await generateOpenAiImages(["slow prompt"], {
+        apiKey: TEST_API_KEY,
         fetchFn: fetchFn as unknown as typeof fetch,
         timeoutMs: 20,
       });
