@@ -4,6 +4,7 @@ import {
   formatComputerDeliveryText,
   formatComputerFailureText,
   formatComputerRunContext,
+  stripMarkdownEmphasis,
 } from "./statusText";
 
 import type { ComputerRunStatus } from "./types";
@@ -52,4 +53,27 @@ test("formatComputerFailureText keeps the goal and error", () => {
   });
   expect(text).toContain("open chrome");
   expect(text).toContain("Desktop container is not running");
+});
+
+test("stripMarkdownEmphasis removes bold markers", () => {
+  expect(
+    stripMarkdownEmphasis(
+      "Solved today’s official Wordle. The answer was **CHURN**, solved in **4 guesses**.",
+    ),
+  ).toBe(
+    "Solved today’s official Wordle. The answer was CHURN, solved in 4 guesses.",
+  );
+});
+
+test("formatComputerDeliveryText strips Markdown bold from summaries", () => {
+  const text = formatComputerDeliveryText({
+    goal: "solve wordle",
+    summary:
+      "Solved today’s official Wordle. The answer was **CHURN**, solved in **4 guesses**.",
+    steps: 9,
+  });
+  expect(text).toBe(
+    "Solved today’s official Wordle. The answer was CHURN, solved in 4 guesses.",
+  );
+  expect(text).not.toContain("**");
 });

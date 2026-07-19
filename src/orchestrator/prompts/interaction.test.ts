@@ -16,6 +16,12 @@ describe("interaction prompt rewrite formatting", () => {
     expect(interactionSystemPrompt).toContain(
       "For an actual list, use plain-text bullet characters like • with one item per line.",
     );
+    expect(interactionSystemPrompt).toContain(
+      "Never wrap words in ** for bold",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Wrong: The answer was **CHURN**. Right: The answer was CHURN.",
+    );
   });
 });
 
@@ -81,5 +87,17 @@ describe("interaction prompt user-facing voice", () => {
       'Never write scratch notes, chain-of-thought, or tool-selection reasoning into the message',
     );
     expect(interactionSystemPrompt).toContain("use commentary");
+  });
+
+  test("forbids explaining memory/pipeline internals", () => {
+    expect(interactionSystemPrompt).toContain(
+      "Never explain how you work under the hood",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Never explain memory mechanics",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "there's a background pipeline that parses our chats",
+    );
   });
 });

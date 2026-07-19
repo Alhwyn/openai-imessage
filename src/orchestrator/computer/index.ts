@@ -1,5 +1,6 @@
 import {
   assertDesktopReady,
+  openGoogleChrome,
   resetDesktopBrowserSession,
   resetDesktopWorkspace,
   startDesktopRecording,
@@ -47,6 +48,7 @@ export const runComputerAgent = async ({
   await resetDesktopBrowserSession();
   await resetDesktopWorkspace();
   await assertDesktopReady();
+  await openGoogleChrome();
   await startDesktopRecording(runId);
 
   let recordingPath: string | undefined;

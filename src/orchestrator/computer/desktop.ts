@@ -226,6 +226,36 @@ export const assertDesktopReady = async (): Promise<void> => {
 };
 
 /**
+ * Always launch Google Chrome at task start so the agent never has to hunt
+ * for the dock icon or fall back to another browser.
+ */
+export const openGoogleChrome = async (): Promise<void> => {
+  await runDocker(
+    [
+      "bash",
+      "-lc",
+      `
+        export DISPLAY=:1
+        if pgrep -x chrome >/dev/null 2>&1 || pgrep -x google-chrome >/dev/null 2>&1; then
+          exit 0
+        fi
+        (google-chrome --no-first-run --no-default-browser-check --disable-session-crashed-bubble about:blank >/tmp/chrome-launch.log 2>&1 &) || \
+        (google-chrome-stable --no-first-run --no-default-browser-check --disable-session-crashed-bubble about:blank >/tmp/chrome-launch.log 2>&1 &) || \
+        (chromium --no-first-run --no-default-browser-check about:blank >/tmp/chrome-launch.log 2>&1 &) || true
+        for _ in $(seq 1 20); do
+          if pgrep -x chrome >/dev/null 2>&1 || pgrep -x google-chrome >/dev/null 2>&1 || pgrep -x chromium >/dev/null 2>&1; then
+            exit 0
+          fi
+          sleep 0.25
+        done
+        exit 0
+      `,
+    ],
+    { allowFailure: true, timeoutMs: 15_000 },
+  );
+};
+
+/**
  * Starts each computer task with a clean browser state while preserving Chrome's
  * installed profile preferences so first-run prompts do not reappear.
  */

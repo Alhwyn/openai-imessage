@@ -264,10 +264,13 @@ export const runComputerUse = async ({
   const instructions =
     "Operate the supplied Linux XFCE desktop using only the computer tool. " +
     `The fixed display size is ${width}x${height}. ` +
-    "For any website or browser task, open Google Chrome (google-chrome) from the dock or applications menu — prefer Chrome over Firefox. " +
+    "Google Chrome is already launched at task start on about:blank. Always use that Chrome window — never Firefox, never another browser, never skip opening a URL in Chrome. " +
+    "If Chrome is somehow not visible, open Google Chrome (google-chrome) from the dock or applications menu before doing anything else. " +
     "You must visually inspect the desktop via screenshots and perform real mouse/keyboard actions. " +
     "Never claim the goal is complete without interacting with the UI. " +
     "Work toward the user's goal, verify the result visually, and only then stop with a concrete written result. " +
+    "Write that final result as plain iMessage text only: never Markdown, never **bold**, never *italics*, never backticks. " +
+    "Example: The answer was CHURN, solved in 4 guesses. Not: The answer was **CHURN**. " +
     "Do not make purchases, send messages, publish content, enter credentials, " +
     "change permissions, or delete data.";
 

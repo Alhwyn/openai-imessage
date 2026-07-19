@@ -23,11 +23,12 @@ export const computerViewerHtml = `<!doctype html>
     :root {
       color: #191919;
       background: #f7f7f5;
-      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
       font-synthesis: none;
     }
     * { box-sizing: border-box; }
-    body { min-height: 100vh; margin: 0; background: #f7f7f5; }
+    body { min-height: 100vh; margin: 0; background: #f7f7f5; font-size: 16px; }
     button { font: inherit; }
     .shell { width: min(1120px, 100%); margin: 0 auto; padding: 18px 20px 40px; }
     .layout { display: block; }
@@ -101,25 +102,26 @@ export const computerViewerHtml = `<!doctype html>
     @keyframes click { to { transform: scale(1.7); opacity: 0; } }
     .events {
       display: flex;
-      max-height: 250px;
+      max-height: 360px;
       flex-direction: column;
       align-items: stretch;
-      gap: 2px;
+      gap: 4px;
       overflow-y: auto;
-      margin-top: 10px;
+      margin-top: 14px;
       padding: 0;
       scrollbar-width: thin;
     }
-    .empty { padding: 4px 2px; color: #999; font-size: 11px; }
+    .empty { padding: 10px 4px; color: #777; font-size: 17px; line-height: 1.4; }
     .event {
       min-width: 0;
-      padding: 4px 2px;
-      border-radius: 4px;
-      color: #4f4f4c;
+      min-height: 28px;
+      padding: 8px 4px;
+      border-radius: 6px;
+      color: #2f2f2c;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 20px;
       font-weight: 500;
-      line-height: 16px;
+      line-height: 28px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -141,7 +143,8 @@ export const computerViewerHtml = `<!doctype html>
     @media (max-width: 640px) {
       .shell { padding: 10px 10px 24px; }
       .stage { border-radius: 5px; }
-      .events { max-height: 200px; }
+      .events { max-height: 280px; }
+      .event { font-size: 18px; line-height: 26px; min-height: 26px; }
     }
   </style>
 </head>

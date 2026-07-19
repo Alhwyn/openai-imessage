@@ -1,5 +1,13 @@
 import type { ComputerRunStatus } from "./types";
 
+/** Strip Markdown emphasis so iMessage never shows **bold** / *italics*. */
+export const stripMarkdownEmphasis = (text: string): string =>
+  text
+    .replace(/\*\*(.+?)\*\*/gu, "$1")
+    .replace(/(?<!\w)\*(.+?)\*(?!\w)/gu, "$1")
+    .replace(/(?<!\w)_(.+?)_(?!\w)/gu, "$1")
+    .replace(/`([^`]+)`/gu, "$1");
+
 /**
  * Formats the latest computer-run for the interaction system prompt so the
  * chat agent always knows whether the desktop task finished, failed, or stalled.
@@ -48,7 +56,7 @@ export const formatComputerDeliveryText = (input: {
   steps: number;
   lastAction?: string;
 }): string => {
-  const summary = input.summary.trim();
+  const summary = stripMarkdownEmphasis(input.summary.trim());
   const looksVague =
     !summary ||
     input.steps <= 0 ||

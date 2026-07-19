@@ -1,0 +1,14 @@
+---
+description: iMessage agent prompts and user-facing text must stay plain — never Markdown bold
+globs: src/orchestrator/prompts/**/*,src/orchestrator/computer/**/*,src/orchestrator/agents/**/*
+alwaysApply: false
+---
+
+# iMessage plain text only
+
+Outbound chat text (interaction agent, computer result summaries, delivery copy) is plain iMessage text.
+
+- Never use Markdown bold/italics: no `**word**`, `*word*`, or `_word_`.
+- Wrong: `The answer was **CHURN**, solved in **4 guesses**.`
+- Right: `The answer was CHURN, solved in 4 guesses.`
+- Keep prompt rules explicit about this; strip Markdown emphasis in delivery helpers when model output may still include it.
