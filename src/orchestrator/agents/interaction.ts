@@ -29,6 +29,7 @@ import { buildUserContent } from "../utils/userContent";
 
 import { buildInteractionTools } from "./interactionTools";
 import { createTurnEffectCollector } from "./turnEffects";
+import { extractVisibleAssistantText } from "./visibleText";
 
 import type { InteractionEvent, InteractionResult } from "./types";
 import type { DeliveryTarget } from "../handoff/types";
@@ -156,7 +157,15 @@ export const runInteractionAgent = async (
       throw error;
     });
 
-    const finalOutbound = effects.finalize(result.text);
+    const visibleText = extractVisibleAssistantText(result.content, result.text);
+    if (result.text.trim() && !visibleText) {
+      console.warn("[agent] Dropped non-user-facing model text", {
+        spaceId,
+        preview: result.text.trim().slice(0, 160),
+      });
+    }
+
+    const finalOutbound = effects.finalize(visibleText);
     const toolCalls = result.steps.flatMap((step) =>
       step.toolCalls.map((call) => call.toolName),
     );
@@ -171,11 +180,11 @@ export const runInteractionAgent = async (
       stepCount: result.steps.length,
       toolCalls,
       toolResults,
-      modelTextPreview: result.text.trim().slice(0, 120) || undefined,
+      modelTextPreview: visibleText.slice(0, 120) || undefined,
       queuedCount: finalOutbound.length,
     });
 
-    if (!result.text.trim() && toolCalls.length === 0) {
+    if (!visibleText && toolCalls.length === 0) {
       console.warn("[agent] Model returned no tools or text", {
         spaceId,
         finishReason: result.finishReason,

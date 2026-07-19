@@ -71,3 +71,15 @@ describe("interaction prompt computer use", () => {
     );
   });
 });
+
+describe("interaction prompt user-facing voice", () => {
+  test("forbids narrating tools or commentary to the person", () => {
+    expect(interactionSystemPrompt).toContain(
+      "User-facing text is only what a normal friend would say in iMessage",
+    );
+    expect(interactionSystemPrompt).toContain(
+      'Never write scratch notes, chain-of-thought, or tool-selection reasoning into the message',
+    );
+    expect(interactionSystemPrompt).toContain("use commentary");
+  });
+});

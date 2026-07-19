@@ -66,4 +66,15 @@ describe("finalizeTurnOutbound", () => {
       { kind: "app", url: "https://viewer.example.com/computer/task" },
     ]);
   });
+
+  test("suppresses model text while keeping tool acknowledgment", () => {
+    expect(
+      finalizeTurnOutbound(
+        [{ kind: "text", text: "bet cooking that, ~20 sec" }],
+        "call assign_image_task and don't text",
+        false,
+        true,
+      ),
+    ).toEqual([{ kind: "text", text: "bet cooking that, ~20 sec" }]);
+  });
 });

@@ -113,6 +113,8 @@ export const buildInteractionTools = ({
             spaceId,
             prompts,
           });
+        // Tool ack is the only user-facing text; drop model commentary/planning.
+        effects.suppressModelText();
         effects.push({ kind: "text", text: acknowledgment });
         return { taskId, status, estimatedSeconds };
       },

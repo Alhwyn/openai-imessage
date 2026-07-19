@@ -7,12 +7,15 @@ import type { OutboundItem } from "../contracts";
 export type TurnEffectCollector = {
   push: (item: OutboundItem) => void;
   suppressText: () => void;
+  /** Keep tool-queued text (e.g. image ack) but ignore model text for this turn. */
+  suppressModelText: () => void;
   finalize: (modelText: string) => OutboundItem[];
 };
 
 export const createTurnEffectCollector = (): TurnEffectCollector => {
   const effects: OutboundItem[] = [];
   let textSuppressed = false;
+  let modelTextSuppressed = false;
 
   return {
     push: (item) => {
@@ -21,8 +24,16 @@ export const createTurnEffectCollector = (): TurnEffectCollector => {
     suppressText: () => {
       textSuppressed = true;
     },
+    suppressModelText: () => {
+      modelTextSuppressed = true;
+    },
     finalize: (modelText) =>
-      finalizeTurnOutbound(effects, modelText, textSuppressed),
+      finalizeTurnOutbound(
+        effects,
+        modelText,
+        textSuppressed,
+        modelTextSuppressed,
+      ),
   };
 };
 
@@ -35,8 +46,9 @@ export const finalizeTurnOutbound = (
   toolOutbound: OutboundItem[],
   modelText: string,
   suppressText = false,
+  suppressModelText = false,
 ): OutboundItem[] => {
-  const trimmedModelText = modelText.trim();
+  const trimmedModelText = suppressModelText ? "" : modelText.trim();
   const nonText = toolOutbound.filter((item) => item.kind !== "text");
   if (suppressText) return nonText;
 
