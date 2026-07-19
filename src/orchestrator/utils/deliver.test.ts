@@ -166,6 +166,33 @@ describe("deliverOutbound", () => {
     expect(await content.url()).toBe(url);
   });
 
+  test("sends computer links as live customized mini-app cards", async () => {
+    const send = mock(() => Promise.resolve(undefined));
+    const space = asSpace({ send });
+    const url = "https://viewer.example.com/computer/task?token=secret";
+
+    await deliverOutbound(space, [
+      { kind: "app", presentation: "computer", url },
+    ]);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect((await buildContent(firstArg(send))) as unknown).toEqual({
+      type: "customized-mini-app",
+      __platform: "iMessage",
+      appName: "Spectrum",
+      appStoreId: 6777616651,
+      extensionBundleId: "codes.photon.Spectrum.MessagesExtension",
+      live: true,
+      teamId: "P8XT6232SL",
+      url,
+      layout: {
+        caption: "Computer use",
+        subcaption: "Tap to watch live",
+        summary: "Live computer use session",
+      },
+    });
+  });
+
   test("sends app then instruction text via space.send in order", async () => {
     const send = mock(() => Promise.resolve(undefined));
     const space = asSpace({ send });

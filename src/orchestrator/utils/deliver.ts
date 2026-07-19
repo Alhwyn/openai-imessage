@@ -1,10 +1,18 @@
 import { app, attachment, group, text } from "@spectrum-ts/core";
+import { customizedMiniApp } from "@spectrum-ts/imessage";
 
 import { tapbackEmoji } from "../tapbacks";
 
 import type { DeliverOutboundOptions } from "./types";
 import type { OutboundItem } from "../contracts";
 import type { ContentInput, Space } from "@spectrum-ts/core";
+
+const SPECTRUM_MINI_APP_IDENTITY = {
+  appName: "Spectrum",
+  appStoreId: 6777616651,
+  extensionBundleId: "codes.photon.Spectrum.MessagesExtension",
+  teamId: "P8XT6232SL",
+} as const;
 
 const buildAlbumContent = (paths: string[]): ContentInput => {
   if (paths.length === 0) {
@@ -69,9 +77,23 @@ export const deliverOutbound = async (
       }
       case "app": {
         console.log("[deliver] Sending app deep-link via space.send", {
+          presentation: item.presentation,
           url: item.url,
         });
-        await space.send(app(item.url));
+        const content =
+          item.presentation === "computer"
+            ? customizedMiniApp({
+                ...SPECTRUM_MINI_APP_IDENTITY,
+                live: true,
+                url: item.url,
+                layout: {
+                  caption: "Computer use",
+                  subcaption: "Tap to watch live",
+                  summary: "Live computer use session",
+                },
+              })
+            : app(item.url);
+        await space.send(content);
         break;
       }
       default: {

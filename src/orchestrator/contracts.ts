@@ -18,4 +18,4 @@ export type OutboundItem =
   | { kind: "text"; text: string }
   | { kind: "reaction"; emoji: TapbackKey }
   | { kind: "album"; paths: string[] }
-  | { kind: "app"; url: string };
+  | { kind: "app"; url: string; presentation?: "computer" };

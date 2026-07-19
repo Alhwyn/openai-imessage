@@ -67,7 +67,11 @@ export const buildInteractionTools = ({
         });
         if (result.viewerPageUrl && /^https?:\/\//.test(result.viewerPageUrl)) {
           effects.setTextPolicy("non_text_only");
-          effects.push({ kind: "app", url: result.viewerPageUrl });
+          effects.push({
+            kind: "app",
+            presentation: "computer",
+            url: result.viewerPageUrl,
+          });
         }
         return result;
       },
