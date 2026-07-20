@@ -98,9 +98,12 @@ const runProcess = async (
       child.exited,
     ]);
 
-    if (timedOut) throw new Error(
-      `Desktop command timed out after ${timeoutMs}ms: ${argv.join(" ")}`,
-    );
+    if (timedOut) {
+      if (options.allowFailure) return stdout.trim();
+      throw new Error(
+        `Desktop command timed out after ${timeoutMs}ms: ${argv.join(" ")}`,
+      );
+    }
 
     if (exitCode !== 0 && !options.allowFailure) throw new Error(
       `Desktop command failed (${exitCode}): ${stderr.trim() || argv.join(" ")}`,
@@ -242,7 +245,15 @@ export const assertDesktopReady = async (): Promise<void> => {
       "Recording falls back to /tmp. Fix with: " +
       "mkdir -p runtime/computer/{artifacts,workspace} && bun run computer:down && bun run computer:up",
   );
-  await ensureFixedDisplaySize();
+  // Best-effort: a wedged X server must not abort the whole computer task.
+  try {
+    await ensureFixedDisplaySize();
+  } catch (error) {
+    console.warn(
+      "[computer] Could not lock display size:",
+      error instanceof Error ? error.message : error,
+    );
+  }
   await runDocker(["/opt/computer-agent/bin/screenshot", "/tmp/ready.png"], {
     timeoutMs: 15_000,
   });
@@ -343,16 +354,39 @@ export const resetDesktopWorkspace = async (): Promise<void> => {
 
 /**
  * Capture a screenshot of the desktop.
- * @returns The screenshot.
+ * Uses ffmpeg x11grab inside the container (maim hangs while the session
+ * recorder also holds x11grab — exit 124).
  */
 export const captureDesktopScreenshot = async (): Promise<Uint8Array> => {
   const path = `/tmp/computer-screen-${crypto.randomUUID()}.png`;
-  try {
-    await runDocker(["/opt/computer-agent/bin/screenshot", path]);
-    const encoded = await runDocker(["base64", "-w", "0", path]);
+  const capture = async (): Promise<Uint8Array> => {
+    await runDocker(["/opt/computer-agent/bin/screenshot", path], {
+      timeoutMs: 20_000,
+    });
+    const encoded = await runDocker(["base64", "-w", "0", path], {
+      timeoutMs: 15_000,
+    });
     return new Uint8Array(Buffer.from(encoded, "base64"));
+  };
+
+  try {
+    try {
+      return await capture();
+    } catch (error) {
+      // One retry after clearing stuck grabbers from a prior wedged capture.
+      await runDocker(
+        ["bash", "-lc", "pkill -x maim 2>/dev/null || true; pkill -f 'ffmpeg.*x11grab.*frames:v 1' 2>/dev/null || true"],
+        { allowFailure: true, timeoutMs: 5_000 },
+      );
+      await Bun.sleep(250);
+      try {
+        return await capture();
+      } catch {
+        throw error;
+      }
+    }
   } finally {
-    await runDocker(["rm", "-f", path], { allowFailure: true });
+    await runDocker(["rm", "-f", path], { allowFailure: true, timeoutMs: 5_000 });
   }
 };
 

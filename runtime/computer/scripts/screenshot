@@ -7,17 +7,45 @@ width="1280"
 height="800"
 
 mkdir -p "$(dirname "$output")"
+pkill -x maim 2>/dev/null || true
 
-# Keep the desktop in the model's fixed coordinate space. Kasm often boots at
-# 1024x768 even when VNC_RESOLUTION is set, and VNC clients can resize it.
-# Bound xdpyinfo so a wedged X server cannot hang the worker forever.
-current="$(timeout 3 xdpyinfo -display "$display" 2>/dev/null | awk '/dimensions:/ {print $2; found=1} END { if (!found) exit 0 }' || true)"
+# Prefer ffmpeg x11grab. maim often hangs forever while the session recorder
+# already holds an x11grab on the same display (exit 124 from `timeout`).
+capture_with_ffmpeg() {
+  local size="$1"
+  timeout 8 env DISPLAY="$display" ffmpeg -nostdin -hide_banner -loglevel error -y \
+    -f x11grab \
+    -video_size "$size" \
+    -i "${display}.0" \
+    -frames:v 1 \
+    -update 1 \
+    "$output"
+}
+
+# Best-effort geometry lock for model coordinates (never block the capture path).
+current="$(timeout 2 xdpyinfo -display "$display" 2>/dev/null | awk '/dimensions:/ {print $2; found=1} END { if (!found) exit 0 }' || true)"
 if [[ -n "$current" && "$current" != "${width}x${height}" ]]; then
-  timeout 5 env DISPLAY="$display" xrandr --output VNC-0 --mode "${width}x${height}" 2>/dev/null \
-    || timeout 5 env DISPLAY="$display" xrandr -s "${width}x${height}" 2>/dev/null \
+  timeout 3 env DISPLAY="$display" xrandr --output VNC-0 --mode "${width}x${height}" 2>/dev/null \
+    || timeout 3 env DISPLAY="$display" xrandr -s "${width}x${height}" 2>/dev/null \
     || true
 fi
 
-# maim can block forever if X is wedged or another grab is held.
-timeout 10 env DISPLAY="$display" maim -u "$output"
-printf '%s\n' "$output"
+if capture_with_ffmpeg "${width}x${height}"; then
+  printf '%s\n' "$output"
+  exit 0
+fi
+
+# Fallback if the live desktop is still at the Kasm boot geometry.
+if capture_with_ffmpeg "1024x768"; then
+  printf '%s\n' "$output"
+  exit 0
+fi
+
+# Last resort: maim (may still hang under a live recorder — keep timeout tight).
+if timeout 5 env DISPLAY="$display" maim -u "$output"; then
+  printf '%s\n' "$output"
+  exit 0
+fi
+
+echo "screenshot failed: ffmpeg and maim could not capture ${display}" >&2
+exit 1
