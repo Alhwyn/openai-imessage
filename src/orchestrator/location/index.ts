@@ -4,12 +4,17 @@ import {
   registerSpectrumApp,
   requestMyLocation,
 } from "./imessage";
+import { createDirectionsLink } from "./maps";
 import {
   coarseFromShared,
   resolveSenderAddress,
   searchAreaFrom,
 } from "./utils";
 
+import type {
+  CreateDirectionsLinkInput,
+  CreateDirectionsLinkResult,
+} from "./maps";
 import type {
   CoarseSharedLocation,
   GetMyLocationInput,
@@ -23,6 +28,7 @@ import type {
 export {
   clearSpectrumApp,
   coarseFromShared,
+  createDirectionsLink,
   getMyLocation,
   registerSpectrumApp,
   requestMyLocation,
@@ -31,6 +37,8 @@ export {
 };
 export type {
   CoarseSharedLocation,
+  CreateDirectionsLinkInput,
+  CreateDirectionsLinkResult,
   GetMyLocationInput,
   GetMyLocationResult,
   LocationType,

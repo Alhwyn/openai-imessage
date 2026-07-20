@@ -129,7 +129,7 @@ describe("interaction prompt location discovery", () => {
       "Every place claim must come from search_nearby_places results",
     );
     expect(interactionSystemPrompt).toContain(
-      "end with a Sources section listing those same URLs",
+      "end with a Sources section listing the evidence URLs",
     );
     expect(interactionSystemPrompt).toContain(
       'search_nearby_places(subject="parks with peacocks", searchArea="Victoria, BC")',
@@ -150,10 +150,22 @@ describe("interaction prompt location discovery", () => {
       "treat these opaque native payloads as a possible share update",
     );
     expect(interactionSystemPrompt).toContain(
-      "Cite only URLs returned by search_nearby_places",
+      "Cite only URLs returned by search_nearby_places (evidence sources) and create_directions_link (navigation)",
     );
     expect(interactionSystemPrompt).toContain(
-      "only cite URLs returned by search_nearby_places",
+      "only cite URLs returned by search_nearby_places and create_directions_link",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "call create_directions_link with that place name as destination",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Do not invent destinations. Do not build Maps URLs by hand",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Google Maps uses the recipient device's live GPS for real-time navigation",
+    );
+    expect(interactionSystemPrompt).toContain(
+      'create_directions_link(destination="Beacon Hill Park", searchArea="Victoria, BC")',
     );
   });
 });

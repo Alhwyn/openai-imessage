@@ -11,7 +11,11 @@ import {
   getImageTaskStatus,
 } from "../handoff/index";
 import { isComposioAuthUrl } from "../integrations/index";
-import { getMyLocation, requestMyLocation } from "../location/index";
+import {
+  createDirectionsLink,
+  getMyLocation,
+  requestMyLocation,
+} from "../location/index";
 import { editMemory } from "../memory/index";
 import { TAPBACK_KEYS } from "../tapbacks";
 import {
@@ -259,6 +263,27 @@ export const buildInteractionTools = ({
       }),
       execute: async ({ subject, searchArea }) => {
         return await searchNearbyPlaces({ subject, searchArea });
+      },
+    }),
+    create_directions_link: tool({
+      description:
+        "Build a keyless Google Maps navigation URL for an evidence-backed place. Call only after search_nearby_places. Pass a destination name from those results plus the same coarse searchArea. Omits origin so Maps uses the recipient device live GPS. Never invent destinations. Never pass coordinates. Include the returned URL in the reply as plain text.",
+      inputSchema: z.object({
+        destination: z
+          .string()
+          .min(1)
+          .describe(
+            'Place name from search_nearby_places evidence, e.g. "Beacon Hill Park"',
+          ),
+        searchArea: z
+          .string()
+          .min(1)
+          .describe(
+            'Same coarse area used for search_nearby_places, e.g. "Victoria, BC". Never lat/lng.',
+          ),
+      }),
+      execute: ({ destination, searchArea }) => {
+        return createDirectionsLink({ destination, searchArea });
       },
     }),
     memory: tool({
