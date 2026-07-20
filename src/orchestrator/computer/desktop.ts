@@ -259,7 +259,6 @@ export const assertDesktopReady = async (): Promise<void> => {
   });
 };
 
-
 /**
  * Always launch Google Chrome at task start so the agent never has to hunt
  * for the dock icon or fall back to another browser.
