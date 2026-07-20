@@ -2,6 +2,7 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
 import {
+  assignBackgroundTask,
   assignComputerTask,
   assignImageTask,
   assignTask,
@@ -14,6 +15,7 @@ import { TAPBACK_KEYS } from "../tapbacks";
 import {
   IMAGE_MAX_COUNT,
   IMAGE_MIN_COUNT,
+  toBackgroundJpeg,
 } from "../utils/index";
 
 import type { TurnEffectCollector } from "./turnEffects";
@@ -130,6 +132,47 @@ export const buildInteractionTools = ({
       execute: () => {
         const progress = getImageTaskStatus(spaceId);
         return progress ?? { state: "not_found" as const };
+      },
+    }),
+    set_chat_background: tool({
+      description:
+        "Set or clear this iMessage chat wallpaper. Use source=prompt to generate one, source=attachment for an image they just sent, or source=clear to remove it. Not for sending pics — use assign_image_task for that.",
+      inputSchema: z.discriminatedUnion("source", [
+        z.object({
+          source: z.literal("prompt"),
+          prompt: z.string().min(1).describe("Wallpaper image prompt"),
+        }),
+        z.object({ source: z.literal("attachment") }),
+        z.object({ source: z.literal("clear") }),
+      ]),
+      execute: async (input) => {
+        if (input.source === "clear") {
+          effects.push({ kind: "background" });
+          return { ok: true };
+        }
+
+        if (input.source === "prompt") {
+          const { taskId, status, acknowledgment } = assignBackgroundTask({
+            deliveryTarget,
+            spaceId,
+            prompt: input.prompt,
+          });
+          effects.setTextPolicy("tools_only");
+          effects.push({ kind: "text", text: acknowledgment });
+          return { taskId, status };
+        }
+
+        const image = event.images?.[0];
+        if (!image) return {
+          ok: false,
+          error: "No image attachment on this message; ask them to send one",
+        };
+
+        effects.push({
+          kind: "background",
+          image: await toBackgroundJpeg(image.data),
+        });
+        return { ok: true };
       },
     }),
     react_to_message: tool({

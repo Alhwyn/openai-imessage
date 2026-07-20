@@ -22,6 +22,13 @@ export type AssignImageTaskInput = {
   prompts: string[];
 };
 
+export type AssignBackgroundTaskInput = {
+  deliveryTarget: DeliveryTarget;
+  spaceId: string;
+  /** Prompt used to generate a single wallpaper image. */
+  prompt: string;
+};
+
 export type AssignComputerTaskInput = {
   deliveryTarget: DeliveryTarget;
   spaceId: string;
@@ -35,6 +42,11 @@ export type AssignTaskResult = {
 
 export type AssignImageTaskResult = AssignTaskResult & {
   estimatedSeconds: number;
+  /** Text acknowledgment the interaction turn should deliver immediately. */
+  acknowledgment: string;
+};
+
+export type AssignBackgroundTaskResult = AssignTaskResult & {
   /** Text acknowledgment the interaction turn should deliver immediately. */
   acknowledgment: string;
 };

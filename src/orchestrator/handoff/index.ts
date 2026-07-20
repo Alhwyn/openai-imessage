@@ -1,4 +1,5 @@
 import {
+  assignBackgroundTask,
   assignComputerTask,
   assignImageTask,
   assignTask,
@@ -7,6 +8,8 @@ import {
 import { getImageTaskStatus } from "./imageTaskTracker";
 
 import type {
+  AssignBackgroundTaskInput,
+  AssignBackgroundTaskResult,
   AssignComputerTaskInput,
   AssignComputerTaskResult,
   AssignImageTaskInput,
@@ -20,6 +23,7 @@ import type {
 } from "./types";
 
 export {
+  assignBackgroundTask,
   assignComputerTask,
   assignImageTask,
   assignTask,
@@ -27,6 +31,8 @@ export {
   getImageTaskStatus,
 };
 export type {
+  AssignBackgroundTaskInput,
+  AssignBackgroundTaskResult,
   AssignComputerTaskInput,
   AssignComputerTaskResult,
   AssignImageTaskInput,

@@ -11,6 +11,11 @@ export const summarizeOutbound = (items: OutboundItem[]) => {
         return { kind: item.kind, emoji: item.emoji };
       case "app":
         return { kind: item.kind, url: item.url };
+      case "background":
+        return {
+          kind: item.kind,
+          bytes: item.image?.byteLength ?? 0,
+        };
       default: {
         const _exhaustive: never = item;
         throw new Error(`Unhandled outbound kind: ${JSON.stringify(_exhaustive)}`);

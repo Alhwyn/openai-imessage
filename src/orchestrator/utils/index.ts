@@ -21,6 +21,7 @@ import {
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
 } from "./constants";
+import { toBackgroundJpeg } from "./backgroundImage";
 import { createKeyedDebounce } from "./debounce";
 import { deliverOutbound } from "./deliver";
 import {
@@ -79,6 +80,7 @@ export {
   OPENAI_TEXT_MODEL_ID,
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
+  toBackgroundJpeg,
 };
 export type {
   DeliverOutboundOptions,
