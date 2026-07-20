@@ -117,11 +117,13 @@ describe("interaction prompt chat background", () => {
 });
 
 describe("interaction prompt location discovery", () => {
-  test("requires consent, coarse area only, and cited Exa results", () => {
-    expect(interactionSystemPrompt).toContain("call get_my_location first");
+  test("asks for city, uses Exa, and delivers live map mini-app card", () => {
     expect(interactionSystemPrompt).toContain(
-      "call request_my_location once and send one short plain-text ask",
+      "ask for a city, neighborhood, or specific place name",
     );
+    expect(interactionSystemPrompt).toContain("Do not use Find My");
+    expect(interactionSystemPrompt).not.toContain("call get_my_location first");
+    expect(interactionSystemPrompt).not.toContain("request_my_location");
     expect(interactionSystemPrompt).toContain(
       "Never pass latitude/longitude to search_nearby_places",
     );
@@ -129,7 +131,7 @@ describe("interaction prompt location discovery", () => {
       "Every place claim must come from search_nearby_places results",
     );
     expect(interactionSystemPrompt).toContain(
-      "end with a Sources section listing the evidence URLs",
+      "end with a Sources section listing those evidence URLs",
     );
     expect(interactionSystemPrompt).toContain(
       'search_nearby_places(subject="parks with peacocks", searchArea="Victoria, BC")',
@@ -141,28 +143,19 @@ describe("interaction prompt location discovery", () => {
       "call search_nearby_places again with a differently phrased subject",
     );
     expect(interactionSystemPrompt).toContain(
-      "Native Find My acceptance can arrive immediately after that request",
+      "create_directions_link delivers the live map mini-app card",
     );
     expect(interactionSystemPrompt).toContain(
-      "do not answer the payload, ask what it means, or expose reasoning",
+      "so a Spectrum mini-app live map card is delivered",
     );
     expect(interactionSystemPrompt).toContain(
-      "treat these opaque native payloads as a possible share update",
+      "Do not invent destinations. Do not build map URLs by hand",
     );
     expect(interactionSystemPrompt).toContain(
-      "Cite only URLs returned by search_nearby_places (evidence sources) and create_directions_link (navigation)",
+      "Never paste Google Maps or hosted map URLs into chat text",
     );
     expect(interactionSystemPrompt).toContain(
-      "only cite URLs returned by search_nearby_places and create_directions_link",
-    );
-    expect(interactionSystemPrompt).toContain(
-      "call create_directions_link with that place name as destination",
-    );
-    expect(interactionSystemPrompt).toContain(
-      "Do not invent destinations. Do not build Maps URLs by hand",
-    );
-    expect(interactionSystemPrompt).toContain(
-      "Google Maps uses the recipient device's live GPS for real-time navigation",
+      "the bot never receives GPS",
     );
     expect(interactionSystemPrompt).toContain(
       'create_directions_link(destination="Beacon Hill Park", searchArea="Victoria, BC")',

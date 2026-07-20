@@ -11,11 +11,7 @@ import {
   getImageTaskStatus,
 } from "../handoff/index";
 import { isComposioAuthUrl } from "../integrations/index";
-import {
-  createDirectionsLink,
-  getMyLocation,
-  requestMyLocation,
-} from "../location/index";
+import { createDirectionsLink } from "../maps";
 import { editMemory } from "../memory/index";
 import { TAPBACK_KEYS } from "../tapbacks";
 import {
@@ -219,34 +215,9 @@ export const buildInteractionTools = ({
         return { ok: true };
       },
     }),
-    get_my_location: tool({
-      description:
-        "Read the current sender's already-shared Find My location as a coarse snapshot (city/neighborhood). Returns searchArea for place lookup when address metadata exists. Does not return exact coordinates. Use before near-me place questions. If status is not_shared, call request_my_location once.",
-      inputSchema: z.object({}),
-      execute: async () => {
-        return await getMyLocation({
-          space: deliveryTarget.space,
-          message: deliveryTarget.message,
-          senderId: event.senderId,
-        });
-      },
-    }),
-    request_my_location: tool({
-      description:
-        "Send a native Find My location-request card to the current sender in this chat. Success means the request card was sent, not that they accepted sharing. Call at most once per ask when get_my_location returns not_shared. After they accept, call get_my_location again.",
-      inputSchema: z.object({}),
-      execute: async () => {
-        return await requestMyLocation({
-          space: deliveryTarget.space,
-          message: deliveryTarget.message,
-          senderId: event.senderId,
-          clientMessageId: `location-request-${deliveryTarget.message.id}`,
-        });
-      },
-    }),
     search_nearby_places: tool({
       description:
-        "Search Exa for evidence-backed places near a coarse area. Use a specific natural-language subject (full phrase, not keywords). Pass searchArea from get_my_location or a city they named. If results are thin, call again with a differently phrased subject. Only report returned results with their source URLs. Do not pass coordinates.",
+        "Search Exa for evidence-backed places near a coarse area. Use a specific natural-language subject (full phrase, not keywords). Pass a city/neighborhood or place area they named. If results are thin, call again with a differently phrased subject. Only report returned results with their source URLs. Do not pass coordinates.",
       inputSchema: z.object({
         subject: z
           .string()
@@ -258,7 +229,7 @@ export const buildInteractionTools = ({
           .string()
           .min(1)
           .describe(
-            'Coarse area only, e.g. "Victoria, BC" or shortAddress from get_my_location. Never lat/lng.',
+            'Coarse area only, e.g. "Victoria, BC". Never lat/lng.',
           ),
       }),
       execute: async ({ subject, searchArea }) => {
@@ -267,7 +238,7 @@ export const buildInteractionTools = ({
     }),
     create_directions_link: tool({
       description:
-        "Build a keyless Google Maps navigation URL for an evidence-backed place. Call only after search_nearby_places. Pass a destination name from those results plus the same coarse searchArea. Omits origin so Maps uses the recipient device live GPS. Never invent destinations. Never pass coordinates. Include the returned URL in the reply as plain text.",
+        "Send a Spectrum mini-app card for a hosted live map to an evidence-backed place. Call only after search_nearby_places. Pass a destination name from those results plus the same coarse searchArea. The map shows the person's live GPS in the browser and a route to the destination — the bot never receives GPS. Never invent destinations. Never pass coordinates. Never put map URLs in chat text or Markdown — this tool delivers the card.",
       inputSchema: z.object({
         destination: z
           .string()
@@ -282,8 +253,23 @@ export const buildInteractionTools = ({
             'Same coarse area used for search_nearby_places, e.g. "Victoria, BC". Never lat/lng.',
           ),
       }),
-      execute: ({ destination, searchArea }) => {
-        return createDirectionsLink({ destination, searchArea });
+      execute: async ({ destination, searchArea }) => {
+        const result = await createDirectionsLink({ destination, searchArea });
+        if (result.status !== "ok") return {
+          ok: false as const,
+          error: result.error,
+        };
+
+        effects.push({
+          kind: "app",
+          presentation: "maps",
+          url: result.url,
+        });
+        return {
+          ok: true as const,
+          destination: result.destination,
+          searchArea: result.searchArea,
+        };
       },
     }),
     memory: tool({

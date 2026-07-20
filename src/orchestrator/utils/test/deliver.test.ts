@@ -191,6 +191,34 @@ describe("deliverOutbound", () => {
     });
   });
 
+  test("sends maps links as live customized mini-app cards", async () => {
+    const send = mock(() => Promise.resolve(undefined));
+    const space = asSpace({ send });
+    const url =
+      "https://maps.alhwyn.com/maps/session-1?token=viewer-token";
+
+    await deliverOutbound(space, [
+      { kind: "app", presentation: "maps", url },
+    ]);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect((await buildContent(firstArg(send))) as unknown).toEqual({
+      type: "customized-mini-app",
+      __platform: "iMessage",
+      appName: "Spectrum",
+      appStoreId: 6777616651,
+      extensionBundleId: "codes.photon.Spectrum.MessagesExtension",
+      live: true,
+      teamId: "P8XT6232SL",
+      url,
+      layout: {
+        caption: "Live map",
+        subcaption: "Tap to open",
+        summary: "Live directions map",
+      },
+    });
+  });
+
   test("sends app then instruction text via space.send in order", async () => {
     const send = mock(() => Promise.resolve(undefined));
     const space = asSpace({ send });

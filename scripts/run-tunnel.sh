@@ -7,6 +7,7 @@ computer_config="$root/cloudflared/computer.yml"
 tunnel="webhook-automator"
 computer_tunnel="computer-viewer"
 viewer_host="viewer.alhwyn.com"
+maps_host="maps.alhwyn.com"
 
 if [[ ! -f "$config" || ! -f "$computer_config" ]]; then
   echo "Missing a Cloudflare tunnel config." >&2
@@ -22,6 +23,7 @@ fi
 cloudflared tunnel --config "$config" ingress validate
 cloudflared tunnel --config "$computer_config" ingress validate
 echo "Phone viewer: https://$viewer_host/computer/<task-id>?token=<run-token>"
+echo "Maps viewer:  https://$maps_host/maps/<session-id>?token=<viewer-token>"
 
 cloudflared tunnel \
   --config "$config" \

@@ -73,19 +73,42 @@ export const deliverOutbound = async (
         presentation: item.presentation,
         url: item.url,
       });
-      const content =
-          item.presentation === "computer"
-            ? customizedMiniApp({
-              ...SPECTRUM_MINI_APP_IDENTITY,
-              live: true,
-              url: item.url,
-              layout: {
-                caption: "Computer use",
-                subcaption: "Tap to watch live",
-                summary: "Live computer use session",
-              },
-            })
-            : app(item.url);
+      let content: ContentInput;
+      switch (item.presentation) {
+        case "computer":
+          content = customizedMiniApp({
+            ...SPECTRUM_MINI_APP_IDENTITY,
+            live: true,
+            url: item.url,
+            layout: {
+              caption: "Computer use",
+              subcaption: "Tap to watch live",
+              summary: "Live computer use session",
+            },
+          });
+          break;
+        case "maps":
+          content = customizedMiniApp({
+            ...SPECTRUM_MINI_APP_IDENTITY,
+            live: true,
+            url: item.url,
+            layout: {
+              caption: "Live map",
+              subcaption: "Tap to open",
+              summary: "Live directions map",
+            },
+          });
+          break;
+        case undefined:
+          content = app(item.url);
+          break;
+        default: {
+          const _exhaustive: never = item.presentation;
+          throw new Error(
+            `Unhandled app presentation: ${JSON.stringify(_exhaustive)}`,
+          );
+        }
+      }
       await space.send(content);
       break;
     }

@@ -34,7 +34,6 @@
     "@ai-sdk/openai": "^4.0.14",
     "@composio/core": "^0.14.0",
     "@composio/vercel": "^0.11.1",
-    "@photon-ai/advanced-imessage": "1.0.0",
     "@spectrum-ts/core": "^11.0.0",
     "@spectrum-ts/imessage": "^11.0.0",
     "ai": "^7.0.28",
