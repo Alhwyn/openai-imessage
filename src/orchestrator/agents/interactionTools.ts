@@ -132,7 +132,7 @@ export const buildInteractionTools = ({
       execute: () => {
         const progress = getImageTaskStatus(spaceId);
         return progress ?? { state: "not_found" as const };
-      },
+      }
     }),
     set_chat_background: tool({
       description:
@@ -168,10 +168,17 @@ export const buildInteractionTools = ({
           error: "No image attachment on this message; ask them to send one",
         };
 
-        effects.push({
-          kind: "background",
-          image: await toBackgroundJpeg(image.data),
-        });
+        try {
+          effects.push({
+            kind: "background",
+            image: await toBackgroundJpeg(image.data),
+          });
+        } catch {
+          return {
+            ok: false,
+            error: "Couldn't use that attachment as a wallpaper; send a real image (PNG, JPEG, or WebP)",
+          };
+        }
         return { ok: true };
       },
     }),
