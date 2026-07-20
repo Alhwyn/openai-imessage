@@ -115,3 +115,45 @@ describe("interaction prompt chat background", () => {
     );
   });
 });
+
+describe("interaction prompt location discovery", () => {
+  test("requires consent, coarse area only, and cited Exa results", () => {
+    expect(interactionSystemPrompt).toContain("call get_my_location first");
+    expect(interactionSystemPrompt).toContain(
+      "call request_my_location once and send one short plain-text ask",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Never pass latitude/longitude to search_nearby_places",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Every place claim must come from search_nearby_places results",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "end with a Sources section listing those same URLs",
+    );
+    expect(interactionSystemPrompt).toContain(
+      'search_nearby_places(subject="parks with peacocks", searchArea="Victoria, BC")',
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Prefer full phrases over keyword stuffing",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "call search_nearby_places again with a differently phrased subject",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Native Find My acceptance can arrive immediately after that request",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "do not answer the payload, ask what it means, or expose reasoning",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "treat these opaque native payloads as a possible share update",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Cite only URLs returned by search_nearby_places",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "only cite URLs returned by search_nearby_places",
+    );
+  });
+});

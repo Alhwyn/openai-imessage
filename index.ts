@@ -18,6 +18,7 @@ import {
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
 } from "./src/orchestrator/index";
+import { registerSpectrumApp } from "./src/orchestrator/location/index";
 
 /** Drop provider redeliveries for a few minutes inside one process. */
 const seenInboundMessages = createRecentIdTracker({
@@ -118,6 +119,7 @@ const main = async () => {
     platforms: [imessage.config()],
     webhookSecret,
   });
+  registerSpectrumApp(app);
 
   let stopping = false;
   const inboundJobs = new Set<Promise<void>>();

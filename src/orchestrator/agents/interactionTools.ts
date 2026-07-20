@@ -1,6 +1,7 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
+import { searchNearbyPlaces } from "../exa/index";
 import {
   assignBackgroundTask,
   assignComputerTask,
@@ -10,6 +11,7 @@ import {
   getImageTaskStatus,
 } from "../handoff/index";
 import { isComposioAuthUrl } from "../integrations/index";
+import { getMyLocation, requestMyLocation } from "../location/index";
 import { editMemory } from "../memory/index";
 import { TAPBACK_KEYS } from "../tapbacks";
 import {
@@ -211,6 +213,52 @@ export const buildInteractionTools = ({
 
         effects.push({ kind: "app", url: trimmed });
         return { ok: true };
+      },
+    }),
+    get_my_location: tool({
+      description:
+        "Read the current sender's already-shared Find My location as a coarse snapshot (city/neighborhood). Returns searchArea for place lookup when address metadata exists. Does not return exact coordinates. Use before near-me place questions. If status is not_shared, call request_my_location once.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        return await getMyLocation({
+          space: deliveryTarget.space,
+          message: deliveryTarget.message,
+          senderId: event.senderId,
+        });
+      },
+    }),
+    request_my_location: tool({
+      description:
+        "Send a native Find My location-request card to the current sender in this chat. Success means the request card was sent, not that they accepted sharing. Call at most once per ask when get_my_location returns not_shared. After they accept, call get_my_location again.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        return await requestMyLocation({
+          space: deliveryTarget.space,
+          message: deliveryTarget.message,
+          senderId: event.senderId,
+          clientMessageId: `location-request-${deliveryTarget.message.id}`,
+        });
+      },
+    }),
+    search_nearby_places: tool({
+      description:
+        "Search Exa for evidence-backed places near a coarse area. Use a specific natural-language subject (full phrase, not keywords). Pass searchArea from get_my_location or a city they named. If results are thin, call again with a differently phrased subject. Only report returned results with their source URLs. Do not pass coordinates.",
+      inputSchema: z.object({
+        subject: z
+          .string()
+          .min(1)
+          .describe(
+            'Specific natural-language ask, e.g. "parks with peacocks", "off-leash dog parks", "best tacos"',
+          ),
+        searchArea: z
+          .string()
+          .min(1)
+          .describe(
+            'Coarse area only, e.g. "Victoria, BC" or shortAddress from get_my_location. Never lat/lng.',
+          ),
+      }),
+      execute: async ({ subject, searchArea }) => {
+        return await searchNearbyPlaces({ subject, searchArea });
       },
     }),
     memory: tool({
