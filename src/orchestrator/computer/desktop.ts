@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import {
@@ -10,6 +11,10 @@ import {
 } from "./constants";
 
 import type { ComputerAction } from "./types";
+
+const COMPOSE_DIR = resolve("runtime/computer");
+const HOST_ARTIFACTS_DIR = resolve(COMPOSE_DIR, "artifacts");
+const HOST_WORKSPACE_DIR = resolve(COMPOSE_DIR, "workspace");
 
 const keyAliases: Record<string, string> = {
   ALT: "alt",
@@ -55,10 +60,19 @@ const buttonNumber = (
   }
 };
 
-const COMPOSE_FILE = resolve("runtime/computer/compose.yaml");
+const COMPOSE_FILE = resolve(COMPOSE_DIR, "compose.yaml");
 const COMPOSE_PROJECT =
   dirname(COMPOSE_FILE).split("/").pop() ||
   "computer";
+
+/**
+ * Docker Desktop bind mounts break with ENOENT if the host source directory
+ * is deleted while the container is running. Keep both mount roots present.
+ */
+const ensureHostMountDirs = async (): Promise<void> => {
+  await mkdir(HOST_ARTIFACTS_DIR, { recursive: true });
+  await mkdir(HOST_WORKSPACE_DIR, { recursive: true });
+};
 
 const runProcess = async (
   argv: string[],
@@ -103,6 +117,7 @@ const runProcess = async (
  * interpolation (which requires COMPUTER_DESKTOP_PASSWORD on every call).
  */
 const getDesktopContainerId = async (): Promise<string> => {
+  await ensureHostMountDirs();
   const byLabel = await runProcess(
     [
       "docker",
@@ -125,6 +140,28 @@ const getDesktopContainerId = async (): Promise<string> => {
         ? "Run `bun run computer:up` and wait until https://127.0.0.1:6901 is reachable."
         : "Add COMPUTER_DESKTOP_PASSWORD to your local .env, then run `bun run computer:up`."),
   );
+};
+
+/** Returns false when Docker Desktop bind mounts are in the ENOENT ghost state. */
+const areBindMountsWritable = async (): Promise<boolean> => {
+  const result = await runDocker(
+    [
+      "bash",
+      "-lc",
+      `
+        for directory in /artifacts /workspace; do
+          if ! mkdir -p "$directory/.mount-check" 2>/dev/null; then
+            echo broken
+            exit 0
+          fi
+          rmdir "$directory/.mount-check" 2>/dev/null || true
+        done
+        echo ok
+      `,
+    ],
+    { allowFailure: true, timeoutMs: 10_000 },
+  );
+  return result.trim() === "ok";
 };
 
 const runDocker = async (
@@ -199,11 +236,18 @@ export const ensureFixedDisplaySize = async (): Promise<{
 };
 
 export const assertDesktopReady = async (): Promise<void> => {
+  await ensureHostMountDirs();
+  if (!(await areBindMountsWritable())) console.warn(
+    "[computer] /artifacts or /workspace bind mount is not writable. " +
+      "Recording falls back to /tmp. Fix with: " +
+      "mkdir -p runtime/computer/{artifacts,workspace} && bun run computer:down && bun run computer:up",
+  );
   await ensureFixedDisplaySize();
   await runDocker(["/opt/computer-agent/bin/screenshot", "/tmp/ready.png"], {
     timeoutMs: 15_000,
   });
 };
+
 
 /**
  * Always launch Google Chrome at task start so the agent never has to hunt
@@ -432,22 +476,34 @@ export const executeComputerAction = async (
  * @param runId - The ID of the computer task.
  */
 export const startDesktopRecording = async (runId: string): Promise<void> => {
-  await runDocker(["/opt/computer-agent/bin/record-start", runId]);
+  await ensureHostMountDirs();
+  await runDocker(["/opt/computer-agent/bin/record-start", runId], {
+    timeoutMs: 15_000,
+  });
 };
 
 /**
  * Stop the desktop recording.
  * @param runId - The ID of the computer task.
- * @returns The path to the recording.
+ * @returns The host path to the recording.
  */
 export const stopDesktopRecording = async (
   runId: string,
 ): Promise<string | undefined> => {
   const output = await runDocker(
     ["/opt/computer-agent/bin/record-stop", runId],
-    { allowFailure: true },
+    { allowFailure: true, timeoutMs: 60_000 },
   );
   if (!output.endsWith("/demo.mp4")) return undefined;
 
-  return resolve(dirname(COMPOSE_FILE), "artifacts", runId, "demo.mp4");
+  const hostPath = resolve(HOST_ARTIFACTS_DIR, runId, "demo.mp4");
+  await mkdir(dirname(hostPath), { recursive: true });
+
+  // /tmp recordings need an explicit copy; /artifacts is already bind-mounted.
+  if (output.startsWith("/tmp/")) {
+    const containerId = await getDesktopContainerId();
+    await runProcess(["docker", "cp", `${containerId}:${output}`, hostPath]);
+  }
+
+  return hostPath;
 };

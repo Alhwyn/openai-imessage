@@ -2,7 +2,14 @@
 set -euo pipefail
 
 run_id="${1:?run id is required}"
-artifact_dir="/artifacts/${run_id}"
+path_file="/tmp/computer-recording-${run_id}.path"
+
+if [[ -f "$path_file" ]]; then
+  artifact_dir="$(cat "$path_file")"
+else
+  artifact_dir="/artifacts/${run_id}"
+fi
+
 pid_file="${artifact_dir}/recording.pid"
 source_file="${artifact_dir}/session.mkv"
 output_file="${artifact_dir}/demo.mp4"
@@ -18,6 +25,8 @@ if [[ -f "$pid_file" ]]; then
   fi
   rm -f "$pid_file"
 fi
+
+rm -f "$path_file"
 
 if [[ ! -s "$source_file" ]]; then
   printf '%s\n' "recording was not created" >&2

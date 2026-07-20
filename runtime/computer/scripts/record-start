@@ -4,12 +4,24 @@ set -euo pipefail
 run_id="${1:?run id is required}"
 display=":1"
 fps="15"
-artifact_dir="/artifacts/${run_id}"
+path_file="/tmp/computer-recording-${run_id}.path"
+
+# Prefer the bind-mounted /artifacts volume. Fall back to container-local
+# /tmp when Docker Desktop bind mounts are broken (ENOENT on writes).
+artifact_root="/artifacts"
+if ! mkdir -p "${artifact_root}/.mount-check" 2>/dev/null; then
+  artifact_root="/tmp/computer-artifacts"
+  mkdir -p "$artifact_root"
+fi
+rmdir "${artifact_root}/.mount-check" 2>/dev/null || true
+
+artifact_dir="${artifact_root}/${run_id}"
 pid_file="${artifact_dir}/recording.pid"
 log_file="${artifact_dir}/recording.log"
 recording="${artifact_dir}/session.mkv"
 
 mkdir -p "$artifact_dir"
+printf '%s\n' "$artifact_dir" >"$path_file"
 
 if [[ -f "$pid_file" ]] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
   printf '%s\n' "$recording"

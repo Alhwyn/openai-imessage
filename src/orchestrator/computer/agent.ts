@@ -31,7 +31,17 @@ export const runComputerAgent = async ({
   await resetDesktopWorkspace();
   await assertDesktopReady();
   await openGoogleChrome();
-  await startDesktopRecording(runId);
+
+  let recordingStarted = false;
+  try {
+    await startDesktopRecording(runId);
+    recordingStarted = true;
+  } catch (error) {
+    console.warn(
+      `[computer-agent] Recording start failed; continuing without recording:`,
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   try {
     const result = await runComputerUse({
@@ -41,10 +51,12 @@ export const runComputerAgent = async ({
       onProgress,
       onAction,
     });
-    const recordingPath = await stopDesktopRecording(runId);
+    const recordingPath = recordingStarted
+      ? await stopDesktopRecording(runId)
+      : undefined;
     return { ...result, recordingPath };
   } catch (error) {
-    await stopDesktopRecording(runId).catch(() => undefined);
+    if (recordingStarted) await stopDesktopRecording(runId).catch(() => undefined);
     throw error;
   }
 };

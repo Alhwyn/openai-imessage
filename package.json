@@ -8,7 +8,7 @@
     "check": "bun run lint && bun run typecheck && bun run test && bun run build",
     "computer:down": "docker compose --env-file .env -f runtime/computer/compose.yaml down",
     "computer:logs": "docker compose --env-file .env -f runtime/computer/compose.yaml logs -f desktop",
-    "computer:up": "docker compose --env-file .env -f runtime/computer/compose.yaml up -d --build",
+    "computer:up": "mkdir -p runtime/computer/artifacts runtime/computer/workspace && docker compose --env-file .env -f runtime/computer/compose.yaml up -d --build",
     "start": "bun --watch index.ts",
     "convex:dev": "convex dev",
     "lint": "eslint .",
