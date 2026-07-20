@@ -1,3 +1,4 @@
+import { toBackgroundJpeg } from "./backgroundImage";
 import {
   DEFAULT_OPENAI_TEXT_MODEL,
   DEFAULT_ORCHESTRATOR_DEBOUNCE_MS,
@@ -79,6 +80,7 @@ export {
   OPENAI_TEXT_MODEL_ID,
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
+  toBackgroundJpeg,
 };
 export type {
   DeliverOutboundOptions,

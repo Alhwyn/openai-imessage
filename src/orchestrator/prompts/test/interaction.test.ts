@@ -101,3 +101,17 @@ describe("interaction prompt user-facing voice", () => {
     );
   });
 });
+
+describe("interaction prompt chat background", () => {
+  test("routes wallpaper changes through set_chat_background", () => {
+    expect(interactionSystemPrompt).toContain(
+      "Use set_chat_background for chat wallpaper",
+    );
+    expect(interactionSystemPrompt).toContain(
+      'set_chat_background(source="prompt", prompt="misty forest at dusk, soft wallpaper")',
+    );
+    expect(interactionSystemPrompt).toContain(
+      'set_chat_background(source="attachment")',
+    );
+  });
+});

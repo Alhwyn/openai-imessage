@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/protect-env.sh",
+        "failClosed": true
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": ".cursor/hooks/protect-env.sh",
+        "failClosed": true
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": ".cursor/hooks/protect-env.sh",
+        "matcher": "Write|EditNotebook|Delete|ApplyPatch",
+        "failClosed": true
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/protect-env.sh"
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/ci-check.sh",
+        "timeout": 300,
+        "loop_limit": 3
+      }
+    ]
+  }
+}

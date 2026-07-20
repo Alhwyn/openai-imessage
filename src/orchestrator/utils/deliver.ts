@@ -1,5 +1,5 @@
 import { app, attachment, group, text } from "@spectrum-ts/core";
-import { customizedMiniApp } from "@spectrum-ts/imessage";
+import { background, customizedMiniApp } from "@spectrum-ts/imessage";
 
 import { tapbackEmoji } from "../tapbacks";
 
@@ -87,6 +87,20 @@ export const deliverOutbound = async (
             })
             : app(item.url);
       await space.send(content);
+      break;
+    }
+    case "background": {
+      if (!item.image) {
+        console.log("[deliver] Clearing chat background via space.send");
+        await space.send(background("clear"));
+        break;
+      }
+      console.log("[deliver] Setting chat background via space.send", {
+        bytes: item.image.byteLength,
+      });
+      await space.send(
+        background(Buffer.from(item.image), { mimeType: "image/jpeg" }),
+      );
       break;
     }
     default: {

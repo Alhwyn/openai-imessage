@@ -213,4 +213,37 @@ describe("deliverOutbound", () => {
 
     expect(await first.url()).toBe(url);
   });
+
+  test("clears chat background via space.send", async () => {
+    const send = mock(() => Promise.resolve(undefined));
+    const space = asSpace({ send });
+
+    await deliverOutbound(space, [{ kind: "background" }]);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect((await buildContent(firstArg(send))) as unknown).toEqual({
+      type: "background",
+      __platform: "iMessage",
+      __fireAndForget: true,
+      action: { kind: "clear" },
+    });
+  });
+
+  test("sets chat background from in-memory bytes via space.send", async () => {
+    const send = mock(() => Promise.resolve(undefined));
+    const space = asSpace({ send });
+    const image = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+
+    await deliverOutbound(space, [{ kind: "background", image }]);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    const content = (await buildContent(firstArg(send))) as unknown as {
+      type: string;
+      action: { kind: string; mimeType?: string; read: () => Promise<Buffer> };
+    };
+    expect(content.type).toBe("background");
+    expect(content.action.kind).toBe("set");
+    expect(content.action.mimeType).toBe("image/jpeg");
+    expect(Uint8Array.from(await content.action.read())).toEqual(image);
+  });
 });

@@ -20,4 +20,16 @@ describe("summarizeOutbound", () => {
       { kind: "reaction", emoji: "like" },
     ]);
   });
+
+  test("summarizes background set and clear items", () => {
+    expect(
+      summarizeOutbound([
+        { kind: "background", image: new Uint8Array([1, 2, 3]) },
+        { kind: "background" },
+      ]),
+    ).toEqual([
+      { kind: "background", bytes: 3 },
+      { kind: "background", bytes: 0 },
+    ]);
+  });
 });

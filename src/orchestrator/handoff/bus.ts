@@ -33,6 +33,8 @@ import {
 } from "./imageTaskTracker";
 
 import type {
+  AssignBackgroundTaskInput,
+  AssignBackgroundTaskResult,
   AssignComputerTaskInput,
   AssignComputerTaskResult,
   AssignImageTaskInput,
@@ -45,6 +47,10 @@ import type { OutboundItem } from "../contracts";
 
 /** Immediate acknowledgment owned by the image handoff path. */
 export const IMAGE_TASK_ACK_TEXT = "got u, making those now, gimme a sec";
+
+/** Immediate acknowledgment owned by the chat-background handoff path. */
+export const BACKGROUND_TASK_ACK_TEXT =
+  "got u, swapping the wallpaper, gimme a sec";
 
 const inFlight = new Set<string>();
 let activeComputerTaskId: string | undefined;
@@ -428,5 +434,60 @@ export const assignImageTask = (
     status: "started",
     estimatedSeconds: Math.ceil(task.estimatedDurationMs / 1_000),
     acknowledgment: IMAGE_TASK_ACK_TEXT,
+  };
+};
+
+/**
+ * Generate one image and apply it as this chat's wallpaper.
+ */
+export const assignBackgroundTask = (
+  input: AssignBackgroundTaskInput,
+): AssignBackgroundTaskResult => {
+  const prompt = input.prompt.trim();
+  if (!prompt) throw new Error("Background prompt is required");
+
+  taskCounter += 1;
+  const taskId = `background_${Date.now()}_${taskCounter}`;
+  let tempDir: string | undefined;
+
+  console.log(
+    `[handoff] Assigned ${taskId} for space ${input.spaceId}: set background`,
+    prompt.slice(0, 120),
+  );
+
+  runHandoffTask({
+    spaceId: input.spaceId,
+    deliveryTarget: input.deliveryTarget,
+    taskId,
+    label: "Background agent",
+    execute: async () => {
+      const album = await generateOpenAiImages([prompt]);
+      tempDir = album.tempDir;
+      const path = album.paths[0];
+      if (!path) throw new Error("Image generation returned no files");
+
+      // Staged album files are already JPEG.
+      const image = new Uint8Array(await Bun.file(path).arrayBuffer());
+      return {
+        outbound: [{ kind: "background", image }],
+        historyText: "[Set chat background from generated image]",
+      };
+    },
+    onFailure: () => {
+      const apology = "couldnt set that wallpaper, something broke on my end";
+      return {
+        outbound: [{ kind: "text", text: apology }],
+        historyText: apology,
+      };
+    },
+    cleanup: async () => {
+      await cleanupImageAlbum(tempDir);
+    },
+  });
+
+  return {
+    taskId,
+    status: "started",
+    acknowledgment: BACKGROUND_TASK_ACK_TEXT,
   };
 };
