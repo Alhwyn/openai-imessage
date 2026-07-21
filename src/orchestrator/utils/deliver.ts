@@ -69,9 +69,8 @@ export const deliverOutbound = async (
       break;
     }
     case "app": {
-      console.log("[deliver] Sending app deep-link via space.send", {
-        presentation: item.presentation,
-        url: item.url,
+      console.log("[deliver] Sending app via space.send", {
+        presentation: item.presentation ?? "app",
       });
       let content: ContentInput;
       switch (item.presentation) {

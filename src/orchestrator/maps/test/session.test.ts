@@ -1,19 +1,28 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import {
-  clearMapsSessionsForTests,
   createMapsSession,
   createMapsViewerToken,
   getMapsSession,
   getMapsSessionById,
   patchMapsSessionOrigin,
+  resetMapsSessionsMemoryForTests,
   verifyMapsViewerToken,
 } from "../session";
 
+import {
+  disposeTempMapsSessionStore,
+  useTempMapsSessionStore,
+} from "./tmpStore";
+
 const originalSecret = process.env.MAPS_VIEWER_TOKEN_SECRET;
 
+beforeEach(() => {
+  useTempMapsSessionStore();
+});
+
 afterEach(() => {
-  clearMapsSessionsForTests();
+  disposeTempMapsSessionStore();
   if (originalSecret === undefined) delete process.env.MAPS_VIEWER_TOKEN_SECRET;
   else process.env.MAPS_VIEWER_TOKEN_SECRET = originalSecret;
 });
@@ -59,5 +68,24 @@ describe("maps session tokens", () => {
     expect(updated?.originLng).toBe(-123.4);
     expect(updated?.originUpdatedAt).toBeGreaterThan(0);
     expect(patchMapsSessionOrigin("missing", { lat: 1, lng: 2 })).toBe(false);
+  });
+
+  test("reloads persisted sessions after memory reset", () => {
+    process.env.MAPS_VIEWER_TOKEN_SECRET = "test-secret";
+    const session = createMapsSession({
+      destinationName: "Beacon Hill Park",
+      searchArea: "Victoria, BC",
+      lat: 48.41,
+      lng: -123.36,
+    });
+    const token = createMapsViewerToken(session.id)!;
+    patchMapsSessionOrigin(session.id, { lat: 48.5, lng: -123.4 });
+
+    resetMapsSessionsMemoryForTests();
+
+    const reloaded = getMapsSession(session.id, token);
+    expect(reloaded?.destinationName).toBe("Beacon Hill Park");
+    expect(reloaded?.originLat).toBe(48.5);
+    expect(reloaded?.originLng).toBe(-123.4);
   });
 });

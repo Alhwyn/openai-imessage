@@ -2,16 +2,17 @@ import {
   type AdvancedIMessage,
   type SharedFriendLocation,
 } from "@photon-ai/advanced-imessage";
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { clearFindMyWatchesForTests } from "../bindFindMyOrigin";
 import { createDirectionsLink } from "../createDirectionsLink";
 import { clearSpectrumApp, registerSpectrumApp } from "../imessage";
+import { getMapsSession, getMapsSessionById } from "../session";
+
 import {
-  clearMapsSessionsForTests,
-  getMapsSession,
-  getMapsSessionById,
-} from "../session";
+  disposeTempMapsSessionStore,
+  useTempMapsSessionStore,
+} from "./tmpStore";
 
 import type { Message, Space, SpectrumInstance } from "@spectrum-ts/core";
 
@@ -66,9 +67,13 @@ const makeApp = (client: AdvancedIMessage) =>
     __providers: [],
   }) as unknown as SpectrumInstance;
 
+beforeEach(() => {
+  useTempMapsSessionStore();
+});
+
 afterEach(() => {
   clearFindMyWatchesForTests();
-  clearMapsSessionsForTests();
+  disposeTempMapsSessionStore();
   clearSpectrumApp();
   mock.restore();
   globalThis.fetch = originalFetch;

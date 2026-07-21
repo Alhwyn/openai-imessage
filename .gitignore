@@ -5,6 +5,7 @@ node_modules
 out
 dist
 *.tgz
+.data
 runtime/computer/artifacts/*
 runtime/computer/workspace/*
 !runtime/computer/artifacts/.gitkeep

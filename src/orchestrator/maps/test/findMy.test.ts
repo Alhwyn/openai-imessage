@@ -4,7 +4,7 @@ import {
   type AdvancedIMessage,
   type SharedFriendLocation,
 } from "@photon-ai/advanced-imessage";
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { bindFindMyOrigin, clearFindMyWatchesForTests } from "../bindFindMyOrigin";
 import {
@@ -13,10 +13,15 @@ import {
 } from "../findMy";
 import { clearSpectrumApp, registerSpectrumApp } from "../imessage";
 import {
-  clearMapsSessionsForTests,
   createMapsSession,
   getMapsSessionById,
+  patchMapsSessionOrigin,
 } from "../session";
+
+import {
+  disposeTempMapsSessionStore,
+  useTempMapsSessionStore,
+} from "./tmpStore";
 
 import type { Message, Space, SpectrumInstance } from "@spectrum-ts/core";
 
@@ -82,9 +87,13 @@ const makeClient = (locations: {
     },
   }) as unknown as AdvancedIMessage;
 
+beforeEach(() => {
+  useTempMapsSessionStore();
+});
+
 afterEach(() => {
   clearFindMyWatchesForTests();
-  clearMapsSessionsForTests();
+  disposeTempMapsSessionStore();
   clearSpectrumApp();
   mock.restore();
 });
@@ -241,5 +250,58 @@ describe("bindFindMyOrigin", () => {
     expect(status).toBe("requested");
     expect(request).toHaveBeenCalled();
     expect(getMapsSessionById(session.id)?.originLat).toBeUndefined();
+  });
+
+  test("reuses a persisted location instead of requesting it again", async () => {
+    const get = mock(() =>
+      Promise.reject(
+        new NotFoundError("missing", {
+          code: ErrorCode.sharedFriendLocationNotFound,
+          grpcCode: 5,
+          retryable: false,
+        }),
+      ),
+    );
+    const request = mock(() =>
+      Promise.resolve({
+        address: "+15559876543",
+        status: "sent",
+      }),
+    );
+    registerSpectrumApp(
+      makeApp([
+        {
+          phone: "+15551234567",
+          client: makeClient({ get, request }),
+        },
+      ]),
+    );
+
+    const previous = createMapsSession({
+      destinationName: "Beacon Hill Park",
+      searchArea: "Victoria, BC",
+      lat: 48.41,
+      lng: -123.36,
+      friendAddress: "+15559876543",
+    });
+    patchMapsSessionOrigin(previous.id, { lat: 48.4, lng: -123.3 });
+    const current = createMapsSession({
+      destinationName: "Fisherman's Wharf",
+      searchArea: "Victoria, BC",
+      lat: 48.42,
+      lng: -123.38,
+    });
+
+    const status = await bindFindMyOrigin({
+      sessionId: current.id,
+      space: makeSpace(),
+      message: makeMessage("+15559876543"),
+      senderId: "+15559876543",
+    });
+
+    expect(status).toBe("shared");
+    expect(request).not.toHaveBeenCalled();
+    expect(getMapsSessionById(current.id)?.originLat).toBe(48.4);
+    expect(getMapsSessionById(current.id)?.originLng).toBe(-123.3);
   });
 });

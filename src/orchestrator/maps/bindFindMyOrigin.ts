@@ -5,6 +5,7 @@ import {
   watchFriendLocation,
 } from "./findMy";
 import {
+  getLatestMapsSessionForFriend,
   getMapsSessionById,
   patchMapsSessionOrigin,
   setMapsSessionFriendAddress,
@@ -59,6 +60,10 @@ export const bindFindMyOrigin = async (input: {
   const address = resolveSenderAddress(input.message, input.senderId);
   if (!address) return "unavailable";
 
+  const previousSession = getLatestMapsSessionForFriend(
+    address,
+    input.sessionId,
+  );
   setMapsSessionFriendAddress(input.sessionId, address);
 
   const snapshot = await getFriendLocation({
@@ -75,6 +80,24 @@ export const bindFindMyOrigin = async (input: {
     });
     startWatch(input.sessionId, input.space, address);
     return "shared";
+  }
+
+  if (
+    previousSession &&
+    previousSession.originLat !== undefined &&
+    previousSession.originLng !== undefined
+  ) {
+    patchMapsSessionOrigin(input.sessionId, {
+      lat: previousSession.originLat,
+      lng: previousSession.originLng,
+    });
+    startWatch(input.sessionId, input.space, address);
+    return "shared";
+  }
+
+  if (previousSession) {
+    startWatch(input.sessionId, input.space, address);
+    return "requested";
   }
 
   const requested = await requestFriendLocation({
