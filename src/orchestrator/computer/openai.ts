@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { API_KEY, CLOUD_BASE_URL } from "../utils/constants";
+import { API_KEY, GMI_CLOUD_API_KEY } from "../utils/constants";
 
 import {
   COMPUTER_COMPACTION_THRESHOLD,
@@ -126,7 +126,7 @@ const callGmi = async (
 ): Promise<OpenAiComputerResponse> => {
   if (!API_KEY) throw new Error("Missing GMI_CLOUD_API_KEY. Add it to your local .env before assigning computer tasks.");
 
-  const response = await fetch(`${CLOUD_BASE_URL}/responses`, {
+  const response = await fetch(`${GMI_CLOUD_API_KEY}/responses`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${API_KEY}`,

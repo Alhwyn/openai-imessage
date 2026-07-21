@@ -1,4 +1,4 @@
-export const CLOUD_BASE_URL = "https://api.gmi-serving.com/v1";
+export const GMI_CLOUD_API_KEY = "https://api.gmi-serving.com/v1";
 export const API_KEY = process.env.GMI_CLOUD_API_KEY?.trim() ?? "";
 export const DEFAULT_MODEL = "openai/gpt-5.6-luna" as const;
 export const MODEL_ID: typeof DEFAULT_MODEL = DEFAULT_MODEL;

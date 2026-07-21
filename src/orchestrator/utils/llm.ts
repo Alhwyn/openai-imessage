@@ -2,7 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 import {
   API_KEY,
-  CLOUD_BASE_URL,
+  GMI_CLOUD_API_KEY,
   MODEL_ID,
 } from "./constants/gmi";
 
@@ -17,7 +17,7 @@ export type GmiErrorDetails = {
 };
 
 const gmi = createOpenAI({
-  baseURL: CLOUD_BASE_URL,
+  baseURL: GMI_CLOUD_API_KEY,
   apiKey: API_KEY,
   name: "gmi",
 });
