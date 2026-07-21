@@ -46,9 +46,11 @@ describe("maps viewer HTTP", () => {
     expect(mapsViewerHtml).toContain("map.setZoom(18)");
     expect(mapsViewerHtml).toContain("pollOrigin");
     expect(mapsViewerHtml).toContain('fillColor: "#007AFF"');
-    expect(mapsViewerHtml).toContain("Rounded navigation chevron");
+    expect(mapsViewerHtml).toContain("Compact rounded chevron");
+    expect(mapsViewerHtml).toContain("scale: 3.6");
     expect(mapsViewerHtml).toContain("bearingDegrees");
     expect(mapsViewerHtml).toContain("headingDegrees");
+    expect(mapsViewerHtml).toContain("min-height: 420px");
   });
 
   test("serves HTML and token-gated session JSON", async () => {

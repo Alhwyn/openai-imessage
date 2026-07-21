@@ -18,35 +18,46 @@ export const mapsViewerHtml = `<!doctype html>
     .banner.error { border: 1px solid #e8c8c3; color: #9a4034; background: #fff6f4; }
     .banner.info { border: 1px solid #c5d4e8; color: #1a3a5c; background: #f2f7fc; }
     .trip {
-      display: none; position: absolute; z-index: 2; left: 12px; right: 12px;
-      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-      align-items: center; gap: 10px; min-height: 74px; padding: 12px 12px 12px 8px;
-      border-radius: 26px; background: rgba(255, 255, 255, 0.94);
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16); backdrop-filter: blur(18px);
+      display: none; position: absolute; z-index: 2; left: 8px; right: 8px;
+      bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+      align-items: center; gap: 8px; min-height: 48px; padding: 8px 8px 8px 6px;
+      border-radius: 16px; background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14); backdrop-filter: blur(18px);
       -webkit-backdrop-filter: blur(18px);
     }
     .trip.visible { display: flex; }
     .trip-metrics {
       display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 4px; flex: 1; min-width: 0; text-align: center;
+      gap: 2px; flex: 1; min-width: 0; text-align: center;
     }
     .metric-value {
-      display: block; color: #111; font-size: 22px; font-weight: 700;
-      letter-spacing: -0.03em; line-height: 1.05;
+      display: block; color: #111; font-size: 14px; font-weight: 700;
+      letter-spacing: -0.02em; line-height: 1.05;
     }
     .metric-label {
-      display: block; margin-top: 2px; color: #8a8a8e;
-      font-size: 11px; font-weight: 500; text-transform: lowercase;
+      display: block; margin-top: 1px; color: #8a8a8e;
+      font-size: 9px; font-weight: 500; text-transform: lowercase;
     }
     .go {
-      flex: 0 0 auto; width: 48px; height: 48px; padding: 0; border: 0;
-      border-radius: 16px; color: white; background: #34c759;
-      font: 700 15px/1 -apple-system, BlinkMacSystemFont, ui-sans-serif, sans-serif;
+      flex: 0 0 auto; width: 34px; height: 34px; padding: 0; border: 0;
+      border-radius: 11px; color: white; background: #34c759;
+      font: 700 12px/1 -apple-system, BlinkMacSystemFont, ui-sans-serif, sans-serif;
       cursor: pointer;
     }
     .go:active { transform: scale(0.96); background: #2db24e; }
-    .go.cancel { background: #ff3b30; font-size: 22px; font-weight: 500; }
+    .go.cancel { background: #ff3b30; font-size: 18px; font-weight: 500; }
     .go.cancel:active { background: #e0342a; }
+    /* Fullscreen / expanded Spectrum sheet: breathe a bit more. */
+    @media (min-height: 420px) {
+      .trip {
+        left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        min-height: 64px; padding: 10px 12px 10px 8px; border-radius: 22px; gap: 10px;
+      }
+      .metric-value { font-size: 20px; }
+      .metric-label { font-size: 11px; margin-top: 2px; }
+      .go { width: 44px; height: 44px; border-radius: 14px; font-size: 14px; }
+      .go.cancel { font-size: 20px; }
+    }
   </style>
 </head>
 <body>
@@ -128,15 +139,15 @@ export const mapsViewerHtml = `<!doctype html>
 
     function youIcon(rotation) {
       return {
-        // Rounded navigation chevron (points north at rotation 0).
-        path: "M 0 -3.6 C 0.55 -3.6 1.15 -3.1 2.55 -0.35 C 3.15 0.85 3.35 1.55 3.05 2.05 C 2.75 2.55 2.15 2.55 1.35 2.15 L 0.35 1.55 C 0.15 1.45 -0.15 1.45 -0.35 1.55 L -1.35 2.15 C -2.15 2.55 -2.75 2.55 -3.05 2.05 C -3.35 1.55 -3.15 0.85 -2.55 -0.35 C -1.15 -3.1 -0.55 -3.6 0 -3.6 Z",
-        scale: 7.5,
+        // Compact rounded chevron (points north at rotation 0).
+        path: "M 0 -2.4 C 0.35 -2.4 0.7 -2.1 1.55 -0.35 C 1.9 0.35 2 0.8 1.8 1.1 C 1.6 1.4 1.2 1.4 0.75 1.15 L 0.2 0.85 C 0.08 0.78 -0.08 0.78 -0.2 0.85 L -0.75 1.15 C -1.2 1.4 -1.6 1.4 -1.8 1.1 C -2 0.8 -1.9 0.35 -1.55 -0.35 C -0.7 -2.1 -0.35 -2.4 0 -2.4 Z",
+        scale: 3.6,
         fillColor: "#007AFF",
         fillOpacity: 1,
         strokeColor: "#ffffff",
-        strokeWeight: 2.5,
+        strokeWeight: 1.6,
         rotation,
-        anchor: new google.maps.Point(0, 0.2),
+        anchor: new google.maps.Point(0, 0.15),
       };
     }
 

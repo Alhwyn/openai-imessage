@@ -87,14 +87,15 @@ export const deliverOutbound = async (
           });
           break;
         case "maps":
+          // Static card (not live bubble): tap hands URL to Spectrum and expands fullscreen.
           content = customizedMiniApp({
             ...SPECTRUM_MINI_APP_IDENTITY,
-            live: true,
+            live: false,
             url: item.url,
             layout: {
-              caption: "Live map",
-              subcaption: "Tap to open",
-              summary: "Live directions map",
+              caption: "Directions",
+              subcaption: "Tap to expand",
+              summary: "Open full directions map",
             },
           });
           break;
