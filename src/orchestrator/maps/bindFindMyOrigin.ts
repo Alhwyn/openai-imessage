@@ -121,6 +121,12 @@ export const bindFindMyOrigin = async (input: {
     address,
   });
   if (requested.status === "request_sent") return "requested";
-  if (snapshot.status === "ok") return "requested";
+
+  console.warn("[maps] Find My share request did not send", {
+    sessionId: input.sessionId,
+    snapshotStatus: snapshot.status,
+    requestStatus: requested.status,
+    error: "error" in requested ? requested.error : undefined,
+  });
   return "unavailable";
 };

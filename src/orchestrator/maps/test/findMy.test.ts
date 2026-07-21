@@ -233,6 +233,42 @@ describe("bindFindMyOrigin", () => {
     expect(getMapsSessionById(session.id)?.originLat).toBeUndefined();
   });
 
+  test("returns unavailable when the Find My share request fails", async () => {
+    const get = mock(() =>
+      Promise.reject(
+        new NotFoundError("missing", {
+          code: ErrorCode.sharedFriendLocationNotFound,
+          grpcCode: 5,
+          retryable: false,
+        }),
+      ),
+    );
+    const request = mock(() => Promise.reject(new Error("request rejected")));
+    registerClients([
+      {
+        phone: "+15551234567",
+        client: makeClient({ get, request }),
+      },
+    ]);
+
+    const session = createMapsSession({
+      destinationName: "Beacon Hill Park",
+      searchArea: "Victoria, BC",
+      lat: 48.41,
+      lng: -123.36,
+    });
+
+    const status = await bindFindMyOrigin({
+      sessionId: session.id,
+      space: makeSpace(),
+      message: makeMessage("+15559876543"),
+      senderId: "+15559876543",
+    });
+
+    expect(status).toBe("unavailable");
+    expect(request).toHaveBeenCalled();
+  });
+
   test("reuses a persisted location instead of requesting it again", async () => {
     const get = mock(() =>
       Promise.reject(

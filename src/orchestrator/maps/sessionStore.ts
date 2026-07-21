@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 
 import type { MapsSession } from "./types";
 
+/** Local JSON store for a single orchestrator process — not shared across replicas. */
 const DEFAULT_PATH = join(
   import.meta.dir,
   "../../../.data/maps-sessions.json",

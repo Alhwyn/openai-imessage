@@ -39,6 +39,8 @@ const sessionResponse = (request: Request): Response => {
   const session = getMapsSession(access.sessionId, access.token);
   if (!session) return jsonResponse({ error: "Map link not found" }, 404);
 
+  // Returned to the browser for Maps JS — restrict this GCP key by HTTP
+  // referrer to the maps public host (e.g. maps.alhwyn.com), not as unrestricted.
   const mapsApiKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
   if (!mapsApiKey) return jsonResponse({ error: "Maps API key missing" }, 500);
 
