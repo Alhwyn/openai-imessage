@@ -18,7 +18,8 @@ import {
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
 } from "./src/orchestrator/index";
-import { registerSpectrumApp, startMapsViewer } from "./src/orchestrator/maps";
+import { registerLocationClients, startMapsViewer } from "./src/orchestrator/maps";
+import { resolveIMessageLocationClients } from "./src/orchestrator/resolveIMessageLocationClients";
 
 /** Drop provider redeliveries for a few minutes inside one process. */
 const seenInboundMessages = createRecentIdTracker({
@@ -120,7 +121,7 @@ const main = async () => {
     platforms: [imessage.config()],
     webhookSecret,
   });
-  registerSpectrumApp(app);
+  registerLocationClients(resolveIMessageLocationClients(app));
   let stopping = false;
   const inboundJobs = new Set<Promise<void>>();
   const stopApp = async (reason: string) => {

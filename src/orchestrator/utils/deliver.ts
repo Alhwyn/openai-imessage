@@ -14,6 +14,19 @@ const SPECTRUM_MINI_APP_IDENTITY = {
   teamId: "P8XT6232SL",
 } as const;
 
+const MINI_APP_LAYOUT = {
+  computer: {
+    caption: "Computer use",
+    subcaption: "Tap to watch live",
+    summary: "Live computer use session",
+  },
+  maps: {
+    caption: "Live map",
+    subcaption: "Tap to open",
+    summary: "Live directions map",
+  },
+} as const;
+
 const buildAlbumContent = (paths: string[]): ContentInput => {
   if (paths.length === 0) throw new Error("Album outbound item requires at least one path");
 
@@ -23,6 +36,16 @@ const buildAlbumContent = (paths: string[]): ContentInput => {
   if (!first || !second) throw new Error("Album outbound item requires at least two paths for a group");
 
   return group(first, second, ...rest);
+};
+
+const buildAppContent = (item: Extract<OutboundItem, { kind: "app" }>): ContentInput => {
+  if (item.presentation === undefined) return app(item.url);
+  return customizedMiniApp({
+    ...SPECTRUM_MINI_APP_IDENTITY,
+    live: true,
+    url: item.url,
+    layout: MINI_APP_LAYOUT[item.presentation],
+  });
 };
 
 /**
@@ -72,43 +95,7 @@ export const deliverOutbound = async (
       console.log("[deliver] Sending app via space.send", {
         presentation: item.presentation ?? "app",
       });
-      let content: ContentInput;
-      switch (item.presentation) {
-        case "computer":
-          content = customizedMiniApp({
-            ...SPECTRUM_MINI_APP_IDENTITY,
-            live: true,
-            url: item.url,
-            layout: {
-              caption: "Computer use",
-              subcaption: "Tap to watch live",
-              summary: "Live computer use session",
-            },
-          });
-          break;
-        case "maps":
-          content = customizedMiniApp({
-            ...SPECTRUM_MINI_APP_IDENTITY,
-            live: true,
-            url: item.url,
-            layout: {
-              caption: "Live map",
-              subcaption: "Tap to open",
-              summary: "Live directions map",
-            },
-          });
-          break;
-        case undefined:
-          content = app(item.url);
-          break;
-        default: {
-          const _exhaustive: never = item.presentation;
-          throw new Error(
-            `Unhandled app presentation: ${JSON.stringify(_exhaustive)}`,
-          );
-        }
-      }
-      await space.send(content);
+      await space.send(buildAppContent(item));
       break;
     }
     case "background": {

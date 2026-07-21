@@ -1,9 +1,10 @@
 import {
   NotFoundError,
+  type AdvancedIMessage,
   type SharedFriendLocation,
 } from "@photon-ai/advanced-imessage";
 
-import { clientForSpace } from "./imessage";
+import { clientForSpace } from "./locationClients";
 
 import type { Space } from "@spectrum-ts/core";
 
@@ -29,22 +30,30 @@ export const hasCoordinates = (
 ): location is SharedFriendLocation & { latitude: number; longitude: number } =>
   typeof location.latitude === "number" && typeof location.longitude === "number";
 
-export const getFriendLocation = async (input: {
-  space: Space;
-  address: string;
-}): Promise<GetFriendLocationResult> => {
-  let client;
+const resolveClient = (
+  space: Space,
+):
+  | { status: "ok"; client: AdvancedIMessage }
+  | { status: "client_unavailable"; error: string } => {
   try {
-    client = clientForSpace(input.space);
+    return { status: "ok", client: clientForSpace(space) };
   } catch (error) {
     return {
       status: "client_unavailable",
       error: error instanceof Error ? error.message : String(error),
     };
   }
+};
+
+export const getFriendLocation = async (input: {
+  space: Space;
+  address: string;
+}): Promise<GetFriendLocationResult> => {
+  const resolved = resolveClient(input.space);
+  if (resolved.status !== "ok") return resolved;
 
   try {
-    const location = await client.locations.get(input.address);
+    const location = await resolved.client.locations.get(input.address);
     return { status: "ok", location };
   } catch (error) {
     if (error instanceof NotFoundError) return { status: "not_shared" };
@@ -60,18 +69,11 @@ export const requestFriendLocation = async (input: {
   address: string;
   clientMessageId?: string;
 }): Promise<RequestFriendLocationResult> => {
-  let client;
-  try {
-    client = clientForSpace(input.space);
-  } catch (error) {
-    return {
-      status: "client_unavailable",
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
+  const resolved = resolveClient(input.space);
+  if (resolved.status !== "ok") return resolved;
 
   try {
-    const receipt = await client.locations.request(
+    const receipt = await resolved.client.locations.request(
       input.space.id,
       input.address,
       input.clientMessageId
@@ -99,14 +101,10 @@ export const watchFriendLocation = async (input: {
   onUpdate: (location: SharedFriendLocation) => void;
   signal: AbortSignal;
 }): Promise<void> => {
-  let client;
-  try {
-    client = clientForSpace(input.space);
-  } catch {
-    return;
-  }
+  const resolved = resolveClient(input.space);
+  if (resolved.status !== "ok") return;
 
-  const stream = client.locations.watch(input.address);
+  const stream = resolved.client.locations.watch(input.address);
   const onAbort = () => {
     void stream.close();
   };

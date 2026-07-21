@@ -11,7 +11,10 @@ import {
   getFriendLocation,
   requestFriendLocation,
 } from "../findMy";
-import { clearSpectrumApp, registerSpectrumApp } from "../imessage";
+import {
+  clearLocationClients,
+  registerLocationClients,
+} from "../locationClients";
 import {
   createMapsSession,
   getMapsSessionById,
@@ -23,7 +26,7 @@ import {
   useTempMapsSessionStore,
 } from "./tmpStore";
 
-import type { Message, Space, SpectrumInstance } from "@spectrum-ts/core";
+import type { Message, Space } from "@spectrum-ts/core";
 
 const makeSpace = (phone = "+15551234567"): Space =>
   ({
@@ -48,26 +51,6 @@ const makeMessage = (senderId: string | null, address?: string): Message =>
     space: makeSpace(),
   }) as unknown as Message;
 
-const makeApp = (clients: Array<{ phone: string; client: AdvancedIMessage }>) =>
-  ({
-    __internal: {
-      platforms: new Map([
-        [
-          "iMessage",
-          {
-            client: clients,
-            config: {},
-            definition: {},
-            projectConfig: undefined,
-            store: {},
-            subscribeMessages: () => ({}),
-          },
-        ],
-      ]),
-    },
-    __providers: [],
-  }) as unknown as SpectrumInstance;
-
 const emptyWatch = () => ({
   async *[Symbol.asyncIterator]() {
     // no updates
@@ -87,6 +70,12 @@ const makeClient = (locations: {
     },
   }) as unknown as AdvancedIMessage;
 
+const registerClients = (
+  clients: Array<{ phone: string; client: AdvancedIMessage }>,
+): void => {
+  registerLocationClients(clients);
+};
+
 beforeEach(() => {
   useTempMapsSessionStore();
 });
@@ -94,7 +83,7 @@ beforeEach(() => {
 afterEach(() => {
   clearFindMyWatchesForTests();
   disposeTempMapsSessionStore();
-  clearSpectrumApp();
+  clearLocationClients();
   mock.restore();
 });
 
@@ -109,14 +98,12 @@ describe("getFriendLocation", () => {
         }),
       ),
     );
-    registerSpectrumApp(
-      makeApp([
-        {
-          phone: "+15551234567",
-          client: makeClient({ get, request: mock() }),
-        },
-      ]),
-    );
+    registerClients([
+      {
+        phone: "+15551234567",
+        client: makeClient({ get, request: mock() }),
+      },
+    ]);
 
     expect(
       await getFriendLocation({
@@ -137,14 +124,12 @@ describe("requestFriendLocation", () => {
         messageGuid: "guid-1",
       }),
     );
-    registerSpectrumApp(
-      makeApp([
-        {
-          phone: "+15551234567",
-          client: makeClient({ get: mock(), request }),
-        },
-      ]),
-    );
+    registerClients([
+      {
+        phone: "+15551234567",
+        client: makeClient({ get: mock(), request }),
+      },
+    ]);
 
     const result = await requestFriendLocation({
       space: makeSpace(),
@@ -176,14 +161,12 @@ describe("bindFindMyOrigin", () => {
     };
     const get = mock(() => Promise.resolve(location));
     const request = mock(() => Promise.resolve({ address: "+15559876543", status: "sent" }));
-    registerSpectrumApp(
-      makeApp([
-        {
-          phone: "+15551234567",
-          client: makeClient({ get, request }),
-        },
-      ]),
-    );
+    registerClients([
+      {
+        phone: "+15551234567",
+        client: makeClient({ get, request }),
+      },
+    ]);
 
     const session = createMapsSession({
       destinationName: "Beacon Hill Park",
@@ -224,14 +207,12 @@ describe("bindFindMyOrigin", () => {
         messageGuid: "guid-1",
       }),
     );
-    registerSpectrumApp(
-      makeApp([
-        {
-          phone: "+15551234567",
-          client: makeClient({ get, request }),
-        },
-      ]),
-    );
+    registerClients([
+      {
+        phone: "+15551234567",
+        client: makeClient({ get, request }),
+      },
+    ]);
 
     const session = createMapsSession({
       destinationName: "Beacon Hill Park",
@@ -268,14 +249,12 @@ describe("bindFindMyOrigin", () => {
         status: "sent",
       }),
     );
-    registerSpectrumApp(
-      makeApp([
-        {
-          phone: "+15551234567",
-          client: makeClient({ get, request }),
-        },
-      ]),
-    );
+    registerClients([
+      {
+        phone: "+15551234567",
+        client: makeClient({ get, request }),
+      },
+    ]);
 
     const previous = createMapsSession({
       destinationName: "Beacon Hill Park",
@@ -284,7 +263,7 @@ describe("bindFindMyOrigin", () => {
       lng: -123.36,
       friendAddress: "+15559876543",
     });
-    patchMapsSessionOrigin(previous.id, { lat: 48.4, lng: -123.3 });
+    patchMapsSessionOrigin(previous.id, { lat: 48.4, lng: -123.3 }, "flush");
     const current = createMapsSession({
       destinationName: "Fisherman's Wharf",
       searchArea: "Victoria, BC",

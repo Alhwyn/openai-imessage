@@ -3,16 +3,17 @@ import {
   hasCoordinates,
   requestFriendLocation,
   watchFriendLocation,
+  type GetFriendLocationResult,
 } from "./findMy";
 import {
+  bindMapsSession,
   getLatestMapsSessionForFriend,
   getMapsSessionById,
   patchMapsSessionOrigin,
-  setMapsSessionFriendAddress,
 } from "./session";
 import { resolveSenderAddress } from "./utils";
 
-import type { MapsLocationStatus } from "./types";
+import type { LatLng, MapsLocationStatus, MapsSession } from "./types";
 import type { Message, Space } from "@spectrum-ts/core";
 
 const watches = new Map<string, AbortController>();
@@ -51,6 +52,39 @@ const startWatch = (sessionId: string, space: Space, address: string): void => {
   });
 };
 
+type BindPlan =
+  | { status: "unavailable" }
+  | { status: "shared"; origin: LatLng }
+  | { status: "requested"; origin?: LatLng; sendRequest: boolean };
+
+export const planBindFindMyOrigin = (
+  snapshot: GetFriendLocationResult,
+  previous: MapsSession | null,
+): BindPlan => {
+  if (snapshot.status === "client_unavailable") return { status: "unavailable" };
+
+  if (snapshot.status === "ok" && hasCoordinates(snapshot.location)) return {
+    status: "shared",
+    origin: {
+      lat: snapshot.location.latitude,
+      lng: snapshot.location.longitude,
+    },
+  };
+
+  if (
+    previous &&
+    previous.originLat !== undefined &&
+    previous.originLng !== undefined
+  ) return {
+    status: "shared",
+    origin: { lat: previous.originLat, lng: previous.originLng },
+  };
+
+  if (previous) return { status: "requested", sendRequest: false };
+
+  return { status: "requested", sendRequest: true };
+};
+
 export const bindFindMyOrigin = async (input: {
   sessionId: string;
   space: Space;
@@ -64,48 +98,28 @@ export const bindFindMyOrigin = async (input: {
     address,
     input.sessionId,
   );
-  setMapsSessionFriendAddress(input.sessionId, address);
-
   const snapshot = await getFriendLocation({
     space: input.space,
     address,
   });
+  const plan = planBindFindMyOrigin(snapshot, previousSession);
 
-  if (snapshot.status === "client_unavailable") return "unavailable";
+  if (plan.status === "unavailable") return "unavailable";
 
-  if (snapshot.status === "ok" && hasCoordinates(snapshot.location)) {
-    patchMapsSessionOrigin(input.sessionId, {
-      lat: snapshot.location.latitude,
-      lng: snapshot.location.longitude,
-    });
-    startWatch(input.sessionId, input.space, address);
-    return "shared";
-  }
+  bindMapsSession(input.sessionId, {
+    friendAddress: address,
+    origin: plan.origin,
+  });
+  startWatch(input.sessionId, input.space, address);
 
-  if (
-    previousSession &&
-    previousSession.originLat !== undefined &&
-    previousSession.originLng !== undefined
-  ) {
-    patchMapsSessionOrigin(input.sessionId, {
-      lat: previousSession.originLat,
-      lng: previousSession.originLng,
-    });
-    startWatch(input.sessionId, input.space, address);
-    return "shared";
-  }
+  if (plan.status === "shared") return "shared";
 
-  if (previousSession) {
-    startWatch(input.sessionId, input.space, address);
-    return "requested";
-  }
+  if (!plan.sendRequest) return "requested";
 
   const requested = await requestFriendLocation({
     space: input.space,
     address,
   });
-  startWatch(input.sessionId, input.space, address);
-
   if (requested.status === "request_sent") return "requested";
   if (snapshot.status === "ok") return "requested";
   return "unavailable";

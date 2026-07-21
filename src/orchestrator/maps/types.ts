@@ -1,11 +1,17 @@
 import type { Message, Space } from "@spectrum-ts/core";
 
+export type LatLng = {
+  lat: number;
+  lng: number;
+};
+
 export type MapsSession = {
   id: string;
   destinationName: string;
   searchArea: string;
   lat: number;
   lng: number;
+  createdAt: number;
   expiresAt: number;
   friendAddress?: string;
   originLat?: number;
@@ -15,12 +21,25 @@ export type MapsSession = {
 
 export type MapsLocationStatus = "shared" | "requested" | "unavailable";
 
-export type CreateDirectionsLinkInput = {
+export type CreateMapsSessionLinkInput = {
   destination: string;
   searchArea: string;
-  space?: Space;
-  message?: Message;
-  senderId?: string | null;
+};
+
+export type CreateMapsSessionLinkResult =
+  | {
+      status: "ok";
+      url: string;
+      destination: string;
+      searchArea: string;
+      sessionId: string;
+    }
+  | { status: "failed"; error: string };
+
+export type CreateDirectionsLinkInput = CreateMapsSessionLinkInput & {
+  space: Space;
+  message: Message;
+  senderId: string | null;
 };
 
 export type CreateDirectionsLinkResult =

@@ -259,7 +259,7 @@ export const buildInteractionTools = ({
           searchArea,
           space: deliveryTarget.space,
           message: deliveryTarget.message,
-          senderId: event.senderId,
+          senderId: event.senderId ?? null,
         });
         if (result.status !== "ok") return {
           ok: false as const,

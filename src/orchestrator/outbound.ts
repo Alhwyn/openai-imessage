@@ -10,7 +10,7 @@ export const summarizeOutbound = (items: OutboundItem[]) => {
       case "reaction":
         return { kind: item.kind, emoji: item.emoji };
       case "app":
-        if (item.presentation === "maps" || item.presentation === "computer") return {
+        if (item.presentation !== undefined) return {
           kind: item.kind,
           presentation: item.presentation,
         };

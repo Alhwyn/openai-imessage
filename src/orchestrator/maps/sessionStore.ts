@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { MapsSession } from "./types";
@@ -23,7 +23,8 @@ const isSession = (value: unknown): value is MapsSession => {
     typeof row.searchArea === "string" &&
     typeof row.lat === "number" &&
     typeof row.lng === "number" &&
-    typeof row.expiresAt === "number"
+    typeof row.expiresAt === "number" &&
+    typeof row.createdAt === "number"
   );
 };
 
@@ -49,7 +50,10 @@ export const readMapsSessions = (): MapsSession[] => {
 export const writeMapsSessions = (sessions: Iterable<MapsSession>): void => {
   try {
     mkdirSync(dirname(storePath), { recursive: true });
-    writeFileSync(storePath, JSON.stringify([...sessions]), "utf8");
+    const payload = JSON.stringify([...sessions]);
+    const tempPath = `${storePath}.${process.pid}.${Date.now()}.tmp`;
+    writeFileSync(tempPath, payload, "utf8");
+    renameSync(tempPath, storePath);
   } catch (error) {
     console.error("[maps] Failed to persist sessions", error);
   }

@@ -6,12 +6,14 @@ import { getMapsViewerPageUrl } from "./urls";
 import type {
   CreateDirectionsLinkInput,
   CreateDirectionsLinkResult,
-  MapsLocationStatus,
+  CreateMapsSessionLinkInput,
+  CreateMapsSessionLinkResult,
 } from "./types";
 
-export const createDirectionsLink = async (
-  input: CreateDirectionsLinkInput,
-): Promise<CreateDirectionsLinkResult> => {
+/** Geocode + mint a hosted maps session URL (no Find My). */
+export const createMapsSessionLink = async (
+  input: CreateMapsSessionLinkInput,
+): Promise<CreateMapsSessionLinkResult> => {
   const destination = input.destination.trim();
   const searchArea = input.searchArea.trim();
   if (!destination || !searchArea) return {
@@ -35,13 +37,34 @@ export const createDirectionsLink = async (
     error: "MAPS_PUBLIC_BASE_URL or MAPS_VIEWER_TOKEN_SECRET is not configured",
   };
 
-  let locationStatus: MapsLocationStatus = "unavailable";
-  if (input.space && input.message) locationStatus = await bindFindMyOrigin({
+  return {
+    status: "ok",
+    url,
+    destination,
+    searchArea,
     sessionId: session.id,
+  };
+};
+
+/** Create a maps session link and bind Find My origin for the sender. */
+export const createDirectionsLink = async (
+  input: CreateDirectionsLinkInput,
+): Promise<CreateDirectionsLinkResult> => {
+  const link = await createMapsSessionLink(input);
+  if (link.status !== "ok") return link;
+
+  const locationStatus = await bindFindMyOrigin({
+    sessionId: link.sessionId,
     space: input.space,
     message: input.message,
-    senderId: input.senderId ?? null,
+    senderId: input.senderId,
   });
 
-  return { status: "ok", url, destination, searchArea, locationStatus };
+  return {
+    status: "ok",
+    url: link.url,
+    destination: link.destination,
+    searchArea: link.searchArea,
+    locationStatus,
+  };
 };

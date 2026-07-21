@@ -60,9 +60,9 @@ describe("maps session tokens", () => {
       lat: 48.41,
       lng: -123.36,
     });
-    expect(patchMapsSessionOrigin(session.id, { lat: 48.5, lng: -123.4 })).toBe(
-      true,
-    );
+    expect(
+      patchMapsSessionOrigin(session.id, { lat: 48.5, lng: -123.4 }, "flush"),
+    ).toBe(true);
     const updated = getMapsSessionById(session.id);
     expect(updated?.originLat).toBe(48.5);
     expect(updated?.originLng).toBe(-123.4);
@@ -79,7 +79,7 @@ describe("maps session tokens", () => {
       lng: -123.36,
     });
     const token = createMapsViewerToken(session.id)!;
-    patchMapsSessionOrigin(session.id, { lat: 48.5, lng: -123.4 });
+    patchMapsSessionOrigin(session.id, { lat: 48.5, lng: -123.4 }, "flush");
 
     resetMapsSessionsMemoryForTests();
 

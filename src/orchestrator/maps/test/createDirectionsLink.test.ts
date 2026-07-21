@@ -5,8 +5,14 @@ import {
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { clearFindMyWatchesForTests } from "../bindFindMyOrigin";
-import { createDirectionsLink } from "../createDirectionsLink";
-import { clearSpectrumApp, registerSpectrumApp } from "../imessage";
+import {
+  createDirectionsLink,
+  createMapsSessionLink,
+} from "../createDirectionsLink";
+import {
+  clearLocationClients,
+  registerLocationClients,
+} from "../locationClients";
 import { getMapsSession, getMapsSessionById } from "../session";
 
 import {
@@ -14,7 +20,7 @@ import {
   useTempMapsSessionStore,
 } from "./tmpStore";
 
-import type { Message, Space, SpectrumInstance } from "@spectrum-ts/core";
+import type { Message, Space } from "@spectrum-ts/core";
 
 const originalBase = process.env.MAPS_PUBLIC_BASE_URL;
 const originalKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -47,25 +53,19 @@ const emptyWatch = () => ({
   close: () => Promise.resolve(),
 });
 
-const makeApp = (client: AdvancedIMessage) =>
-  ({
-    __internal: {
-      platforms: new Map([
-        [
-          "iMessage",
+const stubGeocodeOk = (): void => {
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      Response.json({
+        status: "OK",
+        results: [
           {
-            client: [{ phone: "+15551234567", client }],
-            config: {},
-            definition: {},
-            projectConfig: undefined,
-            store: {},
-            subscribeMessages: () => ({}),
+            geometry: { location: { lat: 48.4125, lng: -123.365 } },
           },
         ],
-      ]),
-    },
-    __providers: [],
-  }) as unknown as SpectrumInstance;
+      }),
+    )) as unknown as typeof fetch;
+};
 
 beforeEach(() => {
   useTempMapsSessionStore();
@@ -74,7 +74,7 @@ beforeEach(() => {
 afterEach(() => {
   clearFindMyWatchesForTests();
   disposeTempMapsSessionStore();
-  clearSpectrumApp();
+  clearLocationClients();
   mock.restore();
   globalThis.fetch = originalFetch;
   if (originalBase === undefined) delete process.env.MAPS_PUBLIC_BASE_URL;
@@ -85,10 +85,10 @@ afterEach(() => {
   else process.env.MAPS_VIEWER_TOKEN_SECRET = originalSecret;
 });
 
-describe("createDirectionsLink", () => {
+describe("createMapsSessionLink", () => {
   test("rejects empty destination or searchArea", async () => {
     expect(
-      await createDirectionsLink({
+      await createMapsSessionLink({
         destination: "  ",
         searchArea: "Victoria, BC",
       }),
@@ -97,7 +97,7 @@ describe("createDirectionsLink", () => {
       error: "destination and searchArea are required",
     });
     expect(
-      await createDirectionsLink({
+      await createMapsSessionLink({
         destination: "Beacon Hill Park",
         searchArea: "",
       }),
@@ -111,7 +111,7 @@ describe("createDirectionsLink", () => {
     delete process.env.MAPS_PUBLIC_BASE_URL;
     delete process.env.GOOGLE_MAPS_API_KEY;
     delete process.env.MAPS_VIEWER_TOKEN_SECRET;
-    const result = await createDirectionsLink({
+    const result = await createMapsSessionLink({
       destination: "Beacon Hill Park",
       searchArea: "Victoria, BC",
     });
@@ -124,20 +124,9 @@ describe("createDirectionsLink", () => {
     process.env.MAPS_PUBLIC_BASE_URL = "https://maps.alhwyn.com";
     process.env.GOOGLE_MAPS_API_KEY = "test-maps-key";
     process.env.MAPS_VIEWER_TOKEN_SECRET = "test-secret";
+    stubGeocodeOk();
 
-    globalThis.fetch = (() =>
-      Promise.resolve(
-        Response.json({
-          status: "OK",
-          results: [
-            {
-              geometry: { location: { lat: 48.4125, lng: -123.365 } },
-            },
-          ],
-        }),
-      )) as unknown as typeof fetch;
-
-    const result = await createDirectionsLink({
+    const result = await createMapsSessionLink({
       destination: "Beacon Hill Park",
       searchArea: "Victoria, BC",
     });
@@ -151,32 +140,23 @@ describe("createDirectionsLink", () => {
     const sessionId = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
     const token = url.searchParams.get("token") ?? "";
     expect(token).toBeTruthy();
+    expect(sessionId).toBe(result.sessionId);
     expect(getMapsSession(sessionId, token)?.destinationName).toBe(
       "Beacon Hill Park",
     );
     expect(getMapsSession(sessionId, "bad")).toBeNull();
     expect(result.destination).toBe("Beacon Hill Park");
     expect(result.searchArea).toBe("Victoria, BC");
-    expect(result.locationStatus).toBe("unavailable");
     expect(result.url).not.toContain("google.com/maps");
   });
+});
 
+describe("createDirectionsLink", () => {
   test("binds Find My origin into the session when sharing is active", async () => {
     process.env.MAPS_PUBLIC_BASE_URL = "https://maps.alhwyn.com";
     process.env.GOOGLE_MAPS_API_KEY = "test-maps-key";
     process.env.MAPS_VIEWER_TOKEN_SECRET = "test-secret";
-
-    globalThis.fetch = (() =>
-      Promise.resolve(
-        Response.json({
-          status: "OK",
-          results: [
-            {
-              geometry: { location: { lat: 48.4125, lng: -123.365 } },
-            },
-          ],
-        }),
-      )) as unknown as typeof fetch;
+    stubGeocodeOk();
 
     const location: SharedFriendLocation = {
       address: "+15559876543",
@@ -185,15 +165,18 @@ describe("createDirectionsLink", () => {
       latitude: 48.42,
       longitude: -123.37,
     };
-    registerSpectrumApp(
-      makeApp({
-        locations: {
-          get: mock(() => Promise.resolve(location)),
-          request: mock(),
-          watch: mock(() => emptyWatch()),
-        },
-      } as unknown as AdvancedIMessage),
-    );
+    registerLocationClients([
+      {
+        phone: "+15551234567",
+        client: {
+          locations: {
+            get: mock(() => Promise.resolve(location)),
+            request: mock(),
+            watch: mock(() => emptyWatch()),
+          },
+        } as unknown as AdvancedIMessage,
+      },
+    ]);
 
     const result = await createDirectionsLink({
       destination: "Beacon Hill Park",

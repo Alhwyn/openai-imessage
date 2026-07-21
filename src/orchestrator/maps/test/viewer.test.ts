@@ -63,7 +63,7 @@ describe("maps viewer HTTP", () => {
       lat: 48.41,
       lng: -123.36,
     });
-    patchMapsSessionOrigin(session.id, { lat: 48.42, lng: -123.37 });
+    patchMapsSessionOrigin(session.id, { lat: 48.42, lng: -123.37 }, "flush");
     const token = createMapsViewerToken(session.id)!;
 
     const page = handleMapsViewerRequest(
