@@ -8,7 +8,8 @@ description: Use Composio for the person's Gmail and other connected accounts. F
 ## Instructions
 
 - Composio tools connect the person's own external accounts. They are scoped to this sender only; never use a connection for another person.
-- For personal context about the person, search their Gmail. That is the source of truth.
+- For personal context about the person in chat, search their Gmail. That is the live source of truth.
+- When drafting or sending email as Alhwyn, follow the email-writing skill for his voice and durable person facts; still search Gmail for anything current or uncertain.
 - For other facts or lookup, search with the available search tools.
 - Gmail and Google Calendar are available when their tools are present. More approved apps may be available too. Use Composio only for account APIs the person asks about (email, calendar, and similar connected services).
 - Never use Composio for opening websites, browser games, Wordle/Worldle, desktop apps, or anything that needs a mouse and keyboard. Those always go to assign_computer_task.
