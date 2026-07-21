@@ -1,17 +1,19 @@
 # openai-imessage
 
-Bouncer-style iMessage orchestrator: inbound messages are debounced, an Interaction Agent may `assign_task` to an Execution Agent, and when the worker finishes it **notifies** the orchestrator, which `space.send`s the reply to the person.
+iMessage orchestrator that debounces inbound messages, routes work through an Interaction Agent, and delivers replies back to the conversation.
 
-Conversation history and Hermes-style curated memory (`USER.md` / `MEMORY.md`) persist in **Convex**.
+Conversation history and curated memory persist in [Convex](https://convex.dev). Connected accounts (Gmail, Calendar, and other approved apps) go through Composio. Browser and desktop GUI work runs on a local Linux computer-use runtime.
 
 ## Stack
 
-- **Bun** + Spectrum iMessage (`@spectrum-ts/core`, `@spectrum-ts/imessage`)
-- **Vercel AI SDK** (`ai`, `@ai-sdk/openai`)
-- **OpenAI** — text agents, image generation, and computer use (`OPENAI_API_KEY`)
-- **Convex** — durable messages + curated memory (`CONVEX_URL`)
-- **Composio** — per-person OAuth connections for Gmail, Google Calendar, and other approved apps
-- **Computer use** — a local KasmVNC/XFCE Linux desktop controlled through OpenAI's screenshot-and-action loop
+| Layer | Role |
+| --- | --- |
+| Bun + Spectrum iMessage | Runtime and messaging transport |
+| Vercel AI SDK | Agent tool loops |
+| GMI Cloud | Text, images, and computer-use model calls (`GMI_CLOUD_API_KEY`) |
+| Convex | Durable messages and memory (`CONVEX_URL`) |
+| Composio | Per-person OAuth for connected apps |
+| Docker + KasmVNC/XFCE | Local Linux desktop for computer-use tasks |
 
 ## Setup
 
@@ -19,32 +21,38 @@ Conversation history and Hermes-style curated memory (`USER.md` / `MEMORY.md`) p
 bun install
 ```
 
-### Convex (memory + conversation)
+Environment variables are defined only in `.env.example`. Copy the names you need into a local `.env` (never commit secrets). Convex writes `CONVEX_URL` to `.env.local` when you run `bun run convex:dev`.
+
+### Convex
 
 ```bash
-# Terminal A — links a deployment, pushes schema/functions, writes CONVEX_URL
+# Terminal A — links a deployment, syncs schema/functions
 bun run convex:dev
 ```
 
-In another terminal (or after `convex:dev` has printed the URL), add to `.env` (do not commit secrets):
+Add the bridge secret to `.env`:
 
 ```bash
 CONVEX_URL=https://….convex.cloud
 ORCHESTRATOR_BRIDGE_SECRET=some-long-random-string
 ```
 
-Set the same bridge secret on the Convex deployment:
+Mirror it on the Convex deployment:
 
 ```bash
 bunx convex env set ORCHESTRATOR_BRIDGE_SECRET some-long-random-string
 ```
 
-Keep `bun run convex:dev` running while developing so functions stay synced.
+Keep `bun run convex:dev` running during development so functions stay synced.
 
-### App env
+### Composio (optional)
 
-Use only the variable names declared in `.env.example`. Convex manages its
-required `CONVEX_URL` in `.env.local` when you run `bun run convex:dev`.
+```bash
+composio login
+composio init
+```
+
+Add `COMPOSIO_API_KEY` (and `COMPOSIO_USER_ID_SALT`) from that setup to `.env`.
 
 ## Run
 
@@ -56,111 +64,84 @@ bun run convex:dev
 bun run start
 ```
 
-### Local Linux computer
+### Computer use
 
-Computer-use tasks operate a complete XFCE Linux desktop through its X11 mouse
-and keyboard. The model does not use DOM selectors or Playwright. Docker is a
-local development boundary; production tasks should receive separate VMs.
+Computer-use tasks drive a full XFCE desktop over X11 (screenshots + `xdotool`), not DOM automation. Docker is the local boundary; production should use dedicated VMs.
 
-Add `OPENAI_API_KEY` and `COMPUTER_DESKTOP_PASSWORD` to your local `.env`
-yourself, then start the desktop:
+1. Set `GMI_CLOUD_API_KEY` and `COMPUTER_DESKTOP_PASSWORD` in `.env`.
+2. Start the desktop:
 
 ```bash
 bun run computer:up
 ```
 
-Open `https://127.0.0.1:6901` and accept the local certificate. Basic auth is
-disabled on the loopback-only Kasm endpoint; `COMPUTER_DESKTOP_PASSWORD` is
-still required by the base image during startup. The fixed desktop resolution
-is 1280×800 so model coordinates remain stable.
+3. Open `https://127.0.0.1:6901` and accept the local certificate. Loopback basic auth is disabled; the password is still required by the Kasm image at startup. Display size is locked to **1280×800** for stable model coordinates.
 
-Then run Convex and the orchestrator normally. When the interaction agent calls
-`assign_computer_task`, it:
+When `assign_computer_task` runs, the orchestrator:
 
-1. Creates a durable run in Convex.
-2. Records the desktop with FFmpeg.
-3. Sends screenshots to OpenAI only after model action batches.
-4. Executes returned mouse and keyboard actions through `xdotool`.
-5. Saves the final MP4 under `runtime/computer/artifacts/<taskId>/demo.mp4`.
-6. Serves a custom viewer on `http://127.0.0.1:6902` with a live action
-   timeline, coordinate highlights, and completed-session replay.
-
-Useful commands:
+1. Creates a durable run in Convex
+2. Records the session with FFmpeg (still captures pause the recorder so X11 is not dual-grabbed)
+3. Sends screenshots to the model and applies returned mouse/keyboard actions
+4. Writes `runtime/computer/artifacts/<taskId>/demo.mp4`
+5. Serves a token-gated viewer at `http://127.0.0.1:6902` (live timeline + replay)
 
 ```bash
 bun run computer:logs
 bun run computer:down
 ```
 
-Set a public desktop tunnel for live-view cards:
+If the desktop X session dies, recreate it:
 
 ```bash
-COMPUTER_LIVE_VIEW_URL=https://desktop.alhwyn.com
+bun run computer:down && bun run computer:up
 ```
 
-That single URL is the source of truth. A `desktop.*` URL is used for the Kasm
-stream and derives the matching token-gated `viewer.*` page.
-
-### Dev tunnel (optional, like ngrok)
-
-Expose localhost to a stable HTTPS hostname for webhook testing (same Cloudflare tunnel as bouncer):
+For live-view cards, set:
 
 ```bash
-# Terminal 1 — app on :4001
-bun run start
-
-# Terminal 2 — one-off random URL
-bun run tunnel:quick
-
-# Or named tunnel (first time)
-bun run tunnel:setup
-bun run tunnel
+COMPUTER_LIVE_VIEW_URL=https://desktop.example.com
 ```
 
-`bun run tunnel` starts the webhook tunnel plus the computer tunnel:
+A `desktop.*` host is used for the Kasm stream; the matching `viewer.*` host is derived for the token-gated page.
 
-- `viewer.alhwyn.com` → token-gated viewer on `127.0.0.1:6902`
-- `desktop.alhwyn.com` → Kasm stream on `127.0.0.1:6901`
-- `agent.alhwyn.com` → webhook server on `127.0.0.1:4001`
+### Dev tunnel (optional)
 
-Set `COMPUTER_LIVE_VIEW_URL=https://desktop.alhwyn.com` for computer cards.
-
-## How orchestration works
-
-Layout lives under `src/orchestrator/` (types / utils / agents / bounce / handoff / **db** / **memory** / prompts):
-
-1. Person texts → keyed debounce (`src/orchestrator/bounce/inbound.ts`)
-2. Interaction Agent loads curated memory, recent conversation history, and optional connected-app tools, then runs with first-party tools such as `assign_task`, `assign_image_task`, `assign_computer_task`, `react_to_message`, and `memory`
-3. Workers run generic tasks or operate the local Linux desktop for computer-use tasks
-4. Handoff delivers worker output to the captured conversation target
-5. Turn transcripts append atomically in Convex; memory edits use their own mutation
-
-`db/` is the only module that talks to Convex; `memory/` calls `db` functions.
-
-### Composio connected apps
-
-The agent caches one Composio Tool Router tool set per sender and toolkit configuration.
-Connections are isolated by sender: the raw Spectrum sender ID is salted and hashed
-before it becomes the Composio user ID. If Spectrum does not provide a sender ID,
-connected-app tools stay disabled for that message. By default, only Gmail and Google Calendar
-are enabled.
-
-When someone asks to use an unconnected service, the agent uses Composio's
-connection manager and texts back the OAuth URL. The person completes OAuth in
-their browser, then sends their request again. No passwords or OAuth codes are
-stored or requested in iMessage.
-
-To set up the Composio project, install and log in to the CLI, then initialize it
-from this project and add the API key it creates to `.env`:
+Expose localhost over HTTPS for webhooks and computer cards:
 
 ```bash
-composio login
-composio init
+bun run tunnel:quick          # one-off URL → :4001
+bun run tunnel:setup && bun run tunnel   # named tunnel
 ```
 
-### Smoke test
+`bun run tunnel` typically maps:
 
-1. Text: “search for weekend plans and tell me” — expect ack → sub-agent → mock search reply.
-2. Text: “call me Al from now on” — agent should `memory` add to user; restart the app; text again and confirm it still knows the name.
-3. Multi-turn chat should survive process restart (history in Convex).
- 
+| Host | Target |
+| --- | --- |
+| `agent.*` | webhook (`127.0.0.1:4001`) |
+| `desktop.*` | Kasm (`127.0.0.1:6901`) |
+| `viewer.*` | computer viewer (`127.0.0.1:6902`) |
+
+## Architecture
+
+Code lives under `src/orchestrator/`:
+
+1. Inbound text → keyed debounce (`bounce/inbound.ts`)
+2. Interaction Agent loads memory, recent history, and tools (`assign_task`, `assign_image_task`, `assign_computer_task`, connected-app tools, and similar)
+3. Workers handle generic tasks, image generation, or the Linux desktop
+4. Handoff delivers results to the original conversation
+5. Transcripts and memory updates persist in Convex
+
+`db/` is the only Convex client surface; `memory/` calls into `db`.
+
+### Connected apps
+
+Composio tools are cached per sender. The Spectrum sender ID is salted and hashed before becoming the Composio user ID. Without a sender ID, connected-app tools stay off. Default toolkits are Gmail and Google Calendar.
+
+For an unconnected service, the agent texts an OAuth URL. The person finishes OAuth in the browser, then retries the request. Credentials are never collected over iMessage.
+
+## Smoke checks
+
+1. “Search for weekend plans and tell me” — ack → worker → reply.
+2. “Call me Al from now on” — memory write; restart the app and confirm the name sticks.
+3. Multi-turn chat survives process restart (history in Convex).
+4. “Open Chrome and go to example.com” — computer card + live viewer; desktop stays healthy through the run.
