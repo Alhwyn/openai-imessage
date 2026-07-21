@@ -5,6 +5,8 @@ import {
   COMPUTER_ACTION_SETTLE_MS,
   COMPUTER_DESKTOP_COMMAND_TIMEOUT_MS,
   COMPUTER_DESKTOP_SERVICE,
+  COMPUTER_DISPLAY_POLL_MS,
+  COMPUTER_DISPLAY_READY_TIMEOUT_MS,
   COMPUTER_DISPLAY_SIZE,
   COMPUTER_STABILITY_ATTEMPTS,
   COMPUTER_STABILITY_DELAY_MS,
@@ -176,8 +178,46 @@ const runDocker = async (
   return runProcess(["docker", "exec", containerId, ...command], options);
 };
 
+const isDisplayError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /Can't open display/i.test(message) ||
+    /Failed creating new xdo instance/i.test(message) ||
+    /display :1 is not available/i.test(message)
+  );
+};
+
+/** Poll until X11 :1 answers, or throw a clear infra error. */
+const waitForDisplay = async (
+  timeoutMs = COMPUTER_DISPLAY_READY_TIMEOUT_MS,
+): Promise<void> => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const alive = await runDocker(
+      [
+        "bash",
+        "-lc",
+        "timeout 2 xdpyinfo -display :1 >/dev/null 2>&1 && echo ok || echo down",
+      ],
+      { allowFailure: true, timeoutMs: 5_000 },
+    );
+    if (alive.trim() === "ok") return;
+    await Bun.sleep(COMPUTER_DISPLAY_POLL_MS);
+  }
+  throw new Error(
+    "Desktop X display :1 is down (KasmVNC likely crashed). " +
+      "Recover with: bun run computer:down && bun run computer:up",
+  );
+};
+
 const runXdotool = async (...args: string[]): Promise<void> => {
-  await runDocker(["env", "DISPLAY=:1", "xdotool", ...args]);
+  try {
+    await runDocker(["env", "DISPLAY=:1", "xdotool", ...args]);
+  } catch (error) {
+    if (!isDisplayError(error)) throw error;
+    await waitForDisplay();
+    await runDocker(["env", "DISPLAY=:1", "xdotool", ...args]);
+  }
 };
 
 const withModifiers = async (
@@ -245,15 +285,11 @@ export const assertDesktopReady = async (): Promise<void> => {
       "Recording falls back to /tmp. Fix with: " +
       "mkdir -p runtime/computer/{artifacts,workspace} && bun run computer:down && bun run computer:up",
   );
-  // Best-effort: a wedged X server must not abort the whole computer task.
-  try {
-    await ensureFixedDisplaySize();
-  } catch (error) {
-    console.warn(
-      "[computer] Could not lock display size:",
-      error instanceof Error ? error.message : error,
-    );
-  }
+  await waitForDisplay();
+  const size = await ensureFixedDisplaySize();
+  if (size.after && size.after !== `${size.width}x${size.height}`) console.warn(
+    `[computer] Display size is ${size.after}, expected ${size.width}x${size.height}`,
+  );
   await runDocker(["/opt/computer-agent/bin/screenshot", "/tmp/ready.png"], {
     timeoutMs: 15_000,
   });

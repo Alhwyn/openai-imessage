@@ -9,6 +9,21 @@ height="800"
 mkdir -p "$(dirname "$output")"
 pkill -x maim 2>/dev/null || true
 
+# Dual ffmpeg x11grab (session recorder + still capture) wedges Xvnc. Pause any
+# live session recorder for the duration of this still frame, then resume.
+recorder_pids="$(pgrep -f 'ffmpeg.*x11grab.*session\.mkv' || true)"
+resume_recorders() {
+  if [[ -n "${recorder_pids}" ]]; then
+    # shellcheck disable=SC2086
+    kill -CONT ${recorder_pids} 2>/dev/null || true
+  fi
+}
+if [[ -n "${recorder_pids}" ]]; then
+  # shellcheck disable=SC2086
+  kill -STOP ${recorder_pids} 2>/dev/null || true
+  trap resume_recorders EXIT
+fi
+
 # Prefer ffmpeg x11grab. maim often hangs forever while the session recorder
 # already holds an x11grab on the same display (exit 124 from `timeout`).
 capture_with_ffmpeg() {
@@ -22,12 +37,9 @@ capture_with_ffmpeg() {
     "$output"
 }
 
-# Best-effort geometry lock for model coordinates (never block the capture path).
-current="$(timeout 2 xdpyinfo -display "$display" 2>/dev/null | awk '/dimensions:/ {print $2; found=1} END { if (!found) exit 0 }' || true)"
-if [[ -n "$current" && "$current" != "${width}x${height}" ]]; then
-  timeout 3 env DISPLAY="$display" xrandr --output VNC-0 --mode "${width}x${height}" 2>/dev/null \
-    || timeout 3 env DISPLAY="$display" xrandr -s "${width}x${height}" 2>/dev/null \
-    || true
+if ! timeout 2 xdpyinfo -display "$display" >/dev/null 2>&1; then
+  echo "screenshot failed: display ${display} is not available" >&2
+  exit 1
 fi
 
 if capture_with_ffmpeg "${width}x${height}"; then
