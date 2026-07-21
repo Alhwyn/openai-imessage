@@ -238,7 +238,7 @@ export const buildInteractionTools = ({
     }),
     create_directions_link: tool({
       description:
-        "Send a Spectrum mini-app card for a hosted live map to an evidence-backed place. Call only after search_nearby_places. Pass a destination name from those results plus the same coarse searchArea. The map shows the person's live GPS in the browser and a route to the destination — the bot never receives GPS. Never invent destinations. Never pass coordinates. Never put map URLs in chat text or Markdown — this tool delivers the card.",
+        "Send a Spectrum mini-app card for a hosted live map to an evidence-backed place. Call only after search_nearby_places. Pass a destination name from those results plus the same coarse searchArea. The map uses Find My sharing for the person's live blue-dot and route — this tool may also send a Find My request card. Never invent destinations. Never pass coordinates. Never put map URLs in chat text or Markdown — this tool delivers the card.",
       inputSchema: z.object({
         destination: z
           .string()
@@ -254,7 +254,13 @@ export const buildInteractionTools = ({
           ),
       }),
       execute: async ({ destination, searchArea }) => {
-        const result = await createDirectionsLink({ destination, searchArea });
+        const result = await createDirectionsLink({
+          destination,
+          searchArea,
+          space: deliveryTarget.space,
+          message: deliveryTarget.message,
+          senderId: event.senderId,
+        });
         if (result.status !== "ok") return {
           ok: false as const,
           error: result.error,
@@ -269,6 +275,7 @@ export const buildInteractionTools = ({
           ok: true as const,
           destination: result.destination,
           searchArea: result.searchArea,
+          locationStatus: result.locationStatus,
         };
       },
     }),

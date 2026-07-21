@@ -2,10 +2,12 @@ tunnel: computer-viewer
 credentials-file: ~/.cloudflared/TUNNEL_ID.json
 
 ingress:
-  - hostname: viewer.alhwyn.com
+  - hostname: viewer.example.com
     service: http://127.0.0.1:6902
-  - hostname: desktop.alhwyn.com
+  - hostname: desktop.example.com
     service: https://127.0.0.1:6901
     originRequest:
       noTLSVerify: true
+  - hostname: maps.example.com
+    service: http://127.0.0.1:6903
   - service: http_status:404

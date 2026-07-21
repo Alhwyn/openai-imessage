@@ -5,6 +5,8 @@ import {
   createMapsSession,
   createMapsViewerToken,
   getMapsSession,
+  getMapsSessionById,
+  patchMapsSessionOrigin,
   verifyMapsViewerToken,
 } from "../session";
 
@@ -40,5 +42,22 @@ describe("maps session tokens", () => {
     );
     expect(getMapsSession(session.id, "bad-token")).toBeNull();
     expect(getMapsSession("missing", token)).toBeNull();
+  });
+
+  test("patches origin coordinates on a live session", () => {
+    const session = createMapsSession({
+      destinationName: "Beacon Hill Park",
+      searchArea: "Victoria, BC",
+      lat: 48.41,
+      lng: -123.36,
+    });
+    expect(patchMapsSessionOrigin(session.id, { lat: 48.5, lng: -123.4 })).toBe(
+      true,
+    );
+    const updated = getMapsSessionById(session.id);
+    expect(updated?.originLat).toBe(48.5);
+    expect(updated?.originLng).toBe(-123.4);
+    expect(updated?.originUpdatedAt).toBeGreaterThan(0);
+    expect(patchMapsSessionOrigin("missing", { lat: 1, lng: 2 })).toBe(false);
   });
 });

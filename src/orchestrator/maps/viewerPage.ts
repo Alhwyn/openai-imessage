@@ -42,6 +42,7 @@ export const mapsViewerHtml = `<!doctype html>
     };
 
     let map, youMarker, directionsRenderer, directionsService, lastRouteOrigin, destination;
+    let pollTimer;
 
     function showError(message) {
       els.error.textContent = message;
@@ -89,8 +90,7 @@ export const mapsViewerHtml = `<!doctype html>
       );
     }
 
-    function onPosition(position) {
-      const origin = { lat: position.coords.latitude, lng: position.coords.longitude };
+    function onOrigin(origin) {
       if (!youMarker) {
         youMarker = new google.maps.Marker({
           map,
@@ -111,21 +111,38 @@ export const mapsViewerHtml = `<!doctype html>
       updateRoute(origin);
     }
 
-    function startGeolocation() {
-      if (!navigator.geolocation) {
-        showInfo("Location is unavailable on this device. Showing destination only.");
-        fitAll(null);
-        return;
-      }
-      showInfo("Waiting for your location…");
-      navigator.geolocation.watchPosition(
-        onPosition,
-        () => {
-          showInfo("Allow location access to see your position and route.");
-          fitAll(null);
-        },
-        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
+    async function loadSession() {
+      const response = await fetch(apiUrl, { cache: "no-store" });
+      if (!response.ok) throw new Error(
+        response.status === 404
+          ? "This map link is invalid or expired."
+          : "Could not load the map session.",
       );
+      return response.json();
+    }
+
+    function schedulePoll(hasOrigin) {
+      if (pollTimer) clearTimeout(pollTimer);
+      pollTimer = setTimeout(pollOrigin, hasOrigin ? 5000 : 2500);
+    }
+
+    async function pollOrigin() {
+      try {
+        const session = await loadSession();
+        if (
+          typeof session.originLat === "number" &&
+          typeof session.originLng === "number"
+        ) {
+          onOrigin({ lat: session.originLat, lng: session.originLng });
+          schedulePoll(true);
+          return;
+        }
+        showInfo("Waiting for Find My location… Accept the share request in Messages if you see one.");
+        fitAll(null);
+        schedulePoll(false);
+      } catch (error) {
+        showError(error instanceof Error ? error.message : String(error));
+      }
     }
 
     function bootMap(session) {
@@ -146,17 +163,17 @@ export const mapsViewerHtml = `<!doctype html>
         suppressMarkers: true,
         preserveViewport: false,
       });
-      startGeolocation();
-    }
-
-    async function loadSession() {
-      const response = await fetch(apiUrl, { cache: "no-store" });
-      if (!response.ok) throw new Error(
-        response.status === 404
-          ? "This map link is invalid or expired."
-          : "Could not load the map session.",
-      );
-      return response.json();
+      if (
+        typeof session.originLat === "number" &&
+        typeof session.originLng === "number"
+      ) {
+        onOrigin({ lat: session.originLat, lng: session.originLng });
+        schedulePoll(true);
+        return;
+      }
+      showInfo("Waiting for Find My location… Accept the share request in Messages if you see one.");
+      fitAll(null);
+      schedulePoll(false);
     }
 
     function loadMapsScript(apiKey) {

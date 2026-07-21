@@ -47,6 +47,8 @@ const sessionResponse = (request: Request): Response => {
     searchArea: session.searchArea,
     lat: session.lat,
     lng: session.lng,
+    originLat: session.originLat ?? null,
+    originLng: session.originLng ?? null,
     mapsApiKey,
   });
 };

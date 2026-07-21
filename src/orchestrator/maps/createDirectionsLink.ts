@@ -1,3 +1,4 @@
+import { bindFindMyOrigin } from "./bindFindMyOrigin";
 import { geocodePlace } from "./geocode";
 import { createMapsSession, createMapsViewerToken } from "./session";
 import { getMapsViewerPageUrl } from "./urls";
@@ -5,6 +6,7 @@ import { getMapsViewerPageUrl } from "./urls";
 import type {
   CreateDirectionsLinkInput,
   CreateDirectionsLinkResult,
+  MapsLocationStatus,
 } from "./types";
 
 export const createDirectionsLink = async (
@@ -33,5 +35,13 @@ export const createDirectionsLink = async (
     error: "MAPS_PUBLIC_BASE_URL or MAPS_VIEWER_TOKEN_SECRET is not configured",
   };
 
-  return { status: "ok", url, destination, searchArea };
+  let locationStatus: MapsLocationStatus = "unavailable";
+  if (input.space && input.message) locationStatus = await bindFindMyOrigin({
+    sessionId: session.id,
+    space: input.space,
+    message: input.message,
+    senderId: input.senderId ?? null,
+  });
+
+  return { status: "ok", url, destination, searchArea, locationStatus };
 };

@@ -121,9 +121,13 @@ describe("interaction prompt location discovery", () => {
     expect(interactionSystemPrompt).toContain(
       "ask for a city, neighborhood, or specific place name",
     );
-    expect(interactionSystemPrompt).toContain("Do not use Find My");
+    expect(interactionSystemPrompt).toContain(
+      "Do not use Find My for place search",
+    );
     expect(interactionSystemPrompt).not.toContain("call get_my_location first");
-    expect(interactionSystemPrompt).not.toContain("request_my_location");
+    expect(interactionSystemPrompt).toContain(
+      "Do not call get_my_location or request_my_location",
+    );
     expect(interactionSystemPrompt).toContain(
       "Never pass latitude/longitude to search_nearby_places",
     );
@@ -155,7 +159,7 @@ describe("interaction prompt location discovery", () => {
       "Never paste Google Maps or hosted map URLs into chat text",
     );
     expect(interactionSystemPrompt).toContain(
-      "the bot never receives GPS",
+      "whose blue-dot and route use Find My sharing",
     );
     expect(interactionSystemPrompt).toContain(
       'create_directions_link(destination="Beacon Hill Park", searchArea="Victoria, BC")',

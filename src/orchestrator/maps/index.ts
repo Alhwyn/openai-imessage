@@ -1,11 +1,23 @@
+import { clearMapsSessionsForTests } from "./clear";
 import { createDirectionsLink } from "./createDirectionsLink";
-import { clearMapsSessionsForTests } from "./session";
+import { clearSpectrumApp, registerSpectrumApp } from "./imessage";
 import { startMapsViewer } from "./viewer";
 
 import type {
   CreateDirectionsLinkInput,
   CreateDirectionsLinkResult,
+  MapsLocationStatus,
 } from "./types";
 
-export { clearMapsSessionsForTests, createDirectionsLink, startMapsViewer };
-export type { CreateDirectionsLinkInput, CreateDirectionsLinkResult };
+export {
+  clearMapsSessionsForTests,
+  clearSpectrumApp,
+  createDirectionsLink,
+  registerSpectrumApp,
+  startMapsViewer,
+};
+export type {
+  CreateDirectionsLinkInput,
+  CreateDirectionsLinkResult,
+  MapsLocationStatus,
+};

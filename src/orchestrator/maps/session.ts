@@ -36,6 +36,7 @@ export const createMapsSession = (input: {
   searchArea: string;
   lat: number;
   lng: number;
+  friendAddress?: string;
 }): MapsSession => {
   const now = Date.now();
   pruneExpired(now);
@@ -47,6 +48,7 @@ export const createMapsSession = (input: {
     lat: input.lat,
     lng: input.lng,
     expiresAt: now + MAPS_SESSION_TTL_MS,
+    friendAddress: input.friendAddress,
   };
   sessions.set(id, session);
   return session;
@@ -64,6 +66,38 @@ export const getMapsSession = (
     return null;
   }
   return session;
+};
+
+export const getMapsSessionById = (sessionId: string): MapsSession | null => {
+  const session = sessions.get(sessionId);
+  if (!session) return null;
+  if (session.expiresAt <= Date.now()) {
+    sessions.delete(sessionId);
+    return null;
+  }
+  return session;
+};
+
+export const patchMapsSessionOrigin = (
+  sessionId: string,
+  origin: { lat: number; lng: number },
+): boolean => {
+  const session = getMapsSessionById(sessionId);
+  if (!session) return false;
+  session.originLat = origin.lat;
+  session.originLng = origin.lng;
+  session.originUpdatedAt = Date.now();
+  return true;
+};
+
+export const setMapsSessionFriendAddress = (
+  sessionId: string,
+  friendAddress: string,
+): boolean => {
+  const session = getMapsSessionById(sessionId);
+  if (!session) return false;
+  session.friendAddress = friendAddress;
+  return true;
 };
 
 export const clearMapsSessionsForTests = (): void => {
