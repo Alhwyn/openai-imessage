@@ -4,7 +4,7 @@ import {
   createKeyedDebounce,
   DEFAULT_ORCHESTRATOR_DEBOUNCE_MS,
   deliverOutbound,
-  getOpenAiErrorDetails,
+  getGmiErrorDetails,
 } from "../utils/index";
 
 import { turnFailureOutbound } from "./failurePolicy";
@@ -94,7 +94,7 @@ const handleTurnFailure = async (
 ): Promise<void> => {
   console.error(
     `[bounce] Turn failed for space ${turn.space.id}`,
-    getOpenAiErrorDetails(error),
+    getGmiErrorDetails(error),
   );
   await deliverOutbound(turn.space, turnFailureOutbound(), {
     targetMessage: turn.message,

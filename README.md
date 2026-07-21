@@ -163,3 +163,4 @@ composio init
 1. Text: “search for weekend plans and tell me” — expect ack → sub-agent → mock search reply.
 2. Text: “call me Al from now on” — agent should `memory` add to user; restart the app; text again and confirm it still knows the name.
 3. Multi-turn chat should survive process restart (history in Convex).
+ 

@@ -1,5 +1,8 @@
 import type { OutboundItem } from "./contracts";
 
+/**
+ * Summarizes a list of outbound items for display in the UI.
+ */
 export const summarizeOutbound = (items: OutboundItem[]) => {
   return items.map((item) => {
     switch (item.kind) {

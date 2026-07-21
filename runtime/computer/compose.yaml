@@ -17,6 +17,11 @@ services:
       MAX_FRAME_RATE: "30"
       START_PULSEAUDIO: "1"
       KASM_SVC_AUDIO: "0"
+      # Printer/smartcard inject -UnixRelay into VNCOPTIONS. Kasm's in-process
+      # VNC restart appends those flags again ("Too many unix relays") and X dies.
+      KASM_SVC_PRINTER: "0"
+      KASM_SVC_SMARTCARD: "0"
+      KASM_SVC_GAMEPAD: "0"
       # Local-only bind (127.0.0.1). Skip the kasm_user password wall so the live
       # viewer/app embed can open the desktop immediately. Lock desktop size so
       # VNC clients cannot resize away from the model's coordinate space.
@@ -36,6 +41,7 @@ services:
         - CMD-SHELL
         - >-
           timeout 3 xdpyinfo -display :1 >/dev/null 2>&1
+          && pgrep -x Xvnc >/dev/null
           && pgrep -x xfce4-session >/dev/null
       start_period: 60s
       interval: 20s

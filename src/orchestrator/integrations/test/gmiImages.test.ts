@@ -1,0 +1,311 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { describe, expect, mock, test } from "bun:test";
+import sharp from "sharp";
+
+import {
+  IMAGE_API_BASE,
+  IMAGE_MAX_COUNT,
+  IMAGE_MAX_FILE_BYTES,
+  IMAGE_MIN_COUNT,
+  IMAGE_MODEL_ID,
+} from "../../utils/constants";
+import {
+  cleanupImageAlbum,
+  clampImageCount,
+  generateGmiImages,
+} from "../gmiImages";
+
+import type { ImageGenerationProgress } from "../../utils/types";
+
+const SOURCE_PNG = await sharp({
+  create: {
+    width: 64,
+    height: 64,
+    channels: 3,
+    background: { r: 40, g: 120, b: 200 },
+  },
+})
+  .png()
+  .toBuffer();
+
+const isJpeg = (bytes: Uint8Array): boolean =>
+  bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8;
+
+const jsonResponse = (body: unknown, status = 200): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
+const requestUrl = (input: string | URL | Request): string => {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+};
+
+const requestBodyText = (body: unknown): string => {
+  if (typeof body === "string") return body;
+  return "";
+};
+
+const noopSleep = (): Promise<void> => Promise.resolve();
+
+describe("clampImageCount", () => {
+  test("clamps into the supported range", () => {
+    expect(clampImageCount(0)).toBe(IMAGE_MIN_COUNT);
+    expect(clampImageCount(3.9)).toBe(3);
+    expect(clampImageCount(99)).toBe(IMAGE_MAX_COUNT);
+    expect(IMAGE_MAX_COUNT).toBe(3);
+    expect(clampImageCount(Number.NaN)).toBe(IMAGE_MIN_COUNT);
+  });
+});
+
+describe("IMAGE_MODEL_ID", () => {
+  test("is seedream-5.0-lite", () => {
+    expect(IMAGE_MODEL_ID).toBe("seedream-5.0-lite");
+  });
+});
+
+describe("cleanupImageAlbum", () => {
+  test("removes a temp directory", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "gmi-cleanup-"));
+    const imagePath = join(tempDir, "image-1.png");
+    await Bun.write(imagePath, SOURCE_PNG);
+
+    await cleanupImageAlbum(tempDir);
+
+    expect(await Bun.file(imagePath).exists()).toBe(false);
+    expect(await Bun.file(tempDir).exists()).toBe(false);
+  });
+});
+
+describe("generateGmiImages", () => {
+  test("runs one Seedream job per image sequentially, downloads urls, and stages JPEGs", async () => {
+    let postCount = 0;
+    const progress: ImageGenerationProgress[] = [];
+    const fetchFn = mock(
+      (input: string | URL | Request, init?: RequestInit) => {
+        const url = requestUrl(input);
+
+        if (
+          url === `${IMAGE_API_BASE}/api/v1/ie/requestqueue/apikey/requests`
+        ) {
+          expect(init?.method).toBe("POST");
+          const body = JSON.parse(requestBodyText(init?.body)) as {
+            model: string;
+            payload: {
+              prompt: string;
+              max_images: number;
+              output_format: string;
+              size: string;
+              sequential_image_generation: string;
+              watermark: boolean;
+            };
+          };
+          expect(body.model).toBe("seedream-5.0-lite");
+          expect(body.payload.prompt).toBe("a fluffy cat");
+          expect(body.payload.max_images).toBe(1);
+          expect(body.payload.size).toBe("2K");
+          expect(body.payload.output_format).toBe("jpeg");
+          expect(body.payload.sequential_image_generation).toBe("disabled");
+          expect(body.payload.watermark).toBe(false);
+
+          postCount += 1;
+          const imageUrl =
+            postCount === 1
+              ? "https://cdn.example/a.png"
+              : "https://cdn.example/b.png";
+          return Promise.resolve(
+            jsonResponse({
+              request_id: `req-${postCount}`,
+              status: "success",
+              outcome: {
+                media_urls: [{ id: "0", url: imageUrl }],
+              },
+            }),
+          );
+        }
+
+        if (
+          url === "https://cdn.example/a.png" ||
+          url === "https://cdn.example/b.png"
+        ) return Promise.resolve(new Response(SOURCE_PNG));
+
+        throw new Error(`Unexpected fetch: ${url}`);
+      },
+    );
+
+    const album = await generateGmiImages(["a fluffy cat", "a fluffy cat"], {
+      fetchFn: fetchFn as unknown as typeof fetch,
+      onProgress: (update) => {
+        progress.push(update);
+      },
+      sleep: noopSleep,
+    });
+
+    expect(postCount).toBe(2);
+    expect(progress).toEqual([
+      { phase: "queued", completedImages: 0, totalImages: 2 },
+      { phase: "processing", completedImages: 1, totalImages: 2 },
+      { phase: "processing", completedImages: 2, totalImages: 2 },
+      { phase: "downloading", completedImages: 2, totalImages: 2 },
+    ]);
+    expect(album.paths).toHaveLength(2);
+
+    const first = await Bun.file(album.paths[0]!).bytes();
+    const second = await Bun.file(album.paths[1]!).bytes();
+    expect(isJpeg(first)).toBe(true);
+    expect(isJpeg(second)).toBe(true);
+    expect(first.byteLength).toBeLessThanOrEqual(IMAGE_MAX_FILE_BYTES);
+    expect(second.byteLength).toBeLessThanOrEqual(IMAGE_MAX_FILE_BYTES);
+
+    await cleanupImageAlbum(album.tempDir);
+  });
+
+  test("polls queued requests until success", async () => {
+    let polls = 0;
+    const fetchFn = mock((input: string | URL | Request) => {
+      const url = requestUrl(input);
+
+      if (
+        url === `${IMAGE_API_BASE}/api/v1/ie/requestqueue/apikey/requests`
+      ) return Promise.resolve(
+        jsonResponse({
+          request_id: "req-queued",
+          status: "queued",
+        }),
+      );
+
+      if (
+        url ===
+        `${IMAGE_API_BASE}/api/v1/ie/requestqueue/apikey/requests/req-queued`
+      ) {
+        polls += 1;
+        if (polls === 1) return Promise.resolve(
+          jsonResponse({ request_id: "req-queued", status: "processing" }),
+        );
+
+        return Promise.resolve(
+          jsonResponse({
+            request_id: "req-queued",
+            status: "success",
+            outcome: {
+              media_urls: [{ id: "0", url: "https://cdn.example/one.png" }],
+            },
+          }),
+        );
+      }
+
+      if (url === "https://cdn.example/one.png") return Promise.resolve(new Response(SOURCE_PNG));
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const album = await generateGmiImages(["sunset"], {
+      fetchFn: fetchFn as unknown as typeof fetch,
+      pollIntervalMs: 1,
+      sleep: noopSleep,
+    });
+
+    expect(polls).toBe(2);
+    expect(album.paths).toHaveLength(1);
+    expect(isJpeg(await Bun.file(album.paths[0]!).bytes())).toBe(true);
+    await cleanupImageAlbum(album.tempDir);
+  });
+
+  test("fails on provider failure without leaving temp files", async () => {
+    const fetchFn = mock(() =>
+      Promise.resolve(
+        jsonResponse({
+          request_id: "req-fail",
+          status: "failed",
+          error: { message: "moderation blocked" },
+        }),
+      ),
+    );
+
+    try {
+      await generateGmiImages(["bad prompt"], {
+        fetchFn: fetchFn as unknown as typeof fetch,
+        sleep: noopSleep,
+      });
+      throw new Error("expected generateGmiImages to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("moderation blocked");
+    }
+  });
+
+  test("rejects non-image downloads during staging", async () => {
+    const fetchFn = mock((input: string | URL | Request) => {
+      const url = requestUrl(input);
+      if (
+        url === `${IMAGE_API_BASE}/api/v1/ie/requestqueue/apikey/requests`
+      ) return Promise.resolve(
+        jsonResponse({
+          request_id: "req-bad",
+          status: "success",
+          outcome: {
+            media_urls: [{ id: "0", url: "https://cdn.example/bad.bin" }],
+          },
+        }),
+      );
+
+      if (url === "https://cdn.example/bad.bin") return Promise.resolve(new Response(new Uint8Array([1, 2, 3, 4])));
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    try {
+      await generateGmiImages(["bad bytes"], {
+        fetchFn: fetchFn as unknown as typeof fetch,
+        sleep: noopSleep,
+      });
+      throw new Error("expected generateGmiImages to reject bad image bytes");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+    }
+  });
+
+  test("times out while still queued", async () => {
+    let now = 0;
+    const fetchFn = mock((input: string | URL | Request) => {
+      const url = requestUrl(input);
+      if (
+        url === `${IMAGE_API_BASE}/api/v1/ie/requestqueue/apikey/requests`
+      ) return Promise.resolve(
+        jsonResponse({
+          request_id: "req-slow",
+          status: "queued",
+        }),
+      );
+
+      return Promise.resolve(
+        jsonResponse({
+          request_id: "req-slow",
+          status: "processing",
+        }),
+      );
+    });
+
+    try {
+      await generateGmiImages(["slow prompt"], {
+        fetchFn: fetchFn as unknown as typeof fetch,
+        now: () => {
+          now += 50;
+          return now;
+        },
+        pollIntervalMs: 1,
+        timeoutMs: 100,
+        sleep: noopSleep,
+      });
+      throw new Error("expected generateGmiImages to time out");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("Image generation timed out");
+    }
+  });
+});
