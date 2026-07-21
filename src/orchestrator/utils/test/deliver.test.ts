@@ -191,7 +191,7 @@ describe("deliverOutbound", () => {
     });
   });
 
-  test("sends maps links as tappable expandable mini-app cards", async () => {
+  test("sends maps links as live customized mini-app cards", async () => {
     const send = mock(() => Promise.resolve(undefined));
     const space = asSpace({ send });
     const url =
@@ -208,13 +208,13 @@ describe("deliverOutbound", () => {
       appName: "Spectrum",
       appStoreId: 6777616651,
       extensionBundleId: "codes.photon.Spectrum.MessagesExtension",
-      live: false,
+      live: true,
       teamId: "P8XT6232SL",
       url,
       layout: {
-        caption: "Directions",
-        subcaption: "Tap to expand",
-        summary: "Open full directions map",
+        caption: "Live map",
+        subcaption: "Tap to open",
+        summary: "Live directions map",
       },
     });
   });

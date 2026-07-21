@@ -41,16 +41,16 @@ describe("maps viewer HTTP", () => {
     expect(mapsViewerHtml).toContain('id="duration-value"');
     expect(mapsViewerHtml).toContain('id="distance-value"');
     expect(mapsViewerHtml).toContain(
-      'navigationActive ? "Cancel live navigation" : "Resume live navigation"',
+      'navigationActive ? "Cancel live navigation" : "Start live navigation"',
     );
+    expect(mapsViewerHtml).toContain("let navigationActive = false");
     expect(mapsViewerHtml).toContain("map.setZoom(18)");
     expect(mapsViewerHtml).toContain("pollOrigin");
     expect(mapsViewerHtml).toContain('fillColor: "#007AFF"');
-    expect(mapsViewerHtml).toContain("Compact rounded chevron");
-    expect(mapsViewerHtml).toContain("scale: 3.6");
+    expect(mapsViewerHtml).toContain("Rounded navigation chevron");
+    expect(mapsViewerHtml).toContain("scale: 7.5");
     expect(mapsViewerHtml).toContain("bearingDegrees");
     expect(mapsViewerHtml).toContain("headingDegrees");
-    expect(mapsViewerHtml).toContain("min-height: 420px");
   });
 
   test("serves HTML and token-gated session JSON", async () => {

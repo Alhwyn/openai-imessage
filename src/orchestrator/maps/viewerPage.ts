@@ -98,7 +98,7 @@ export const mapsViewerHtml = `<!doctype html>
     };
 
     let map, youMarker, directionsRenderer, directionsService, lastRouteOrigin, destination;
-    let navigationActive = true;
+    let navigationActive = false;
     let pollTimer;
     let lastOrigin = null;
     let headingDegrees = 0;
@@ -139,15 +139,15 @@ export const mapsViewerHtml = `<!doctype html>
 
     function youIcon(rotation) {
       return {
-        // Compact rounded chevron (points north at rotation 0).
-        path: "M 0 -2.4 C 0.35 -2.4 0.7 -2.1 1.55 -0.35 C 1.9 0.35 2 0.8 1.8 1.1 C 1.6 1.4 1.2 1.4 0.75 1.15 L 0.2 0.85 C 0.08 0.78 -0.08 0.78 -0.2 0.85 L -0.75 1.15 C -1.2 1.4 -1.6 1.4 -1.8 1.1 C -2 0.8 -1.9 0.35 -1.55 -0.35 C -0.7 -2.1 -0.35 -2.4 0 -2.4 Z",
-        scale: 3.6,
+        // Rounded navigation chevron (points north at rotation 0).
+        path: "M 0 -3.6 C 0.55 -3.6 1.15 -3.1 2.55 -0.35 C 3.15 0.85 3.35 1.55 3.05 2.05 C 2.75 2.55 2.15 2.55 1.35 2.15 L 0.35 1.55 C 0.15 1.45 -0.15 1.45 -0.35 1.55 L -1.35 2.15 C -2.15 2.55 -2.75 2.55 -3.05 2.05 C -3.35 1.55 -3.15 0.85 -2.55 -0.35 C -1.15 -3.1 -0.55 -3.6 0 -3.6 Z",
+        scale: 7.5,
         fillColor: "#007AFF",
         fillOpacity: 1,
         strokeColor: "#ffffff",
-        strokeWeight: 1.6,
+        strokeWeight: 2.5,
         rotation,
-        anchor: new google.maps.Point(0, 0.15),
+        anchor: new google.maps.Point(0, 0.2),
       };
     }
 
@@ -185,7 +185,7 @@ export const mapsViewerHtml = `<!doctype html>
       els.go.classList.toggle("cancel", navigationActive);
       els.go.setAttribute(
         "aria-label",
-        navigationActive ? "Cancel live navigation" : "Resume live navigation",
+        navigationActive ? "Cancel live navigation" : "Start live navigation",
       );
     }
 
