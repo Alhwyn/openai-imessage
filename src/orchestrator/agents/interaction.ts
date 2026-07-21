@@ -7,23 +7,18 @@ import {
 import { formatComputerRunContext } from "../computer/index";
 import { getLatestComputerRunForSpace } from "../db/index";
 import { getComposioTools } from "../integrations/index";
-import {
-  appendHistory,
-  buildSystemPrompt,
-  getCuratedMemories,
-  getHistory,
-} from "../memory/index";
+import { appendHistory, getHistory } from "../memory/index";
 import { summarizeOutbound } from "../outbound";
 import { interactionSystemPrompt } from "../prompts/index";
 import {
-  assertOpenAiApiKey,
-  getOpenAiErrorDetails,
+  assertGmiApiKey,
+  getGmiErrorDetails,
+  MAX_RETRIES,
+  MODEL,
+  MODEL_ID,
+  PROVIDER_OPTIONS,
+  REASONING,
   INTERACTION_AGENT_MAX_STEPS,
-  OPENAI_MAX_RETRIES,
-  OPENAI_PROVIDER_OPTIONS,
-  OPENAI_REASONING,
-  OPENAI_TEXT_MODEL,
-  OPENAI_TEXT_MODEL_ID,
 } from "../utils/index";
 import { buildUserContent } from "../utils/userContent";
 
@@ -67,18 +62,16 @@ export const runInteractionAgent = async (
   deliveryTarget: DeliveryTarget,
 ): Promise<InteractionResult> => {
   return withSpaceLock(spaceId, async () => {
-    assertOpenAiApiKey();
+    assertGmiApiKey();
 
     const effects = createTurnEffectCollector();
     const contextStartedAt = Date.now();
     console.log("[agent] Loading interaction context", { spaceId });
-    const [memories, composioTools, history, latestComputerRun] =
-      await Promise.all([
-        getCuratedMemories(spaceId),
-        getComposioTools(event.senderId),
-        getHistory(spaceId),
-        getLatestComputerRunForSpace(spaceId).catch(() => null),
-      ]);
+    const [composioTools, history, latestComputerRun] = await Promise.all([
+      getComposioTools(event.senderId),
+      getHistory(spaceId),
+      getLatestComputerRunForSpace(spaceId).catch(() => null),
+    ]);
     console.log("[agent] Interaction context loaded", {
       spaceId,
       historyCount: history.length,
@@ -87,10 +80,7 @@ export const runInteractionAgent = async (
     });
     const userContent = buildUserContent(event.text, event.images);
     const computerContext = formatComputerRunContext(latestComputerRun);
-    const system = [
-      buildSystemPrompt(interactionSystemPrompt, memories),
-      computerContext,
-    ]
+    const system = [interactionSystemPrompt, computerContext]
       .filter(Boolean)
       .join("\n\n");
     const messages: ModelMessage[] = [
@@ -117,10 +107,10 @@ export const runInteractionAgent = async (
       (name) => tools[name] === composioTools[name],
     ).length;
 
-    console.log("[agent] Starting OpenAI interaction generation", {
+    console.log("[agent] Starting GMI interaction generation", {
       spaceId,
-      model: OPENAI_TEXT_MODEL_ID,
-      maxRetries: OPENAI_MAX_RETRIES,
+      model: MODEL_ID,
+      maxRetries: MAX_RETRIES,
       toolCount: toolNames.length,
       composioToolCount,
       composioAttachedCount,
@@ -132,16 +122,16 @@ export const runInteractionAgent = async (
     const startedAt = Date.now();
 
     const result = await generateText({
-      model: OPENAI_TEXT_MODEL,
-      maxRetries: OPENAI_MAX_RETRIES,
-      reasoning: OPENAI_REASONING,
-      providerOptions: OPENAI_PROVIDER_OPTIONS,
+      model: MODEL,
+      maxRetries: MAX_RETRIES,
+      reasoning: REASONING,
+      providerOptions: PROVIDER_OPTIONS,
       system,
       messages,
       tools,
       stopWhen: stepCountIs(INTERACTION_AGENT_MAX_STEPS),
       onStepFinish: (step) => {
-        console.log("[agent] OpenAI interaction step finished", {
+        console.log("[agent] GMI interaction step finished", {
           spaceId,
           stepNumber: step.stepNumber,
           finishReason: step.finishReason,
@@ -149,10 +139,10 @@ export const runInteractionAgent = async (
         });
       },
     }).catch((error: unknown) => {
-      console.error("[agent] OpenAI interaction generation failed", {
+      console.error("[agent] GMI interaction generation failed", {
         spaceId,
         elapsedMs: Date.now() - startedAt,
-        ...getOpenAiErrorDetails(error),
+        ...getGmiErrorDetails(error),
       });
       throw error;
     });
@@ -171,7 +161,7 @@ export const runInteractionAgent = async (
       step.toolResults.map((tr) => tr.toolName),
     );
 
-    console.log("[agent] OpenAI interaction generation completed", {
+    console.log("[agent] GMI interaction generation completed", {
       spaceId,
       elapsedMs: Date.now() - startedAt,
       finishReason: result.finishReason,

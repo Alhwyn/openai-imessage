@@ -17,11 +17,11 @@ import {
 } from "../db/index";
 import {
   cleanupImageAlbum,
-  generateOpenAiImages,
-} from "../integrations/openaiImages";
+  generateGmiImages,
+} from "../integrations/gmiImages";
 import { recordAssistantText } from "../memory/index";
 import { summarizeOutbound } from "../outbound";
-import { deliverOutbound, getOpenAiErrorDetails } from "../utils/index";
+import { deliverOutbound, getGmiErrorDetails } from "../utils/index";
 import { runExecutionAgent } from "../workers/execution";
 
 import {
@@ -162,7 +162,7 @@ const runHandoffTask = (input: RunHandoffTaskInput): void => {
     }
   })().catch((error: unknown) => {
     console.error(`[handoff] Unhandled failure for ${input.taskId}`, {
-      ...getOpenAiErrorDetails(error),
+      ...getGmiErrorDetails(error),
     });
   });
 };
@@ -385,7 +385,7 @@ export const assignImageTask = (
         count: prompts.length,
         promptPreview: promptSummary.slice(0, 120),
       });
-      const album = await generateOpenAiImages(prompts, {
+      const album = await generateGmiImages(prompts, {
         onProgress: createImageTaskProgressHook(task, (progress) => {
           console.log(`[image-agent] Progress ${taskId}`, {
             phase: progress.phase,
@@ -461,7 +461,7 @@ export const assignBackgroundTask = (
     taskId,
     label: "Background agent",
     execute: async () => {
-      const album = await generateOpenAiImages([prompt]);
+      const album = await generateGmiImages([prompt]);
       tempDir = album.tempDir;
       const path = album.paths[0];
       if (!path) throw new Error("Image generation returned no files");

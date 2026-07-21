@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { getOpenAiApiKey, getOpenAiBaseUrl } from "../utils/openaiEnv";
+import { API_KEY, CLOUD_BASE_URL } from "../utils/constants";
 
 import {
   COMPUTER_COMPACTION_THRESHOLD,
@@ -120,14 +120,16 @@ const buildRequestBody = (
     : {}),
 });
 
-const callOpenAi = async (
+const callGmi = async (
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<OpenAiComputerResponse> => {
-  const response = await fetch(`${getOpenAiBaseUrl()}/responses`, {
+  if (!API_KEY) throw new Error("Missing GMI_CLOUD_API_KEY. Add it to your local .env before assigning computer tasks.");
+
+  const response = await fetch(`${CLOUD_BASE_URL}/responses`, {
     method: "POST",
     headers: {
-      authorization: `Bearer ${getOpenAiApiKey("assigning computer tasks")}`,
+      authorization: `Bearer ${API_KEY}`,
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
@@ -137,7 +139,7 @@ const callOpenAi = async (
   if (!response.ok) {
     const details = (await response.text()).slice(0, 2_000);
     throw new Error(
-      `OpenAI computer-use request failed (${response.status}): ${details}`,
+      `GMI computer-use request failed (${response.status}): ${details}`,
     );
   }
 
@@ -393,7 +395,7 @@ export const runComputerUse = async ({
   for (let step = 1; step <= maximumSteps; step += 1) {
     signal?.throwIfAborted();
 
-    const response = await callOpenAi(
+    const response = await callGmi(
       buildRequestBody({
         sessionId,
         instructions,

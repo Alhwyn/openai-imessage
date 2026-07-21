@@ -7,11 +7,11 @@ import {
 import { assertConvexEnv, reconcileStaleComputerRuns } from "./db/index";
 import { assignImageTask, assignTask } from "./handoff/index";
 import {
-  assertOpenAiApiKey,
+  assertGmiApiKey,
   createRecentIdTracker,
   extractInboundImages,
   extractInboundText,
-  OPENAI_TEXT_MODEL,
+  MODEL,
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
 } from "./utils/index";
@@ -29,7 +29,7 @@ import type { RecentIdTracker, RecentIdTrackerOptions } from "./utils/index";
 
 export {
   assertConvexEnv,
-  assertOpenAiApiKey,
+  assertGmiApiKey,
   assignImageTask,
   assignTask,
   buildDebouncedTurn,
@@ -37,7 +37,7 @@ export {
   extractInboundImages,
   extractInboundText,
   flushPendingOrchestratorTurns,
-  OPENAI_TEXT_MODEL,
+  MODEL,
   reconcileStaleComputerRuns,
   runExecutionAgent,
   runInteractionAgent,

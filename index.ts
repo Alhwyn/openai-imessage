@@ -8,7 +8,7 @@ import {
 import { startComputerViewer } from "./src/orchestrator/computer/viewer";
 import {
   assertConvexEnv,
-  assertOpenAiApiKey,
+  assertGmiApiKey,
   createRecentIdTracker,
   extractInboundImages,
   extractInboundText,
@@ -88,7 +88,7 @@ const handleInbound = async (space: Space, message: Message): Promise<void> => {
 };
 
 const main = async () => {
-  assertOpenAiApiKey();
+  assertGmiApiKey();
   assertConvexEnv();
   const reconciled = await reconcileStaleComputerRuns({
     staleBefore: Date.now(),
@@ -157,7 +157,7 @@ const main = async () => {
   });
 
   console.log(
-    `[app] Orchestrator listening (Spectrum + OpenAI). Debounced inbound → assign_task → notify → reply/react`,
+    `[app] Orchestrator listening (Spectrum + GMI). Debounced inbound → assign_task → notify → reply/react`,
   );
 
   try {

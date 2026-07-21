@@ -1,6 +1,9 @@
 import type { IMessageRemoteClient } from "./maps/locationClients";
 import type { SpectrumInstance } from "@spectrum-ts/core";
 
+/**
+ * Checks if a value is a valid IMessage remote client.
+ */
 const isRemoteClient = (value: unknown): value is IMessageRemoteClient => {
   if (!value || typeof value !== "object") return false;
   const entry = value as { client?: unknown; phone?: unknown };
@@ -18,7 +21,7 @@ const isRemoteClient = (value: unknown): value is IMessageRemoteClient => {
  */
 export const resolveIMessageLocationClients = (
   app: SpectrumInstance,
-): IMessageRemoteClient[] => {
+): ReadonlyArray<IMessageRemoteClient> => {
   const runtime = app.__internal.platforms.get("iMessage");
   if (!runtime || !Array.isArray(runtime.client)) return [];
   return runtime.client.filter(isRemoteClient);

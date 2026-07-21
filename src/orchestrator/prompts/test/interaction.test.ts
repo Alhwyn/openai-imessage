@@ -34,9 +34,7 @@ describe("interaction prompt composio auth deep links", () => {
     expect(interactionSystemPrompt).toContain(
       "Never format it as Markdown like [label](url)",
     );
-    expect(interactionSystemPrompt).toContain(
-      'send_auth_link(url="https://connect.composio.dev/link/ln_abc123")',
-    );
+    expect(interactionSystemPrompt).toContain("Always use send_auth_link");
     expect(interactionSystemPrompt).not.toContain(
       "reply with that raw URL and a short instruction",
     );
@@ -72,9 +70,6 @@ describe("interaction prompt computer use", () => {
     expect(interactionSystemPrompt).toContain(
       "Never use Composio for opening websites, browser games, Wordle/Worldle",
     );
-    expect(interactionSystemPrompt).toContain(
-      "open worlds and solve the world of the day",
-    );
   });
 });
 
@@ -84,21 +79,21 @@ describe("interaction prompt user-facing voice", () => {
       "User-facing text is only what a normal friend would say in iMessage",
     );
     expect(interactionSystemPrompt).toContain(
-      'Never write scratch notes, chain-of-thought, or tool-selection reasoning into the message',
+      "Never write scratch notes, chain-of-thought, or tool-selection reasoning into the message",
     );
     expect(interactionSystemPrompt).toContain("use commentary");
   });
 
-  test("forbids explaining memory/pipeline internals", () => {
+  test("forbids explaining internals and uses Gmail for personal context", () => {
     expect(interactionSystemPrompt).toContain(
       "Never explain how you work under the hood",
     );
     expect(interactionSystemPrompt).toContain(
-      "Never explain memory mechanics",
+      "If you need personal context about the person, search their Gmail",
     );
-    expect(interactionSystemPrompt).toContain(
-      "there's a background pipeline that parses our chats",
-    );
+    expect(interactionSystemPrompt).not.toContain("USER.md");
+    expect(interactionSystemPrompt).not.toContain("MEMORY.md");
+    expect(interactionSystemPrompt).not.toContain('<skill name="memory">');
   });
 });
 
@@ -108,10 +103,10 @@ describe("interaction prompt chat background", () => {
       "Use set_chat_background for chat wallpaper",
     );
     expect(interactionSystemPrompt).toContain(
-      'set_chat_background(source="prompt", prompt="misty forest at dusk, soft wallpaper")',
+      "set_chat_background source=prompt already sends a short acknowledgment",
     );
     expect(interactionSystemPrompt).toContain(
-      'set_chat_background(source="attachment")',
+      "source=attachment needs an image on this message",
     );
   });
 });
@@ -136,7 +131,7 @@ describe("interaction prompt location discovery", () => {
       "Never include source URLs, hosted map URLs, a Sources section, or Markdown links in chat text",
     );
     expect(interactionSystemPrompt).toContain(
-      'search_nearby_places(subject="parks with peacocks", searchArea="Victoria, BC")',
+      'subject="parks with peacocks", searchArea="Victoria, BC"',
     );
     expect(interactionSystemPrompt).toContain(
       "Prefer full phrases over keyword stuffing",
@@ -166,11 +161,13 @@ describe("interaction prompt location discovery", () => {
     expect(interactionSystemPrompt).toContain(
       "Do not answer location in words",
     );
-    expect(interactionSystemPrompt).toContain(
-      'create_directions_link(destination="Beacon Hill Park", searchArea="Victoria, BC")',
-    );
-    expect(interactionSystemPrompt).toContain(
-      "never answer live location in text",
-    );
+  });
+});
+
+describe("interaction prompt has no examples", () => {
+  test("drops example blocks from the assembled prompt", () => {
+    expect(interactionSystemPrompt).not.toContain("<examples>");
+    expect(interactionSystemPrompt).not.toContain("<example>");
+    expect(interactionSystemPrompt).not.toContain("## Examples");
   });
 });

@@ -10,9 +10,9 @@ let locationClients: IMessageRemoteClient[] | null = null;
 
 /** Inject resolved iMessage location clients at boot (or in tests). */
 export const registerLocationClients = (
-  clients: IMessageRemoteClient[],
+  clients: ReadonlyArray<IMessageRemoteClient>,
 ): void => {
-  locationClients = clients.length > 0 ? clients : null;
+  locationClients = clients.length > 0 ? [...clients] : null;
 };
 
 export const clearLocationClients = (): void => {

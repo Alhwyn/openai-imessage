@@ -58,27 +58,32 @@ export type ImageGenerationProgress = {
   totalImages: number;
 };
 
-/** Test/injection hooks for OpenAI image generation. */
-export type GenerateImagesOptions = {
-  apiKey?: string;
+/** Test/injection hooks for GMI image generation. */
+export type GenerateGmiImagesOptions = {
   fetchFn?: typeof fetch;
   now?: () => number;
   onProgress?: (progress: ImageGenerationProgress) => void;
+  pollIntervalMs?: number;
+  sleep?: (ms: number) => Promise<void>;
   timeoutMs?: number;
 };
 
-/** Success envelope from OpenAI `POST /v1/images/generations`. */
-export type OpenAiImagesResponse = {
-  created?: number;
-  data?: Array<{
-    b64_json?: string;
-    revised_prompt?: string;
-    url?: string;
-  }>;
-  error?: {
-    message?: string;
-    type?: string;
-    code?: string;
-    param?: string;
+/** Seedream request body for GMI image generation. */
+export type SeedreamImagePayload = {
+  prompt: string;
+  size: string;
+  output_format: "jpeg" | "png";
+  max_images: number;
+  sequential_image_generation: "auto" | "disabled";
+  watermark: boolean;
+};
+
+/** Queue/status response from the GMI image request API. */
+export type GmiImageResponse = {
+  request_id?: string;
+  status?: string;
+  outcome?: {
+    media_urls?: Array<{ id?: string; url?: string }>;
   };
+  error?: string | { message?: string };
 };

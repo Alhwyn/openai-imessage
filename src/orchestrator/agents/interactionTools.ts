@@ -12,7 +12,6 @@ import {
 } from "../handoff/index";
 import { isComposioAuthUrl } from "../integrations/index";
 import { createDirectionsLink } from "../maps";
-import { editMemory } from "../memory/index";
 import { TAPBACK_KEYS } from "../tapbacks";
 import {
   IMAGE_MAX_COUNT,
@@ -277,58 +276,6 @@ export const buildInteractionTools = ({
           searchArea: result.searchArea,
           // Opaque status only — never expose coordinates to the model.
           locationStatus: result.locationStatus,
-        };
-      },
-    }),
-    memory: tool({
-      description:
-        "Update persistent memory. Use kind=user for the person's preferences/profile; kind=agent for lasting notes and conventions. Do not store secrets.",
-      inputSchema: z.discriminatedUnion("action", [
-        z.object({
-          kind: z.enum(["user", "agent"]).describe("Which memory file to edit"),
-          action: z.literal("add"),
-          text: z.string().describe("New text to append"),
-        }),
-        z.object({
-          kind: z.enum(["user", "agent"]).describe("Which memory file to edit"),
-          action: z.literal("replace"),
-          text: z.string().describe("Replacement text"),
-          old_text: z.string().describe("Substring to find"),
-        }),
-        z.object({
-          kind: z.enum(["user", "agent"]).describe("Which memory file to edit"),
-          action: z.literal("remove"),
-          old_text: z.string().describe("Substring to remove"),
-        }),
-      ]),
-      execute: async (input) => {
-        const updated =
-          input.action === "add"
-            ? await editMemory({
-              spaceId,
-              kind: input.kind,
-              action: "add",
-              text: input.text,
-            })
-            : input.action === "replace"
-              ? await editMemory({
-                spaceId,
-                kind: input.kind,
-                action: "replace",
-                text: input.text,
-                oldText: input.old_text,
-              })
-              : await editMemory({
-                spaceId,
-                kind: input.kind,
-                action: "remove",
-                oldText: input.old_text,
-              });
-        return {
-          ok: true,
-          kind: updated.kind,
-          body: updated.body,
-          updatedAt: updated.updatedAt,
         };
       },
     }),

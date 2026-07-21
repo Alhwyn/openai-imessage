@@ -6,14 +6,14 @@ import {
 import {
   cleanupImageAlbum,
   clampImageCount,
-  generateOpenAiImages,
-} from "./openaiImages";
+  generateGmiImages,
+} from "./gmiImages";
 
 export {
   cleanupImageAlbum,
   clampImageCount,
   composioUserIdFor,
-  generateOpenAiImages,
+  generateGmiImages,
   getComposioTools,
   isComposioAuthUrl,
 };
