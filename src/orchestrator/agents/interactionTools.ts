@@ -1,6 +1,7 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
+import { searchNearbyPlaces } from "../exa/index";
 import {
   assignBackgroundTask,
   assignComputerTask,
@@ -10,6 +11,7 @@ import {
   getImageTaskStatus,
 } from "../handoff/index";
 import { isComposioAuthUrl } from "../integrations/index";
+import { createDirectionsLink } from "../maps";
 import { editMemory } from "../memory/index";
 import { TAPBACK_KEYS } from "../tapbacks";
 import {
@@ -211,6 +213,71 @@ export const buildInteractionTools = ({
 
         effects.push({ kind: "app", url: trimmed });
         return { ok: true };
+      },
+    }),
+    search_nearby_places: tool({
+      description:
+        "Search Exa for evidence-backed places near a coarse area. Use a specific natural-language subject (full phrase, not keywords). Pass a city/neighborhood or place area they named. If results are thin, call again with a differently phrased subject. Use only returned results as evidence, but never show their source URLs in chat. Do not pass coordinates.",
+      inputSchema: z.object({
+        subject: z
+          .string()
+          .min(1)
+          .describe(
+            'Specific natural-language ask, e.g. "parks with peacocks", "off-leash dog parks", "best tacos"',
+          ),
+        searchArea: z
+          .string()
+          .min(1)
+          .describe(
+            'Coarse area only, e.g. "Victoria, BC". Never lat/lng.',
+          ),
+      }),
+      execute: async ({ subject, searchArea }) => {
+        return await searchNearbyPlaces({ subject, searchArea });
+      },
+    }),
+    create_directions_link: tool({
+      description:
+        "Send the custom Spectrum maps mini-app card for an evidence-backed place. Call only after search_nearby_places (or again when they ask for directions / where they are to that place). Pass a destination name from those results plus the same coarse searchArea. Live blue-dot and route stay inside that card only — never describe the person's location in chat. This tool may also send a Find My request card. Never invent destinations. Never pass coordinates.",
+      inputSchema: z.object({
+        destination: z
+          .string()
+          .min(1)
+          .describe(
+            'Place name from search_nearby_places evidence, e.g. "Beacon Hill Park"',
+          ),
+        searchArea: z
+          .string()
+          .min(1)
+          .describe(
+            'Same coarse area used for search_nearby_places, e.g. "Victoria, BC". Never lat/lng.',
+          ),
+      }),
+      execute: async ({ destination, searchArea }) => {
+        const result = await createDirectionsLink({
+          destination,
+          searchArea,
+          space: deliveryTarget.space,
+          message: deliveryTarget.message,
+          senderId: event.senderId ?? null,
+        });
+        if (result.status !== "ok") return {
+          ok: false as const,
+          error: result.error,
+        };
+
+        effects.push({
+          kind: "app",
+          presentation: "maps",
+          url: result.url,
+        });
+        return {
+          ok: true as const,
+          destination: result.destination,
+          searchArea: result.searchArea,
+          // Opaque status only — never expose coordinates to the model.
+          locationStatus: result.locationStatus,
+        };
       },
     }),
     memory: tool({

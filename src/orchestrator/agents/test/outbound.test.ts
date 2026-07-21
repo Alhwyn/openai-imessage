@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { summarizeOutbound } from "../../outbound";
 
 describe("summarizeOutbound", () => {
-  test("summarizes app items by url instead of as reactions", () => {
+  test("summarizes plain app items by url instead of as reactions", () => {
     expect(
       summarizeOutbound([
         {
@@ -18,6 +18,26 @@ describe("summarizeOutbound", () => {
         url: "https://connect.composio.dev/link/ln_abc123",
       },
       { kind: "reaction", emoji: "like" },
+    ]);
+  });
+
+  test("summarizes maps and computer mini-apps by presentation without url", () => {
+    expect(
+      summarizeOutbound([
+        {
+          kind: "app",
+          presentation: "maps",
+          url: "https://maps.example.com/maps/session?token=secret",
+        },
+        {
+          kind: "app",
+          presentation: "computer",
+          url: "https://viewer.example.com/computer/task?token=secret",
+        },
+      ]),
+    ).toEqual([
+      { kind: "app", presentation: "maps" },
+      { kind: "app", presentation: "computer" },
     ]);
   });
 

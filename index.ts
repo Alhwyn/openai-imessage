@@ -18,6 +18,8 @@ import {
   SEEN_MESSAGE_MAX,
   SEEN_MESSAGE_TTL_MS,
 } from "./src/orchestrator/index";
+import { registerLocationClients, startMapsViewer } from "./src/orchestrator/maps";
+import { resolveIMessageLocationClients } from "./src/orchestrator/resolveIMessageLocationClients";
 
 /** Drop provider redeliveries for a few minutes inside one process. */
 const seenInboundMessages = createRecentIdTracker({
@@ -108,6 +110,7 @@ const main = async () => {
   watchdog.unref();
 
   const computerViewer = startComputerViewer();
+  const mapsViewer = startMapsViewer();
 
   const { projectId, projectSecret, webhookSecret, missing } = getSpectrumEnv();
   if (missing.length > 0) throw new Error(`Missing env: ${missing.join(", ")}`);
@@ -118,7 +121,7 @@ const main = async () => {
     platforms: [imessage.config()],
     webhookSecret,
   });
-
+  registerLocationClients(resolveIMessageLocationClients(app));
   let stopping = false;
   const inboundJobs = new Set<Promise<void>>();
   const stopApp = async (reason: string) => {
@@ -131,6 +134,7 @@ const main = async () => {
       await flushPendingOrchestratorTurns();
       await app.stop();
       await computerViewer.stop(true);
+      await mapsViewer.stop(true);
     } catch (error) {
       console.error("[app] Spectrum stop failed", error);
     }

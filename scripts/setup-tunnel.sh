@@ -5,9 +5,11 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 host="agent.alhwyn.com"
 viewer_host="viewer.alhwyn.com"
 desktop_host="desktop.alhwyn.com"
+maps_host="maps.alhwyn.com"
 port="4001"
 viewer_port="6902"
 desktop_port="6901"
+maps_port="6903"
 tunnel="webhook-automator"
 computer_tunnel="computer-viewer"
 
@@ -73,12 +75,15 @@ ingress:
     service: https://127.0.0.1:$desktop_port
     originRequest:
       noTLSVerify: true
+  - hostname: $maps_host
+    service: http://127.0.0.1:$maps_port
   - service: http_status:404
 EOF
 
 cloudflared tunnel route dns --overwrite-dns "$tunnel" "$host"
 cloudflared tunnel route dns --overwrite-dns "$computer_tunnel" "$viewer_host"
 cloudflared tunnel route dns --overwrite-dns "$computer_tunnel" "$desktop_host"
+cloudflared tunnel route dns --overwrite-dns "$computer_tunnel" "$maps_host"
 cloudflared tunnel --config "$root/cloudflared/config.yml" ingress validate
 cloudflared tunnel --config "$root/cloudflared/computer.yml" ingress validate
 
@@ -86,3 +91,4 @@ echo "Wrote Cloudflare tunnel configs"
 echo "  Webhook: https://$host -> 127.0.0.1:$port"
 echo "  Viewer:  https://$viewer_host -> 127.0.0.1:$viewer_port"
 echo "  Desktop: https://$desktop_host -> 127.0.0.1:$desktop_port"
+echo "  Maps:    https://$maps_host -> 127.0.0.1:$maps_port"

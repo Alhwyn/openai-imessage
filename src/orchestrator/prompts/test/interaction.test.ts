@@ -115,3 +115,62 @@ describe("interaction prompt chat background", () => {
     );
   });
 });
+
+describe("interaction prompt location discovery", () => {
+  test("asks for city, uses Exa, and delivers live map mini-app card", () => {
+    expect(interactionSystemPrompt).toContain(
+      "ask for a city, neighborhood, or specific place name",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Do not use Find My for place search",
+    );
+    expect(interactionSystemPrompt).not.toContain("get_my_location");
+    expect(interactionSystemPrompt).not.toContain("request_my_location");
+    expect(interactionSystemPrompt).toContain(
+      "Never pass latitude/longitude to search_nearby_places",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Every place claim must come from search_nearby_places results",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Never include source URLs, hosted map URLs, a Sources section, or Markdown links in chat text",
+    );
+    expect(interactionSystemPrompt).toContain(
+      'search_nearby_places(subject="parks with peacocks", searchArea="Victoria, BC")',
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Prefer full phrases over keyword stuffing",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "call search_nearby_places again with a differently phrased subject",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "create_directions_link delivers the custom hosted maps mini-app card",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "so a Spectrum mini-app live map card is delivered",
+    );
+    expect(interactionSystemPrompt).toContain("Do not invent destinations");
+    expect(interactionSystemPrompt).toContain(
+      "The maps mini-app card is the only user-facing link",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Find My blue-dot and route exist only inside that card",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "NEVER show, narrate, paraphrase, or confirm the person's live location in chat text",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Live position is only in the custom maps mini-app from create_directions_link",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Do not answer location in words",
+    );
+    expect(interactionSystemPrompt).toContain(
+      'create_directions_link(destination="Beacon Hill Park", searchArea="Victoria, BC")',
+    );
+    expect(interactionSystemPrompt).toContain(
+      "never answer live location in text",
+    );
+  });
+});
