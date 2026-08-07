@@ -40,22 +40,19 @@ const buildAlbumContent = (paths: string[]): ContentInput => {
 
 const buildAppContent = (item: Extract<OutboundItem, { kind: "app" }>): ContentInput => {
   // Avoid `app(url)` OG layouts — Photon rejects unpaired layout.image / image_title.
-  if (item.presentation === undefined) return customizedMiniApp({
-    ...SPECTRUM_MINI_APP_IDENTITY,
-    live: false,
-    url: item.url,
-    layout: {
-      caption: "Link",
+  const layout = item.presentation === undefined
+    ? {
+      caption: item.url,
       subcaption: "Tap to open",
-      summary: "Open link",
-    },
-  });
+      summary: item.url,
+    }
+    : MINI_APP_LAYOUT[item.presentation];
 
   return customizedMiniApp({
     ...SPECTRUM_MINI_APP_IDENTITY,
     live: true,
     url: item.url,
-    layout: MINI_APP_LAYOUT[item.presentation],
+    layout,
   });
 };
 

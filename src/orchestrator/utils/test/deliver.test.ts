@@ -163,13 +163,13 @@ describe("deliverOutbound", () => {
       appName: "Spectrum",
       appStoreId: 6777616651,
       extensionBundleId: "codes.photon.Spectrum.MessagesExtension",
-      live: false,
+      live: true,
       teamId: "P8XT6232SL",
       url,
       layout: {
-        caption: "Link",
+        caption: url,
         subcaption: "Tap to open",
-        summary: "Open link",
+        summary: url,
       },
     });
   });
