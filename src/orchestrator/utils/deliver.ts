@@ -70,10 +70,10 @@ const buildAppContent = (item: Extract<OutboundItem, { kind: "app" }>): ContentI
   const layout =
     item.presentation === undefined
       ? textOnlyLayout({
-          caption: linkCaption(item.url),
-          subcaption: "Tap to open",
-          summary: linkCaption(item.url),
-        })
+        caption: linkCaption(item.url),
+        subcaption: "Tap to open",
+        summary: linkCaption(item.url),
+      })
       : textOnlyLayout(MINI_APP_LAYOUT[item.presentation]);
 
   return customizedMiniApp({
