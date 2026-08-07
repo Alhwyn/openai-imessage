@@ -14,6 +14,12 @@ const SPECTRUM_MINI_APP_IDENTITY = {
   teamId: "P8XT6232SL",
 } as const;
 
+type MiniAppLayout = {
+  caption: string;
+  subcaption: string;
+  summary: string;
+};
+
 const MINI_APP_LAYOUT = {
   computer: {
     caption: "Computer use",
@@ -25,7 +31,29 @@ const MINI_APP_LAYOUT = {
     subcaption: "Tap to open",
     summary: "Live directions map",
   },
-} as const;
+} as const satisfies Record<"computer" | "maps", MiniAppLayout>;
+
+const WWW_PREFIX = /^www\./;
+
+/** Host label for generic app-link cards (no Open Graph fetch). */
+const linkCaption = (url: string): string => {
+  try {
+    return new URL(url).host.replace(WWW_PREFIX, "") || url;
+  } catch {
+    return url;
+  }
+};
+
+/**
+ * Text-only layout for Spectrum mini-app cards.
+ * Never sets `image` / `imageTitle` — Photon requires those two together, and
+ * OG-derived `app(url)` layouts can leave one set after upstream drops a bad JPEG.
+ */
+const textOnlyLayout = (layout: MiniAppLayout): MiniAppLayout => ({
+  caption: layout.caption,
+  subcaption: layout.subcaption,
+  summary: layout.summary,
+});
 
 const buildAlbumContent = (paths: string[]): ContentInput => {
   if (paths.length === 0) throw new Error("Album outbound item requires at least one path");
@@ -39,18 +67,18 @@ const buildAlbumContent = (paths: string[]): ContentInput => {
 };
 
 const buildAppContent = (item: Extract<OutboundItem, { kind: "app" }>): ContentInput => {
-  // Avoid `app(url)` OG layouts — Photon rejects unpaired layout.image / image_title.
-  const layout = item.presentation === undefined
-    ? {
-      caption: item.url,
-      subcaption: "Tap to open",
-      summary: item.url,
-    }
-    : MINI_APP_LAYOUT[item.presentation];
+  const layout =
+    item.presentation === undefined
+      ? textOnlyLayout({
+        caption: linkCaption(item.url),
+        subcaption: "Tap to open",
+        summary: linkCaption(item.url),
+      })
+      : textOnlyLayout(MINI_APP_LAYOUT[item.presentation]);
 
   return customizedMiniApp({
     ...SPECTRUM_MINI_APP_IDENTITY,
-    live: true,
+    live: item.presentation !== undefined,
     url: item.url,
     layout,
   });
@@ -101,7 +129,7 @@ export const deliverOutbound = async (
     }
     case "app": {
       console.log("[deliver] Sending app via space.send", {
-        presentation: item.presentation ?? "app",
+        presentation: item.presentation ?? "link",
       });
       await space.send(buildAppContent(item));
       break;

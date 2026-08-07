@@ -163,13 +163,13 @@ describe("deliverOutbound", () => {
       appName: "Spectrum",
       appStoreId: 6777616651,
       extensionBundleId: "codes.photon.Spectrum.MessagesExtension",
-      live: true,
+      live: false,
       teamId: "P8XT6232SL",
       url,
       layout: {
-        caption: url,
+        caption: "connect.composio.dev",
         subcaption: "Tap to open",
-        summary: url,
+        summary: "connect.composio.dev",
       },
     });
   });
@@ -243,17 +243,50 @@ describe("deliverOutbound", () => {
     const first = (await buildContent(nthArg(send, 0))) as unknown as {
       type: string;
       url: string;
-      layout: { image?: Uint8Array; imageTitle?: string };
+      layout: Record<string, unknown>;
     };
     const second = await buildContent(nthArg(send, 1));
     expect(first.type).toBe("customized-mini-app");
     expect(first.url).toBe(url);
-    expect(first.layout.image).toBeUndefined();
-    expect(first.layout.imageTitle).toBeUndefined();
+    expect(first.layout).toEqual({
+      caption: "connect.composio.dev",
+      subcaption: "Tap to open",
+      summary: "connect.composio.dev",
+    });
     expect(second).toEqual({
       type: "text",
       text: "tap that to finish connecting gmail",
     });
+  });
+
+  test("app card layouts never set image without imageTitle", async () => {
+    const send = mock(() => Promise.resolve(undefined));
+    const space = asSpace({ send });
+
+    await deliverOutbound(space, [
+      { kind: "app", url: "https://connect.composio.dev/link/ln_abc123" },
+      {
+        kind: "app",
+        presentation: "computer",
+        url: "https://viewer.example.com/computer/task?token=secret",
+      },
+      {
+        kind: "app",
+        presentation: "maps",
+        url: "https://maps.alhwyn.com/maps/session-1?token=viewer-token",
+      },
+    ]);
+
+    expect(send).toHaveBeenCalledTimes(3);
+    for (let index = 0; index < 3; index += 1) {
+      const content = (await buildContent(nthArg(send, index))) as unknown as {
+        layout: { image?: Uint8Array; imageTitle?: string };
+      };
+      const hasImage = content.layout.image !== undefined;
+      const hasImageTitle = content.layout.imageTitle !== undefined;
+      expect(hasImage).toBe(false);
+      expect(hasImageTitle).toBe(false);
+    }
   });
 
   test("clears chat background via space.send", async () => {
