@@ -28,13 +28,36 @@ root=$(pwd)
 cd "$root"
 
 # Cloud/agent shells often omit the default Bun install path.
-export PATH="${HOME}/.bun/bin:${PATH}"
+bun_install="${BUN_INSTALL:-${HOME}/.bun}"
+export PATH="${bun_install}/bin:${HOME}/.bun/bin:${PATH}"
+
+resolve_bun() {
+  if command -v bun >/dev/null 2>&1; then
+    command -v bun
+    return 0
+  fi
+
+  for candidate in "${bun_install}/bin/bun" "${HOME}/.bun/bin/bun"; do
+    if [[ -x "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+bun_bin=$(resolve_bun) || {
+  echo "ci-check: bun not found (checked PATH, ${bun_install}/bin, ~/.bun/bin)" >&2
+  echo "ci-check: install with: curl -fsSL https://bun.sh/install | bash" >&2
+  exit 127
+}
 
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 
 set +e
-bun run check >"$tmp" 2>&1
+"$bun_bin" run check >"$tmp" 2>&1
 code=$?
 set -e
 
