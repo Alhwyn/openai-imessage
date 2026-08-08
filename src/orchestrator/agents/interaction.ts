@@ -153,7 +153,9 @@ export const runInteractionAgent = async (
       preview: result.text.trim().slice(0, 160),
     });
 
-    const finalOutbound = effects.finalize(visibleText);
+    // Meeting-reminder automation: empty Calendar → stay silent.
+    const replyText = /^no meetings\b/i.test(visibleText.trim()) ? "" : visibleText;
+    const finalOutbound = effects.finalize(replyText);
     const toolCalls = result.steps.flatMap((step) =>
       step.toolCalls.map((call) => call.toolName),
     );

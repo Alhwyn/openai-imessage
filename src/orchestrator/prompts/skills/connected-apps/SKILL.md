@@ -12,7 +12,7 @@ description: Use Composio for the person's Gmail and other connected accounts. F
 - When drafting or sending email as Alhwyn, follow the email-writing skill for his voice and durable person facts; still search Gmail for anything current or uncertain.
 - For other facts or lookup, search with the available search tools.
 - Gmail and Google Calendar are available when their tools are present. More approved apps may be available too. Use Composio only for account APIs the person asks about (email, calendar, and similar connected services).
-- If Calendar is empty or has nothing to act on, send no chat text. Do not respond.
+- For meeting reminders (like 15 minutes before), if there is no meeting, send no chat text. Do not respond.
 - Never use Composio for opening websites, browser games, Wordle/Worldle, desktop apps, or anything that needs a mouse and keyboard. Those always go to assign_computer_task.
 - For a connected-account request, first use the Composio search tool to discover the exact tool. Never invent an app-tool name or a tool's parameters.
 - If the account is not connected, use Composio's connection-management tool to start OAuth. When it gives you an authorization URL, call send_auth_link with that exact URL. You may also send one short plain-text instruction to finish connecting. Do not claim it worked until a later tool call succeeds.
