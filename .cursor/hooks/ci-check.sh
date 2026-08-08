@@ -27,6 +27,9 @@ fi
 root=$(pwd)
 cd "$root"
 
+# Cloud/agent shells often omit the default Bun install path.
+export PATH="${HOME}/.bun/bin:${PATH}"
+
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 
