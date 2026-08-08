@@ -149,7 +149,7 @@ describe("deliverOutbound", () => {
     });
   });
 
-  test("sends app deep-link via space.send", async () => {
+  test("sends app deep-link as text-only customized mini-app card", async () => {
     const send = mock(() => Promise.resolve(undefined));
     const space = asSpace({ send });
     const url = "https://connect.composio.dev/link/ln_abc123";
@@ -157,11 +157,21 @@ describe("deliverOutbound", () => {
     await deliverOutbound(space, [{ kind: "app", url }]);
 
     expect(send).toHaveBeenCalledTimes(1);
-    const content = await buildContent(firstArg(send));
-    expect(content.type).toBe("app");
-    if (content.type !== "app") throw new Error("expected app content");
-
-    expect(await content.url()).toBe(url);
+    expect((await buildContent(firstArg(send))) as unknown).toEqual({
+      type: "customized-mini-app",
+      __platform: "iMessage",
+      appName: "Spectrum",
+      appStoreId: 6777616651,
+      extensionBundleId: "codes.photon.Spectrum.MessagesExtension",
+      live: false,
+      teamId: "P8XT6232SL",
+      url,
+      layout: {
+        caption: "connect.composio.dev",
+        subcaption: "Tap to open",
+        summary: "connect.composio.dev",
+      },
+    });
   });
 
   test("sends computer links as live customized mini-app cards", async () => {
@@ -230,16 +240,53 @@ describe("deliverOutbound", () => {
     ]);
 
     expect(send).toHaveBeenCalledTimes(2);
-    const first = await buildContent(nthArg(send, 0));
+    const first = (await buildContent(nthArg(send, 0))) as unknown as {
+      type: string;
+      url: string;
+      layout: Record<string, unknown>;
+    };
     const second = await buildContent(nthArg(send, 1));
-    expect(first.type).toBe("app");
+    expect(first.type).toBe("customized-mini-app");
+    expect(first.url).toBe(url);
+    expect(first.layout).toEqual({
+      caption: "connect.composio.dev",
+      subcaption: "Tap to open",
+      summary: "connect.composio.dev",
+    });
     expect(second).toEqual({
       type: "text",
       text: "tap that to finish connecting gmail",
     });
-    if (first.type !== "app") throw new Error("expected app content");
+  });
 
-    expect(await first.url()).toBe(url);
+  test("app card layouts never set image without imageTitle", async () => {
+    const send = mock(() => Promise.resolve(undefined));
+    const space = asSpace({ send });
+
+    await deliverOutbound(space, [
+      { kind: "app", url: "https://connect.composio.dev/link/ln_abc123" },
+      {
+        kind: "app",
+        presentation: "computer",
+        url: "https://viewer.example.com/computer/task?token=secret",
+      },
+      {
+        kind: "app",
+        presentation: "maps",
+        url: "https://maps.alhwyn.com/maps/session-1?token=viewer-token",
+      },
+    ]);
+
+    expect(send).toHaveBeenCalledTimes(3);
+    for (let index = 0; index < 3; index += 1) {
+      const content = (await buildContent(nthArg(send, index))) as unknown as {
+        layout: { image?: Uint8Array; imageTitle?: string };
+      };
+      const hasImage = content.layout.image !== undefined;
+      const hasImageTitle = content.layout.imageTitle !== undefined;
+      expect(hasImage).toBe(false);
+      expect(hasImageTitle).toBe(false);
+    }
   });
 
   test("clears chat background via space.send", async () => {
