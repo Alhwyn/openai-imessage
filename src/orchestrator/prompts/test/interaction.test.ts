@@ -95,6 +95,22 @@ describe("interaction prompt user-facing voice", () => {
     expect(interactionSystemPrompt).not.toContain("MEMORY.md");
     expect(interactionSystemPrompt).not.toContain('<skill name="memory">');
   });
+
+  test("answers ordinary knowledge directly instead of forcing search/calendar", () => {
+    expect(interactionSystemPrompt).toContain(
+      "Answer ordinary questions, explanations, and general knowledge directly from what you know",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Use Calendar only when they ask about their schedule, meetings, or calendar",
+    );
+    expect(interactionSystemPrompt).toContain(
+      "Never use Gmail, Calendar, or COMPOSIO_SEARCH_TOOLS for ordinary questions, definitions, or general knowledge",
+    );
+    expect(interactionSystemPrompt).not.toContain("For everything else, search");
+    expect(interactionSystemPrompt).not.toContain(
+      "For other facts or lookup, search with the available search tools",
+    );
+  });
 });
 
 describe("interaction prompt chat background", () => {
