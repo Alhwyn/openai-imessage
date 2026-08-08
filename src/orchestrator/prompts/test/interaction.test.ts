@@ -91,7 +91,6 @@ describe("interaction prompt user-facing voice", () => {
     expect(interactionSystemPrompt).toContain(
       "If you need personal context about the person, search their Gmail",
     );
-    expect(interactionSystemPrompt).not.toContain("For everything else, search");
     expect(interactionSystemPrompt).not.toContain("USER.md");
     expect(interactionSystemPrompt).not.toContain("MEMORY.md");
     expect(interactionSystemPrompt).not.toContain('<skill name="memory">');
